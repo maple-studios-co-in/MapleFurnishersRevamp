@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, Italiana, Playfair_Display } from "next/font/google";
+import { Inter, Italiana, Montserrat, Playfair_Display } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
+import SectionRail from "@/components/layout/SectionRail";
+import SectionTheme from "@/components/layout/SectionTheme";
+import SiteHeader from "@/components/layout/SiteHeader";
+import SmoothScroll from "@/components/layout/SmoothScroll";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -12,6 +16,13 @@ const inter = Inter({
 const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-playfair",
+  display: "swap",
+});
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-montserrat",
   display: "swap",
 });
 
@@ -60,9 +71,20 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${playfair.variable} ${italiana.variable} ${catilde.variable}`}
+      className={`${inter.variable} ${playfair.variable} ${italiana.variable} ${catilde.variable} ${montserrat.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {/* Chrome lives outside <main> so it never sits inside a pinned
+            container — ScrollTrigger transforms the pin parent, and a fixed
+            element inside a transformed ancestor resolves against that
+            ancestor rather than the viewport. */}
+        <SmoothScroll>
+          <SectionTheme />
+          <SiteHeader />
+          <SectionRail />
+          {children}
+        </SmoothScroll>
+      </body>
     </html>
   );
 }
