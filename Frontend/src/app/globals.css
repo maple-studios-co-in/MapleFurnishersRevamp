@@ -19,14 +19,54 @@
   --color-ink: #171310;
   --color-cream: #f6f1e8;
 
+  /* Brand Promise palette — the closing 07/07 section */
+  --color-maple-bg: #100f0d;
+  --color-maple-footer: #0a0908;
+  --color-maple-accent: #c08552;
+  --color-maple-headline: #f2ece1;
+  --color-maple-body: #a39c91;
+  --color-maple-nav: #e8e2d6;
+  --color-maple-divider: #322d28;
+
   --font-display: var(--font-playfair), ui-serif, Georgia, serif;
   --font-hero: var(--font-catilde), var(--font-italiana), ui-serif, Georgia,
     serif;
   --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* UI / nav / body type for the Brand Promise section */
+  --font-ui: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* --- Fixed-chrome theming -------------------------------------------
+   SectionTheme writes data-theme onto <html> as chapters scroll past.
+   The header and rail read these vars, so crossing a section boundary
+   restyles the chrome in CSS with no React re-render. ------------------ */
+:root,
+[data-theme="dark"] {
+  --chrome-fg: 232 226 214; /* maple-nav */
+  --chrome-bg: 16 15 13; /* maple-bg   */
+  --chrome-accent: 192 133 82; /* maple-accent */
+  --chrome-border: 50 45 40;
+}
+
+[data-theme="light"] {
+  --chrome-fg: 46 29 16; /* timber-900 */
+  --chrome-bg: 232 224 213;
+  --chrome-accent: 138 47 29; /* clay-700 */
+  --chrome-border: 46 29 16;
 }
 
 html {
   scroll-behavior: smooth;
+}
+
+/* Lenis owns the scroll position; native smooth scrolling fights it. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
 }
 
 body {

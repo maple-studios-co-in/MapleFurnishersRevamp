@@ -1,0 +1,2 @@
+Drop the chair scene photo here as chair-scene.webp
+(referenced by BrandPromise.tsx; falls back to a tinted panel if absent).

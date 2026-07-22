@@ -8,7 +8,7 @@ node_modules/
 # testing
 coverage/
 
-# env files — never commit secrets
+# env files â€” never commit secrets
 .env
 .env*.local
 
@@ -39,3 +39,10 @@ Backend/build/
 
 # vercel
 .vercel
+
+# Raw frame sequences (~1 GB of source PNGs). Build inputs only —
+# `npm run frames:*` regenerates everything served from public/media/.
+.assets-src/
+
+# Local agent/editor tooling (machine-specific paths, launch configs)
+.claude/
