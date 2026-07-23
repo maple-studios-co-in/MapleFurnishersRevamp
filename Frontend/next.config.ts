@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
       { source: "/catalogue", destination: `${CATALOGUE_ORIGIN}/` },
       { source: "/catalogue/:path*", destination: `${CATALOGUE_ORIGIN}/:path*` },
       { source: "/assets/:path*", destination: `${CATALOGUE_ORIGIN}/assets/:path*` },
+      { source: "/catalogues/:path*", destination: `${CATALOGUE_ORIGIN}/catalogues/:path*` },
       { source: "/favicon.svg", destination: `${CATALOGUE_ORIGIN}/favicon.svg` },
     ];
   },
