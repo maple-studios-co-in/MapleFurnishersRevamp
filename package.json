@@ -4,7 +4,8 @@
   "private": true,
   "description": "Maple Furnishers monorepo â€” Frontend (Next.js) now, Backend to follow.",
   "workspaces": [
-    "Frontend"
+    "Frontend",
+    "Backend"
   ],
   "scripts": {
     "dev": "npm run dev --workspace Frontend",
@@ -14,7 +15,10 @@
     "frames:hero": "node scripts/extract-hero-frames.mjs .assets-src/hero-transformation.mp4 Frontend/public/media/sequences/hero-title --start=8.4 --end=14.3 --fps=10",
     "frames:chair": "python scripts/cutout-frames.py .assets-src/output-frames Frontend/public/media/sequences/chair --width 1280 --quality 72",
     "frames:outro": "node scripts/build-frame-scene.mjs .assets-src/end-frames Frontend/public/media/sequences/outro --from=260 --to=742 --step=2 --width=1280 --quality=52",
-    "frames:all": "npm run frames:hero && npm run frames:chair && npm run frames:outro"
+    "frames:all": "npm run frames:hero && npm run frames:chair && npm run frames:outro",
+    "dev:api": "npm run dev --workspace Backend",
+    "build:api": "npm run build --workspace Backend",
+    "start:api": "npm run start --workspace Backend"
   },
   "engines": {
     "node": ">=18.18.0"
@@ -22,5 +26,10 @@
   "devDependencies": {
     "@imgly/background-removal-node": "^1.4.5",
     "sharp": "^0.35.3"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "prisma": "^7.9.0"
   }
 }

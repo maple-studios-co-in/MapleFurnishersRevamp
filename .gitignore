@@ -46,3 +46,4 @@ Backend/build/
 
 # Local agent/editor tooling (machine-specific paths, launch configs)
 .claude/
+.env*
