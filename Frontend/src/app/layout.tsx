@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
-import { Inter, Italiana, Montserrat, Playfair_Display } from "next/font/google";
+import {
+  Inter,
+  Italiana,
+  Montserrat,
+  Playfair_Display,
+  Red_Hat_Display,
+} from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import SectionRail from "@/components/layout/SectionRail";
 import SectionTheme from "@/components/layout/SectionTheme";
 import SiteHeader from "@/components/layout/SiteHeader";
 import SmoothScroll from "@/components/layout/SmoothScroll";
+import SocialRail from "@/components/layout/SocialRail";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,6 +37,14 @@ const italiana = Italiana({
   weight: "400",
   subsets: ["latin"],
   variable: "--font-italiana",
+  display: "swap",
+});
+
+// Scroll-cue + bedroom-copy face, per the design key frames.
+const redHat = Red_Hat_Display({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
+  variable: "--font-redhat",
   display: "swap",
 });
 
@@ -71,7 +86,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${playfair.variable} ${italiana.variable} ${catilde.variable} ${montserrat.variable}`}
+      className={`${inter.variable} ${playfair.variable} ${italiana.variable} ${catilde.variable} ${montserrat.variable} ${redHat.variable}`}
     >
       <body>
         {/* Chrome lives outside <main> so it never sits inside a pinned
@@ -82,6 +97,7 @@ export default function RootLayout({
           <SectionTheme />
           <SiteHeader />
           <SectionRail />
+          <SocialRail />
           {children}
         </SmoothScroll>
       </body>

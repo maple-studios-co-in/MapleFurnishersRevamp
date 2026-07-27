@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Heart, Leaf, ShieldCheck, User, type LucideIcon } from "lucide-react";
+import { subscribeNewsletter } from "../../lib/api";
 
 /* ------------------------------------------------------------------ */
 /*  Content                                                            */
@@ -159,7 +160,7 @@ function ContentRight() {
 
 function BrandFooter() {
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   return (
     <footer className="border-t border-maple-divider bg-maple-footer">
@@ -207,9 +208,16 @@ function BrandFooter() {
 
           <form
             className="mt-5 flex max-w-sm items-center gap-2 rounded-full border border-maple-divider bg-maple-bg/60 p-1.5 focus-within:border-maple-accent/60"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              setSent(true);
+              if (status === "sending") return;
+              setStatus("sending");
+              try {
+                await subscribeNewsletter(email);
+                setStatus("sent");
+              } catch {
+                setStatus("error");
+              }
             }}
           >
             <label htmlFor="mf-newsletter" className="sr-only">
@@ -237,7 +245,13 @@ function BrandFooter() {
             role="status"
             aria-live="polite"
           >
-            {sent ? "Thank you — you're on the list." : ""}
+            {status === "sent"
+              ? "Thank you — you're on the list."
+              : status === "error"
+                ? "Couldn't subscribe — please try again."
+                : status === "sending"
+                  ? "Subscribing…"
+                  : ""}
           </p>
 
           <div className="mt-5 flex gap-3">

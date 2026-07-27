@@ -232,7 +232,12 @@ const SCENES: readonly Scene[] = [
       headline: "The Best Part Of Every Day…",
       subBold: "Begins And Ends Here.",
       body: "Comfort designed to welcome you home.",
-      subClassName: "left-[13%] top-[55%] max-w-[24rem]",
+      // Bedroom key frame position (1536×1024): x154 (10%), y613 (60%).
+      // Type runs at 26px — a step under the Figma panel's 29.026px so
+      // the block reads clearly smaller than the 40px headline — and the
+      // box narrows with it so the bold line stays single and the body
+      // breaks "Comfort designed to / welcome you home.".
+      subClassName: "left-[10%] top-[60%] w-[22.5rem] max-w-[22.5rem]",
     },
     hotspots: [
       {
@@ -720,18 +725,39 @@ export default function OutroScene() {
                 <div
                   className={`invisible absolute opacity-0 ${scene.copy.subClassName}`}
                 >
+                  {/* Bedroom key-frame treatment (Red Hat Display, 150%
+                      leading, 0.1em tracking, 700 bold over a 300 body,
+                      #F4F2EC) at 26px — one step under the Figma panel's
+                      29.026px per the user, so it sits clearly below the
+                      40px headline. */}
                   {scene.copy.subBold && (
                     <p
-                      className="font-ui text-[19px] font-semibold tracking-[0.02em] text-cream"
-                      style={{ textShadow: "0 1px 14px rgba(23,19,16,0.55)" }}
+                      style={{
+                        color: "#F4F2EC",
+                        fontFamily: "var(--font-redhat)",
+                        fontSize: "26px",
+                        fontStyle: "normal",
+                        fontWeight: 700,
+                        lineHeight: "150%",
+                        letterSpacing: "2.6px",
+                        textShadow: "0 1px 14px rgba(23,19,16,0.55)",
+                      }}
                     >
                       {scene.copy.subBold}
                     </p>
                   )}
                   {scene.copy.body && (
                     <p
-                      className="mt-1.5 font-ui text-[14.5px] leading-relaxed text-cream/85"
-                      style={{ textShadow: "0 1px 12px rgba(23,19,16,0.5)" }}
+                      style={{
+                        color: "#F4F2EC",
+                        fontFamily: "var(--font-redhat)",
+                        fontSize: "26px",
+                        fontStyle: "normal",
+                        fontWeight: 300,
+                        lineHeight: "150%",
+                        letterSpacing: "2.6px",
+                        textShadow: "0 1px 12px rgba(23,19,16,0.5)",
+                      }}
                     >
                       {scene.copy.body}
                     </p>

@@ -29,11 +29,14 @@ export const SEQUENCES = {
     frames: 240,
     scrollPerFrame: 17,
   },
-  /** Chair assembling/disassembling, background removed (alpha WebP). */
+  /** Chair assembling/disassembling, background removed (alpha WebP).
+   *  Deliberately paced SLOWER than the shared footage rate (26 would match
+   *  it): the explosion reads as sudden when a wheel notch spans ~7 frames,
+   *  so 42px/frame stretches the dis/re-assembly across more scroll. */
   chair: {
     path: "/media/sequences/chair",
     frames: 79,
-    scrollPerFrame: 26,
+    scrollPerFrame: 42,
   },
   /** Closing scene: room → exterior → brand card. */
   outro: {

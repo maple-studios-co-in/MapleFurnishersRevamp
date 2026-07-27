@@ -28,20 +28,28 @@ const CALLOUTS = [
     body: "Balanced support beneath every moment of relaxation.",
     className: "text-left",
     style: { left: "calc(50% + clamp(11rem, 14.5vw, 17rem))", top: "17%" },
+    /** Keep the heading on a single line per the key frame. */
+    nowrapTitle: true,
   },
   {
     title: "Every Curve Has A Purpose.",
     body: "Sculpted for comfort. Refined through precision.",
-    className: "text-center",
+    // w-[17.625rem]: the heading's first line renders 280px wide, so a
+    // 282px box makes the centered text FILL it — the left-edge eyebrow
+    // rule then sits flush with the text instead of floating 16px out,
+    // and the body wraps at the period like the key frame.
+    className: "w-[17.625rem] text-center",
     // Anchored via `right` on purpose — a translateX(-100%) here would be
     // clobbered by the cursor-parallax gsap x/y writes.
     style: { right: "calc(50% + clamp(13rem, 20vw, 20rem))", top: "46%" },
+    nowrapTitle: false,
   },
   {
     title: "Strength Hidden In Plain Sight.",
     body: "Solid wood craftsmanship that defines every silhouette.",
     className: "text-left",
     style: { left: "calc(50% + clamp(11rem, 14.5vw, 17rem))", top: "66%" },
+    nowrapTitle: false,
   },
 ] as const;
 
@@ -190,10 +198,22 @@ export default function ChairShowcase() {
            lag, and the chair must be fully re-assembled and resting before
            the pin releases — never cropped mid-explosion at the exit. */
         tailHold={0.3}
+        /* Lazier playhead lerp than the shared 0.6 — with the slower
+           42px/frame pacing it makes the dis/re-assembly glide instead of
+           jumping several frames per wheel notch. */
+        scrubSmooth={1.2}
         onProgress={handleProgress}
-        /* Stage starts below the fixed header and breathes at the bottom, so
-           the exploded seat back never disappears underneath the chrome. */
-        canvasClassName="absolute inset-x-0 bottom-[3vh] top-[92px] z-10"
+        /* Stage runs from inside the header band to 50px BELOW the
+           viewport: the footage carries ~58px of empty alpha under the
+           chair's base (ink spans rows 9–662 of 720), so overhanging that
+           padding off-screen buys more chair. The header is TRANSPARENT,
+           so "touching the navbar" means reaching the visible links row
+           (text bottom ~48px, Shop Now bottom ~58px) — top 36px lands the
+           exploded seat back's tip at ~47-57px across 1280×720 through
+           1920×1080, pressed against the nav band at every aspect ratio.
+           The chrome is z-50 over the canvas's z-10, so the links can
+           never be covered. */
+        canvasClassName="absolute inset-x-0 bottom-[-50px] top-[36px] z-10"
         background={
           <>
             {/* Full-bleed studio falloff — the page IS the backdrop, no
@@ -206,13 +226,14 @@ export default function ChairShowcase() {
               }}
             />
 
-            {/* ------- assembled-state copy (craftsmanship key frame) ------- */}
+            {/* ------- assembled-state copy (alignment key frame, 1440×985:
+                em-dash eyebrow at x255/y172, flanking the wordmark's left
+                edge) ------- */}
             <p
               data-assembled-copy
-              className="absolute left-[10%] top-[15%] font-ui text-[13px] font-medium uppercase tracking-[0.3em] text-timber-900"
+              className="absolute left-[17.7%] top-[17.5%] font-ui text-[22px] font-medium uppercase tracking-[0.2em] text-timber-900"
             >
-              <span className="mr-3 inline-block h-px w-8 translate-y-[-4px] bg-timber-900/70 align-middle" />
-              Craftmanship
+              — Craftmanship
             </p>
 
             {/* Centring lives on the wrapper; gsap animates the inner span.
@@ -221,16 +242,23 @@ export default function ChairShowcase() {
                 exactly what shoved the wordmark half a screen to the right. */}
             <span
               aria-hidden
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              className="absolute left-1/2 top-[37%] -translate-x-1/2 -translate-y-1/2"
             >
               <span
                 data-wordmark
                 data-assembled-copy
-                className="block select-none whitespace-nowrap leading-none text-clay-700"
+                className="block select-none whitespace-nowrap text-center"
                 style={{
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 500,
-                  fontSize: "clamp(8rem, 26vw, 26rem)",
+                  color: "#741A14",
+                  fontFamily: "var(--font-hero)",
+                  fontWeight: 300,
+                  // 350px on the 1440px key frame (24.3vw) — the frame's
+                  // ~1006px wordmark = 2.87em of 350px incl. tracking —
+                  // with the glyph centre at ~37% of the stage height.
+                  fontSize: "clamp(8rem, 24.3vw, 21.875rem)",
+                  fontStyle: "normal",
+                  lineHeight: "normal",
+                  letterSpacing: "0.05em",
                 }}
               >
                 Maple
@@ -240,11 +268,18 @@ export default function ChairShowcase() {
             <div
               data-assembled-copy
               data-depth="12"
-              className="absolute left-[7%] top-[52%] max-w-[17rem]"
+              className="absolute left-[11.3%] top-[57.7%] max-w-[18rem]"
             >
+              {/* Catilde per the alignment key frame — the mock's thin
+                  high-contrast letterforms are the hero face, not
+                  Playfair. */}
               <p
-                className="text-[1.45rem] leading-snug tracking-[0.04em] text-timber-900"
-                style={{ fontFamily: "var(--font-display)", fontWeight: 500 }}
+                className="text-[1.75rem] leading-snug text-timber-900"
+                style={{
+                  fontFamily: "var(--font-hero)",
+                  fontWeight: 300,
+                  letterSpacing: "1.4px",
+                }}
               >
                 Beauty You Can See.
                 <br />
@@ -261,36 +296,67 @@ export default function ChairShowcase() {
                 key={c.title}
                 data-callout
                 data-depth={10 + i * 6}
-                className={`invisible absolute max-w-[17rem] opacity-0 ${c.className}`}
+                className={`invisible absolute max-w-[19.5rem] opacity-0 ${c.className}`}
                 style={c.style}
               >
+                {/* `block` so the rule hugs the LEFT edge even inside the
+                    text-centered middle callout, per the key frame. */}
                 <span
                   aria-hidden
-                  className="mb-3 inline-block h-px w-10 bg-clay-700/80"
+                  className="mb-3 block h-px w-10 bg-[#741A14]/80"
                 />
+                {/* Key-frame spec: Catilde 30px/300 headings in the deep
+                    clay, Red Hat Display 18.544px/300 black body, both at
+                    0.05em/0.1em tracking respectively. */}
                 <h3
-                  className="text-[2.05rem] leading-[1.15] text-clay-700"
-                  style={{ fontFamily: "var(--font-hero)", fontWeight: 400 }}
+                  className={c.nowrapTitle ? "whitespace-nowrap" : undefined}
+                  style={{
+                    color: "#741A14",
+                    fontFamily: "var(--font-hero)",
+                    fontSize: "30px",
+                    fontStyle: "normal",
+                    fontWeight: 300,
+                    lineHeight: "normal",
+                    letterSpacing: "1.5px",
+                  }}
                 >
                   {c.title}
                 </h3>
-                <p className="mt-2.5 font-ui text-[15px] leading-relaxed text-timber-900/65">
+                <p
+                  className="mt-2.5"
+                  style={{
+                    color: "#000",
+                    fontFamily: "var(--font-redhat)",
+                    fontSize: "18.544px",
+                    fontStyle: "normal",
+                    fontWeight: 300,
+                    lineHeight: "normal",
+                    letterSpacing: "1.854px",
+                  }}
+                >
                   {c.body}
                 </p>
               </div>
             ))}
 
             {/* Contact shadow — the plate's own shadow was removed with the
-                background; without one the chair looks pasted on. */}
+                background; without one the chair looks pasted on. The outer
+                div mirrors the canvas wrapper's insets so the ellipse tracks
+                the chair's base (ink row 662/720 ≈ 92% of the drawn frame)
+                instead of drifting when the stage geometry changes. */}
             <div
               aria-hidden
-              className="absolute bottom-[9%] left-1/2 h-[6%] w-[36%] -translate-x-1/2 rounded-[50%]"
-              style={{
-                background:
-                  "radial-gradient(50% 50% at 50% 50%, rgba(70,45,25,0.28) 0%, rgba(70,45,25,0) 70%)",
-                filter: "blur(6px)",
-              }}
-            />
+              className="absolute inset-x-0 bottom-[-50px] top-[36px]"
+            >
+              <div
+                className="absolute bottom-[4.5%] left-1/2 h-[6%] w-[36%] -translate-x-1/2 rounded-[50%]"
+                style={{
+                  background:
+                    "radial-gradient(50% 50% at 50% 50%, rgba(70,45,25,0.28) 0%, rgba(70,45,25,0) 70%)",
+                  filter: "blur(6px)",
+                }}
+              />
+            </div>
           </>
         }
       />

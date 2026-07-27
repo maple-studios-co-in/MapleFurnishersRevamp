@@ -40,6 +40,13 @@ export interface FrameSequenceConfig {
    */
   leadHold?: number;
   /**
+   * ScrollTrigger `scrub` lerp seconds — how lazily the playhead chases the
+   * scroll. Higher = softer, slower-feeling motion (the chair chapter uses
+   * 1.2 so the explosion eases instead of snapping with each wheel notch).
+   * @default 0.6
+   */
+  scrubSmooth?: number;
+  /**
    * Called with 0..1 FRAME progress — derived from the frame actually being
    * drawn (scrub lag and tailHold included), not from raw scroll. Scene
    * scripts keyed to footage stay in sync with what's on screen no matter
@@ -86,6 +93,7 @@ export function useFrameSequence(
     pin = true,
     tailHold = 0.15,
     leadHold = 0,
+    scrubSmooth = 0.6,
     onProgress,
   } = config;
 
@@ -271,7 +279,7 @@ export function useFrameSequence(
         // The section already reserves `100dvh + scrollDistance`, so letting
         // ScrollTrigger add its own pin spacer would double the scroll length.
         pinSpacing: false,
-        scrub: 0.6, // lerped playhead — removes frame-to-frame snapping
+        scrub: scrubSmooth, // lerped playhead — removes frame-to-frame snapping
         invalidateOnRefresh: true,
       },
     });
@@ -294,7 +302,7 @@ export function useFrameSequence(
       tl.scrollTrigger?.kill();
       tl.kill();
     };
-  }, [ready, totalFrames, scrollDistance, pin, tailHold, leadHold, draw]);
+  }, [ready, totalFrames, scrollDistance, pin, tailHold, leadHold, scrubSmooth, draw]);
 
   return { canvasRef, sectionRef, stickyRef, ready, loaded, scrollDistance };
 }

@@ -1,18 +1,47 @@
-generator client{
-  provider="prisma-client-js"
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
-
-datasource db{
-  provider="postgresql"
-  url=env("DATABASE_URL")
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
+model Product {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @default("")
+  priceCents  Int
+  currency    String   @default("USD")
+  imageUrl    String
+  category    String
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
-model Product{
-  id   String @id @default(cuid())
-  slug String  @unique
-  name String 
-  description String @default("")
-  
+model Subscriber {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  source         String    @default("site-footer")
+  createdAt      DateTime  @default(now())
+  unsubscribedAt DateTime?
+}
+
+model Inquiry {
+  id        String        @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  message   String
+  status    InquiryStatus @default(NEW)
+  createdAt DateTime      @default(now())
+}
+
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  CLOSED
 }

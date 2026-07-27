@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { gsap } from "@/lib/gsap";
 
 /**
- * "SCROLL DOWN" cue shown once the hero film freezes, per the blueprint
- * reference: the label arches gently over a thin plumb line, with a small
- * hollow ring that drifts down the line. No enclosing circle — just the
- * arc, the line, and the bead, in warm cream with a soft shadow so it
- * survives the bright floor of the frozen frame.
+ * "SCROLL DOWN" cue shown once the hero film freezes, matched to the
+ * user's reference crop: the label arches steeply (sagitta ≈ 0.28 of the
+ * chord, end letters tilting ~45°) over a thin plumb line threaded
+ * THROUGH a hollow ring, which drifts gently down the line — scroll
+ * direction. Red Hat Display 500 at full-strength #F4F2EC with a tight
+ * dark halo so it holds up over the sunlit floor.
  */
 export default function ScrollCue({ visible }: { visible: boolean }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -35,14 +36,14 @@ export default function ScrollCue({ visible }: { visible: boolean }) {
         { autoAlpha: 1, y: 0, duration: 1.1, ease: "power2.out" },
       );
       if (reduce) return;
-      // The ring drifts down the line and dissolves — scroll direction.
+      // The ring drifts down the line and softens — scroll direction.
       gsap.fromTo(
         beadRef.current,
         { y: 0, opacity: 1 },
         {
-          y: 26,
-          opacity: 0.15,
-          duration: 1.6,
+          y: 14,
+          opacity: 0.5,
+          duration: 1.5,
           ease: "power1.inOut",
           repeat: -1,
           yoyo: true,
@@ -62,45 +63,54 @@ export default function ScrollCue({ visible }: { visible: boolean }) {
   return (
     <div
       ref={rootRef}
-      className="pointer-events-none absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center"
-      style={{ filter: "drop-shadow(0 2px 12px rgba(0,0,0,0.5))" }}
+      className="pointer-events-none absolute bottom-[4%] left-1/2 z-20 flex -translate-x-1/2 flex-col items-center"
+      style={{
+        // Tight dark halo + soft ambient shadow — the cue sits over the
+        // bright sunlit floor, where a single soft shadow washed out.
+        filter:
+          "drop-shadow(0 1px 3px rgba(0,0,0,0.85)) drop-shadow(0 4px 14px rgba(0,0,0,0.55))",
+      }}
       aria-hidden
     >
-      {/* Label arched over the line. */}
-      <svg viewBox="0 0 180 46" className="h-[46px] w-[180px]">
+      {/* One drawing, per the reference: the label rides a steep arc
+          (chord 236, sagitta 64) whose descending ends flank the plumb
+          line below; the line threads through the ring. The path runs
+          ~14px longer than the label — glyphs past a path's end are
+          dropped entirely, so the margin guards against fallback-font
+          metrics while Red Hat Display loads. */}
+      <svg viewBox="0 0 300 195" className="h-[195px] w-[300px]">
         <defs>
-          <path id="mf-scroll-arc" d="M 8,42 Q 90,4 172,42" fill="none" />
+          <path id="mf-scroll-arc" d="M 32,108 Q 150,-20 268,108" fill="none" />
         </defs>
         <text
-          className="font-ui"
-          fill="rgb(246 241 232 / 0.92)"
-          fontSize="11"
-          letterSpacing="4.2"
+          fill="#F4F2EC"
+          fontSize="21.863"
+          fontWeight="500"
+          style={{ fontFamily: "var(--font-redhat)", letterSpacing: "9.2px" }}
         >
           <textPath href="#mf-scroll-arc" startOffset="50%" textAnchor="middle">
             SCROLL DOWN
           </textPath>
         </text>
-      </svg>
 
-      {/* Plumb line with the drifting ring bead. */}
-      <svg viewBox="0 0 20 60" className="mt-1 h-[60px] w-[20px]">
         <line
-          x1="10"
-          y1="0"
-          x2="10"
-          y2="60"
-          stroke="rgb(246 241 232 / 0.55)"
+          x1="150"
+          y1="103"
+          x2="150"
+          y2="188"
+          stroke="#F4F2EC"
+          strokeOpacity="0.7"
           strokeWidth="1"
         />
         <circle
           ref={beadRef}
-          cx="10"
-          cy="12"
-          r="5.5"
+          cx="150"
+          cy="134"
+          r="17"
           fill="none"
-          stroke="rgb(246 241 232 / 0.95)"
-          strokeWidth="1.2"
+          stroke="#F4F2EC"
+          strokeOpacity="0.95"
+          strokeWidth="1.5"
         />
       </svg>
     </div>

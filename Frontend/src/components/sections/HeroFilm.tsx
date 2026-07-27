@@ -23,39 +23,9 @@ const INTRO_MAX_MS = 16_000;
 const TITLE_IN_S = 4.3;
 
 /** Frame progress at which the chair has settled — "Let's furnish yours."
- *  plus the kicker line and social rings fade in over the film. */
+ *  plus the kicker line fade in over the film. (The social rings are the
+ *  fixed SocialRail now — they persist across every scrubbed chapter.) */
 const SUB_AT = 0.66;
-
-/** Social profiles for the ring buttons under the kicker. The installed
- *  lucide-react no longer ships brand icons, so the paths are inlined in
- *  the same 24px stroke style. */
-const SOCIALS = [
-  {
-    label: "Instagram",
-    href: "https://www.instagram.com/maplefurnishers",
-    path: (
-      <>
-        <rect x="2" y="2" width="20" height="20" rx="5" />
-        <circle cx="12" cy="12" r="4" />
-        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-      </>
-    ),
-  },
-  {
-    label: "Facebook",
-    href: "https://www.facebook.com/maplefurnishers",
-    path: (
-      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-    ),
-  },
-  {
-    label: "Twitter",
-    href: "https://x.com/maplefurnishers",
-    path: (
-      <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
-    ),
-  },
-] as const;
 
 /** Dev-only sequencing trail (window.__mfIntroLog). */
 function devLog(event: string, videoT?: number) {
@@ -307,25 +277,31 @@ export default function HeroFilm() {
           }`}
         />
 
-        {/* "Let's furnish yours." — per the design key frame: Catilde,
-            spanning the stage from the left edge over the settled chair. */}
+        {/* "Let's furnish yours." — per the design key frame: Catilde Light
+            at 140px full-scale (9.11vw of the 1536px design frame), centred
+            over the settled chair, 0.05em tracking = the spec's 7px. */}
         <p
           ref={titleBRef}
-          className="invisible absolute left-[7%] top-[26%] z-10 whitespace-nowrap leading-none text-cream opacity-0"
+          className="invisible absolute inset-x-0 top-[26%] z-10 whitespace-nowrap text-center opacity-0"
           style={{
             fontFamily: "var(--font-hero)",
-            fontWeight: 400,
-            fontSize: "clamp(3rem, 7.8vw, 9.5rem)",
+            fontWeight: 300,
+            fontSize: "clamp(3rem, 9.11vw, 8.75rem)",
+            fontStyle: "normal",
+            lineHeight: "normal",
+            letterSpacing: "0.05em",
+            color: "#F4F2EC",
             textShadow: "0 4px 40px rgba(23,19,16,0.5)",
           }}
         >
           Let&apos;s furnish yours.
         </p>
 
-        {/* Kicker + social rings beneath the title. */}
+        {/* Kicker line — sits well clear of the SocialRail rings in the
+            corner below it, per the key frame's spacing. */}
         <div
           ref={subRef}
-          className="invisible absolute bottom-[6%] left-[7%] z-10 opacity-0"
+          className="invisible absolute bottom-[24%] left-[7%] z-10 opacity-0"
         >
           <p
             className="max-w-[26rem] font-ui text-[clamp(13px,1.05vw,19px)] font-medium uppercase leading-relaxed tracking-[0.22em] text-cream/85"
@@ -333,42 +309,24 @@ export default function HeroFilm() {
           >
             Crafted for the moments you&apos;ll remember.
           </p>
-          <div className="pointer-events-auto mt-7 flex gap-4">
-            {SOCIALS.map((s) => (
-              <a
-                key={s.label}
-                href={s.href}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`Maple Furnishers on ${s.label}`}
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-cream/40 text-cream/80 backdrop-blur-[2px] transition-colors duration-300 hover:border-cream hover:text-cream"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  {s.path}
-                </svg>
-              </a>
-            ))}
-          </div>
         </div>
 
-        {/* "Every home has a story." — Catilde Light, matching the film's
-            original card in face, size and placement. */}
+        {/* "Every home has a story." — Catilde Light, sized to the key
+            frame's FIXED 930×270 text box on its 1440×963 frame: widest
+            line = 930/1440 = 64.6vw ⇒ 10.93vw type (Catilde runs
+            5.91em/line incl. 0.05em tracking), 270px over two lines ⇒
+            0.858 leading, top gap 238/963 = 24.7%. */}
         <h1
           ref={titleARef}
-          className="invisible absolute inset-x-0 top-[24%] z-10 text-center leading-[1.06] text-cream opacity-0"
+          className="invisible absolute inset-x-0 top-[24.7%] z-10 text-center opacity-0"
           style={{
             fontFamily: "var(--font-hero)",
             fontWeight: 300,
-            fontSize: "clamp(3.6rem, 9.8vw, 11.5rem)",
-            letterSpacing: "0.005em",
+            fontSize: "clamp(3.6rem, 10.93vw, 12.5rem)",
+            fontStyle: "normal",
+            lineHeight: 0.858,
+            letterSpacing: "0.05em",
+            color: "#F4F2EC",
             textShadow: "0 4px 40px rgba(23,19,16,0.35)",
           }}
         >
