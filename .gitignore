@@ -27,10 +27,13 @@ Thumbs.db
 # typescript
 *.tsbuildinfo
 
-# --- Frontend (Next.js) ---
-Frontend/.next/
-Frontend/out/
-Frontend/build/
+# --- Next.js apps (Frontend, AdminDashboard, ...) ---
+# Bare patterns so every workspace's build output is covered — the
+# AdminDashboard/.next cache once slipped into a commit via the old
+# Frontend-only rule.
+.next/
+out/
+build/
 next-env.d.ts
 
 # --- Backend (placeholder for when it lands) ---
