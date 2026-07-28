@@ -8,7 +8,7 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   ADMIN_EMAIL: z.email(),
   ADMIN_PASSWORD_HASH: z.string().min(20, "Run the bcrypt hash command from the guide"),
-  CORS_ORIGINS: z.string().default("http://localhost:3000"),
+  CORS_ORIGINS: z.string().default("http://localhost:3000,http://localhost:3001"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),

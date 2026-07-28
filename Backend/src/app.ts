@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import { corsOrigins } from "./config/env";
 import { logger } from "./lib/logger";
 import { errorHandler, notFoundHandler } from "./middleware/error";
+import { adminRouter } from "./modules/admin/admin.routes";
 import { authRouter } from "./modules/auth/auth.routes";
 import { inquiriesRouter } from "./modules/inquiries/inquiries.routes";
 import { newsletterRouter } from "./modules/newsletter/newsletter.routes";
@@ -24,6 +25,7 @@ export function createApp() {
   });
 
   app.use("/api/auth", authRouter);
+  app.use("/api/admin", adminRouter);
   app.use("/api/products", productsRouter);
   app.use("/api/newsletter", newsletterRouter);
   app.use("/api/inquiries", inquiriesRouter);

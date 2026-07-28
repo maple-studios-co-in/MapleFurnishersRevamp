@@ -52,6 +52,8 @@ interface SceneCopy {
   font?: "display" | "hero";
   subBold?: string;
   body?: string;
+  /** Override for the stacked body's size class (default text-[14px]). */
+  bodySizeClass?: string;
   /**
    * When set, subBold + body render as their OWN positioned block instead
    * of stacking under the headline — the bedroom key frame splits its copy
@@ -87,11 +89,13 @@ const SCENES: readonly Scene[] = [
     frames: [30, 47],
     hotspotFrames: [37, 47],
     copy: {
-      className: "left-[9%] top-[22%] max-w-md lg:left-[10%]",
+      // max-w-3xl: wide enough for the headline to run as ONE line.
+      className: "left-[9%] top-[22%] max-w-3xl lg:left-[10%]",
       eyebrow: true,
       font: "display",
       headline: "Comfort, Curated Beautifully.",
       body: "Where everyday moments become lasting memories.",
+      bodySizeClass: "text-[16px]",
     },
     hotspots: [
       {
@@ -140,7 +144,9 @@ const SCENES: readonly Scene[] = [
     hotspotFrames: [55, 86],
     copy: {
       className: "left-[9%] top-[22%] max-w-2xl lg:left-[10%]",
-      headline: "A Room Becomes A Place To Belong.",
+      // Controlled break (rendered via whitespace-pre-line): line 1
+      // "A Room Becomes A", line 2 "Place To Belong."
+      headline: "A Room Becomes A\nPlace To Belong.",
     },
     hotspots: [
       {
@@ -233,11 +239,9 @@ const SCENES: readonly Scene[] = [
       subBold: "Begins And Ends Here.",
       body: "Comfort designed to welcome you home.",
       // Bedroom key frame position (1536×1024): x154 (10%), y613 (60%).
-      // Type runs at 26px — a step under the Figma panel's 29.026px so
-      // the block reads clearly smaller than the 40px headline — and the
-      // box narrows with it so the bold line stays single and the body
-      // breaks "Comfort designed to / welcome you home.".
-      subClassName: "left-[10%] top-[60%] w-[22.5rem] max-w-[22.5rem]",
+      // The block's type mirrors the terrace scene's stacked sub/body
+      // (16.5px semibold + 14px body) per the user.
+      subClassName: "left-[10%] top-[60%] max-w-sm",
     },
     hotspots: [
       {
@@ -277,7 +281,8 @@ const SCENES: readonly Scene[] = [
     frames: [153, 203],
     hotspotFrames: [176, 202],
     copy: {
-      className: "left-[8%] top-[22%] max-w-lg lg:left-[10%]",
+      // max-w-4xl: the headline runs as ONE line.
+      className: "left-[8%] top-[22%] max-w-4xl lg:left-[10%]",
       headline: "Luxury Doesn't End At The Door.",
       subBold: "Bring The Comfort Outside.",
       body: "Designed for open skies, quiet mornings and unforgettable evenings.",
@@ -680,11 +685,13 @@ export default function OutroScene() {
                       className="mb-4 block h-px w-14 bg-cream/80 sm:mb-5 sm:w-20"
                     />
                   )}
+                  {/* whitespace-pre-line honours explicit \n breaks in a
+                      headline (evening room) without affecting the rest. */}
                   <h2
                     className={
                       scene.copy.font === "display"
-                        ? "text-[1.9rem] leading-snug tracking-[0.02em] text-cream sm:text-[2.4rem]"
-                        : "text-[1.95rem] leading-snug tracking-[0.05em] text-cream sm:text-[2.5rem]"
+                        ? "whitespace-pre-line text-[1.9rem] leading-snug tracking-[0.02em] text-cream sm:text-[2.4rem]"
+                        : "whitespace-pre-line text-[1.95rem] leading-snug tracking-[0.05em] text-cream sm:text-[2.5rem]"
                     }
                     style={{
                       fontFamily:
@@ -710,7 +717,7 @@ export default function OutroScene() {
                   )}
                   {!scene.copy.subClassName && scene.copy.body && (
                     <p
-                      className="mt-1.5 max-w-sm font-ui text-[14px] leading-relaxed text-cream/85"
+                      className={`mt-1.5 max-w-sm font-ui ${scene.copy.bodySizeClass ?? "text-[14px]"} leading-relaxed text-cream/85`}
                       style={{ textShadow: "0 1px 12px rgba(23,19,16,0.5)" }}
                     >
                       {scene.copy.body}
@@ -725,39 +732,20 @@ export default function OutroScene() {
                 <div
                   className={`invisible absolute opacity-0 ${scene.copy.subClassName}`}
                 >
-                  {/* Bedroom key-frame treatment (Red Hat Display, 150%
-                      leading, 0.1em tracking, 700 bold over a 300 body,
-                      #F4F2EC) at 26px — one step under the Figma panel's
-                      29.026px per the user, so it sits clearly below the
-                      40px headline. */}
+                  {/* The terrace's stacked-sub treatment, one size step up
+                      (19/16 vs 16.5/14) — per the user for section 5. */}
                   {scene.copy.subBold && (
                     <p
-                      style={{
-                        color: "#F4F2EC",
-                        fontFamily: "var(--font-redhat)",
-                        fontSize: "26px",
-                        fontStyle: "normal",
-                        fontWeight: 700,
-                        lineHeight: "150%",
-                        letterSpacing: "2.6px",
-                        textShadow: "0 1px 14px rgba(23,19,16,0.55)",
-                      }}
+                      className="font-ui text-[19px] font-semibold tracking-[0.02em] text-cream"
+                      style={{ textShadow: "0 1px 14px rgba(23,19,16,0.55)" }}
                     >
                       {scene.copy.subBold}
                     </p>
                   )}
                   {scene.copy.body && (
                     <p
-                      style={{
-                        color: "#F4F2EC",
-                        fontFamily: "var(--font-redhat)",
-                        fontSize: "26px",
-                        fontStyle: "normal",
-                        fontWeight: 300,
-                        lineHeight: "150%",
-                        letterSpacing: "2.6px",
-                        textShadow: "0 1px 12px rgba(23,19,16,0.5)",
-                      }}
+                      className="mt-1.5 font-ui text-[16px] leading-relaxed text-cream/85"
+                      style={{ textShadow: "0 1px 12px rgba(23,19,16,0.5)" }}
                     >
                       {scene.copy.body}
                     </p>

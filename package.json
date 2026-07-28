@@ -5,7 +5,8 @@
   "description": "Maple Furnishers monorepo â€” Frontend (Next.js) now, Backend to follow.",
   "workspaces": [
     "Frontend",
-    "Backend"
+    "Backend",
+    "AdminDashboard"
   ],
   "scripts": {
     "dev": "npm run dev --workspace Frontend",
@@ -18,7 +19,10 @@
     "frames:all": "npm run frames:hero && npm run frames:chair && npm run frames:outro",
     "dev:api": "npm run dev --workspace Backend",
     "build:api": "npm run build --workspace Backend",
-    "start:api": "npm run start --workspace Backend"
+    "start:api": "npm run start --workspace Backend",
+    "dev:admin": "npm run dev --workspace AdminDashboard",
+    "build:admin": "npm run build --workspace AdminDashboard",
+    "start:admin": "npm run start --workspace AdminDashboard"
   },
   "engines": {
     "node": ">=18.18.0"
@@ -29,7 +33,6 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "dotenv": "^17.4.2",
-    "prisma": "^7.9.0"
+    "dotenv": "^17.4.2"
   }
 }

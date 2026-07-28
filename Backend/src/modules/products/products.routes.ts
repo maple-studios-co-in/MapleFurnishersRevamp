@@ -18,6 +18,13 @@ const ProductInput = z.object({
 
 export const productsRouter = Router();
 
+productsRouter.get("/all", requireAdmin, async (_req, res) => {
+  const products = await prisma.product.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+  res.json({ products });
+});
+
 productsRouter.get("/", async (_req, res) => {
   const products = await prisma.product.findMany({
     where: { isPublished: true },

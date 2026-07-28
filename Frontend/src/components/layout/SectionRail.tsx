@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { SECTIONS } from "@/lib/sections";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { useSmoothScroll } from "./SmoothScroll";
@@ -12,8 +13,13 @@ import { useSmoothScroll } from "./SmoothScroll";
  * marker, and there are only six items so re-rendering is trivial.
  */
 export default function SectionRail() {
+  const pathname = usePathname();
   const active = useActiveSection();
   const { scrollTo } = useSmoothScroll();
+
+  // The 01–06 chapter rail belongs to the home scroll story only — other
+  // routes (e.g. /customize with its own 01–07 stepper) go without it.
+  if (pathname !== "/") return null;
 
   return (
     <nav

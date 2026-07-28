@@ -22,10 +22,14 @@ const INTRO_MAX_MS = 16_000;
 /** Video time at which the title card rises (when the baked one did). */
 const TITLE_IN_S = 4.3;
 
-/** Frame progress at which the chair has settled — "Let's furnish yours."
- *  plus the kicker line fade in over the film. (The social rings are the
- *  fixed SocialRail now — they persist across every scrubbed chapter.) */
-const SUB_AT = 0.66;
+/** Frame progress at which "Let's furnish yours." plus the kicker fade in
+ *  over the film — effectively the LAST frame (user: only after the whole
+ *  sequence has played), which then rests on screen through the tail
+ *  hold while the entrance tween plays. Not 1.0 exactly: frame decoding
+ *  can lag a fast scrub by a frame or two, and the reveal must still
+ *  fire. (The social rings are the fixed SocialRail now — they persist
+ *  across every scrubbed chapter.) */
+const SUB_AT = 0.985;
 
 /** Dev-only sequencing trail (window.__mfIntroLog). */
 function devLog(event: string, videoT?: number) {
@@ -110,15 +114,17 @@ export default function HeroFilm() {
     subOnRef.current = show;
     gsap.killTweensOf(els);
     if (show) {
+      // Slow, soft entrance — the sequence has finished and is resting on
+      // its settled frame, so the copy can take its time drifting in.
       gsap.fromTo(
         els,
-        { autoAlpha: 0, y: 26 },
+        { autoAlpha: 0, y: 36 },
         {
           autoAlpha: 1,
           y: 0,
-          duration: 0.9,
+          duration: 1.5,
           ease: "power3.out",
-          stagger: 0.14,
+          stagger: 0.22,
         },
       );
     } else {
@@ -127,14 +133,16 @@ export default function HeroFilm() {
   }, []);
 
   const seq = SEQUENCES.heroTitle;
-  const { canvasRef, sectionRef, stickyRef, ready } = useFrameSequence({
+  const { canvasRef, sectionRef, stickyRef, ready, scrollDistance } = useFrameSequence({
     framePath: seq.path,
     totalFrames: seq.frames,
     scrollPerFrame: seq.scrollPerFrame,
     fit: "cover",
-    /* Tail: the settled frame — chair, room, landed title — rests briefly,
-       then the unpin pushes straight into the chair chapter. */
-    tailHold: 0.22,
+    /* Tail: the settled frame — chair, room, landed title — rests, and the
+       hero→craft hand-off bridge runs INSIDE this rest (0.3 × 4560 ≈
+       1368px ≥ ChairShowcase's BRIDGE_SCROLL_PX + margin). Widened from
+       0.22 with scrollPerFrame 17→19 so the film's pace is unchanged. */
+    tailHold: 0.3,
     onProgress: handleProgress,
   });
 
@@ -217,8 +225,12 @@ export default function HeroFilm() {
     <section
       id="intro"
       ref={sectionRef}
-      className="relative bg-ink"
-      style={{ height: `calc(100dvh + ${seq.frames * seq.scrollPerFrame}px)` }}
+      /* `isolate`: the hero's own z-10/20/30 children (titles, cue, skip)
+         must never paint above the craft section's hand-off overlay, which
+         stacks at z-10 in the root context. Height comes from the hook so
+         reduced-motion collapses the scrub runway to one viewport. */
+      className="isolate relative bg-ink"
+      style={{ height: `calc(100dvh + ${scrollDistance}px)` }}
     >
       {/* Chapter 02 anchor. Chapter 02 is the scrub itself — it begins with
           the very first scroll after the cue. The marker sits on the tall
@@ -235,6 +247,7 @@ export default function HeroFilm() {
       />
       <div
         ref={stickyRef}
+        data-hero-stage
         className="relative h-[100dvh] w-full overflow-hidden"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -322,7 +335,9 @@ export default function HeroFilm() {
           style={{
             fontFamily: "var(--font-hero)",
             fontWeight: 300,
-            fontSize: "clamp(3.6rem, 10.93vw, 12.5rem)",
+            // 9.1vw: two zoom-out steps from the key frame's box-exact
+            // 10.93vw, per the user.
+            fontSize: "clamp(3.2rem, 9.1vw, 10.5rem)",
             fontStyle: "normal",
             lineHeight: 0.858,
             letterSpacing: "0.05em",

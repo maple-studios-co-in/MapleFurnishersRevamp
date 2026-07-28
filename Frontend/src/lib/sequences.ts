@@ -27,16 +27,23 @@ export const SEQUENCES = {
   heroTitle: {
     path: "/media/sequences/hero-title",
     frames: 240,
-    scrollPerFrame: 17,
+    // 19 (not the pace-matched 17): the film still plays at the same
+    // scroll pace because HeroFilm's tailHold grew to 0.3 — the extra
+    // distance all lands in the tail rest, funding the 1250px hand-off
+    // bridge into the chair chapter.
+    scrollPerFrame: 19,
   },
   /** Chair assembling/disassembling, background removed (alpha WebP).
    *  Deliberately paced SLOWER than the shared footage rate (26 would match
-   *  it): the explosion reads as sudden when a wheel notch spans ~7 frames,
-   *  so 42px/frame stretches the dis/re-assembly across more scroll. */
+   *  it): the explosion reads as sudden when a wheel notch spans ~7 frames.
+   *  61px/frame keeps the tuned ~29px-per-frame footage pace AND funds the
+   *  1250px hero→craft hand-off bridge, which lives in this section's
+   *  leadHold (see ChairShowcase's BRIDGE_SCROLL_PX) while the frames rest
+   *  on the assembled chair. */
   chair: {
     path: "/media/sequences/chair",
     frames: 79,
-    scrollPerFrame: 42,
+    scrollPerFrame: 61,
   },
   /** Closing scene: room → exterior → brand card. */
   outro: {

@@ -12,6 +12,35 @@ import { SEQUENCES } from "@/lib/sequences";
  */
 const EXPLODE_AT = 0.32;
 
+/* ---- Hero → Craft hand-off bridge -----------------------------------
+   The craft section overlaps the hero's tail-hold rest by BRIDGE_SCROLL_PX
+   of scroll (negative margin on the scope div). Over that range, a
+   scrubbed timeline pins the alpha chair at full craft size over the
+   hero, shrinks/dims the hero's whole scene beneath it, and grows the
+   cream craft stage in around the constant chair. Desktop (lg) only;
+   reduced-motion and mobile degrade below. ---------------------------- */
+
+/** Scroll px the hand-off occupies. Must stay UNDER the hero's tail-hold
+ *  rest (~1368px = 0.3 × 4560 — widened specifically to slow this
+ *  transition down), or the hero unpins mid-crossfade. Funded by the
+ *  chair sequence's leadHold — frames rest on the assembled chair until
+ *  the bridge completes. */
+const BRIDGE_SCROLL_PX = 1250;
+
+/* The chair itself stays PINNED at the craft stage geometry for the whole
+ * hand-off (per the user: no chair glide/scale) — the zoom choreography
+ * lives on the BACKGROUNDS, in two sequential phases: section 2's scene
+ * shrinks down to a tiny card and vanishes, THEN section 3's stage grows
+ * up from the same tiny size around the constant chair. */
+
+/** CALIBRATION KNOB — how far section 2's stage shrinks before it
+ *  disappears (0.04 ≈ vanishing into a speck, per the user: "more
+ *  extreme"). */
+const HERO_BG_EXIT = { toScale: 0.04, cardRadius: 24 };
+
+/** CALIBRATION KNOB — the size section 3's stage grows FROM. */
+const CRAFT_BG_ENTER = { fromScale: 0.04, cardRadius: 24 };
+
 /**
  * Callouts hug the chair rather than the screen edges: positioned off the
  * stage CENTRE in rem (the chair is always centred), so the composition
@@ -120,19 +149,121 @@ export default function ChairShowcase() {
     }
   }, []);
 
-  /* ---- cursor parallax: chair tilts, copy drifts against it ---- */
+  /* ---- hero hand-off bridge + cursor parallax ---- */
   useGSAP(
     () => {
-      const reduce = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-
-      if (reduce) return;
-
       const stage = scopeRef.current;
       if (!stage) return;
       const canvas = stage.querySelector("canvas");
       if (!canvas) return;
+
+      /* ---- hand-off bridge (see the BRIDGE_* constants above) ----
+         gsap.matchMedia owns breakpoint + motion forks and reverts its
+         own triggers; mm.revert() in the cleanup below covers App-Router
+         unmounts. */
+      const section = stage.querySelector("section");
+      const bridgeLayer = stage.querySelector("[data-bridge-in]");
+      const chairWrap = canvas.parentElement;
+      const mm = gsap.matchMedia();
+      mm.add(
+        {
+          lg: "(min-width: 1024px)",
+          motionOK: "(prefers-reduced-motion: no-preference)",
+        },
+        (mmCtx) => {
+          const { lg, motionOK } = mmCtx.conditions as {
+            lg: boolean;
+            motionOK: boolean;
+          };
+          // Reduced motion: no pin, no scrub, no glide — the markup's
+          // defaults (opaque stage, identity chair) ARE the end state,
+          // and the overlap margin is disabled in CSS via motion-safe.
+          if (!motionOK || !section || !bridgeLayer || !chairWrap) return;
+
+          if (lg) {
+            // Stage + chair invisible while the section approaches under
+            // the resting hero; the scrubbed timeline runs the take-over
+            // across the overlap. The chair carries NO transform — it
+            // appears already pinned at the craft geometry and never
+            // moves; the backgrounds do the zooming.
+            const heroStage = document.querySelector("[data-hero-stage]");
+            gsap.set(bridgeLayer, {
+              autoAlpha: 0,
+              scale: CRAFT_BG_ENTER.fromScale,
+              borderRadius: CRAFT_BG_ENTER.cardRadius,
+              overflow: "hidden",
+              transformOrigin: "50% 50%",
+            });
+            gsap.set(chairWrap, { autoAlpha: 0 });
+            const tl = gsap.timeline({
+              scrollTrigger: {
+                trigger: section,
+                start: "top top",
+                end: `+=${BRIDGE_SCROLL_PX}`,
+                // Lazier lerp than the house 0.6 — the zoom drifts after
+                // the wheel instead of snapping with it.
+                scrub: 1,
+                invalidateOnRefresh: true,
+              },
+            });
+            tl
+              // 1 — the pinned chair fades on, full size, over the hero.
+              .to(chairWrap, { autoAlpha: 1, duration: 0.1, ease: "none" }, 0);
+            if (heroStage) {
+              tl
+                // 2 — PHASE ONE: section 2's whole scene collapses down to
+                //     a tiny card behind the constant chair…
+                .to(
+                  heroStage,
+                  {
+                    scale: HERO_BG_EXIT.toScale,
+                    borderRadius: HERO_BG_EXIT.cardRadius,
+                    transformOrigin: "50% 50%",
+                    duration: 0.46,
+                    ease: "power2.inOut",
+                  },
+                  0.02,
+                )
+                //     …and blinks out right as it bottoms.
+                .to(heroStage, { autoAlpha: 0, duration: 0.1, ease: "none" }, 0.42);
+            }
+            tl
+              // 3 — PHASE TWO: section 3's stage appears at the same tiny
+              //     size and grows smoothly to full around the chair;
+              //     opaque well before the hero unpins beneath.
+              .to(bridgeLayer, { autoAlpha: 1, duration: 0.08, ease: "none" }, 0.5)
+              .to(
+                bridgeLayer,
+                { scale: 1, borderRadius: 0, duration: 0.48, ease: "power2.out" },
+                0.5,
+              );
+          } else {
+            // <lg: no overlap margin (CSS) and no glide — just a plain
+            // scrubbed crossfade of the stage as the section scrolls in.
+            gsap.fromTo(
+              bridgeLayer,
+              { autoAlpha: 0 },
+              {
+                autoAlpha: 1,
+                ease: "none",
+                scrollTrigger: {
+                  trigger: section,
+                  start: "top 85%",
+                  end: "top 15%",
+                  scrub: 0.6,
+                  invalidateOnRefresh: true,
+                },
+              },
+            );
+          }
+        },
+      );
+
+      const reduce = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      if (reduce) return () => mm.revert();
 
       const tiltX = gsap.quickTo(canvas, "rotateY", {
         duration: 0.7,
@@ -177,30 +308,49 @@ export default function ChairShowcase() {
         }
       };
       stage.addEventListener("pointermove", onMove);
-      return () => stage.removeEventListener("pointermove", onMove);
+      return () => {
+        mm.revert();
+        stage.removeEventListener("pointermove", onMove);
+      };
     },
     { scope: scopeRef },
   );
 
   return (
-    <div ref={scopeRef}>
+    <div
+      ref={scopeRef}
+      /* Hand-off overlap: on motion-safe desktop the section is pulled up
+         over the hero's tail-hold rest by one viewport + the bridge
+         distance, and stacks ABOVE the isolated hero (z-10) so the
+         crossfade paints over it. Reduced-motion and <lg keep normal
+         flow. */
+      className="relative isolate z-10 motion-safe:lg:mt-[calc(-100dvh-var(--bridge-scroll))]"
+      style={{ "--bridge-scroll": `${BRIDGE_SCROLL_PX}px` } as React.CSSProperties}
+    >
       <FrameSequence
         id="craft"
         label="Craftsmanship — the Maple chair, part by part"
-        className="bg-[#E8E0D5]"
+        /* No section background — the stage must be transparent while the
+           resting hero shows through during the bridge; all cream lives on
+           the [data-bridge-in] layer below. */
         framePath={seq.path}
         totalFrames={seq.frames}
         scrollPerFrame={seq.scrollPerFrame}
         fit="contain"
         transparent
         preloadMargin={1400}
-        /* Longer tail than the default: a fast flick outruns the scrub's
-           lag, and the chair must be fully re-assembled and resting before
-           the pin releases — never cropped mid-explosion at the exit. */
-        tailHold={0.3}
-        /* Lazier playhead lerp than the shared 0.6 — with the slower
-           42px/frame pacing it makes the dis/re-assembly glide instead of
-           jumping several frames per wheel notch. */
+        /* The bridge occupies the head of this pin: frames rest on the
+           assembled chair (matching the hero's settled one) until the
+           take-over completes. */
+        leadHold={BRIDGE_SCROLL_PX / (seq.frames * seq.scrollPerFrame)}
+        /* Tail: a fast flick outruns the scrub's lag, and the chair must
+           be fully re-assembled and resting before the pin releases —
+           never cropped mid-explosion at the exit. 0.26 of the widened
+           runway keeps the same rest distance as the old 0.3. */
+        tailHold={0.26}
+        /* Lazier playhead lerp than the shared 0.6 — makes the
+           dis/re-assembly glide instead of jumping several frames per
+           wheel notch. */
         scrubSmooth={1.2}
         onProgress={handleProgress}
         /* Stage runs from inside the header band to 50px BELOW the
@@ -215,7 +365,10 @@ export default function ChairShowcase() {
            never be covered. */
         canvasClassName="absolute inset-x-0 bottom-[-50px] top-[36px] z-10"
         background={
-          <>
+          /* One wrapper so the WHOLE stage (backdrop, wordmark, copy,
+             callouts, shadow) crossfades as a unit during the hand-off;
+             the chair canvas sits above it and persists. */
+          <div data-bridge-in className="absolute inset-0">
             {/* Full-bleed studio falloff — the page IS the backdrop, no
                 inner panel. */}
             <div
@@ -357,7 +510,7 @@ export default function ChairShowcase() {
                 }}
               />
             </div>
-          </>
+          </div>
         }
       />
     </div>

@@ -113,7 +113,21 @@ export function useFrameSequence(
   const [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const scrollDistance = totalFrames * scrollPerFrame;
+  /* ---- prefers-reduced-motion: no pin, no scrub — snap to end state ----
+     False during SSR/first paint (matchMedia is browser-only) and corrected
+     after mount; the height collapse + skipped timeline follow via state. */
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setReducedMotion(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  /* Under reduced motion the section keeps no scrub runway: it collapses
+     to one viewport showing the sequence's end state. */
+  const scrollDistance = reducedMotion ? 0 : totalFrames * scrollPerFrame;
 
   /* ---- hold back below-the-fold sequences ---- */
   useEffect(() => {
@@ -265,6 +279,14 @@ export function useFrameSequence(
     const sticky = stickyRef.current;
     if (!section) return;
 
+    if (reducedMotion) {
+      // Snap straight to the section's end state: paint the final frame,
+      // which also emits onProgress(1) so scene copy lands in its settled
+      // position. No pin, no timeline — nothing to kill.
+      draw(totalFrames - 1);
+      return;
+    }
+
     const playhead = { frame: 0 };
     draw(0);
 
@@ -302,7 +324,7 @@ export function useFrameSequence(
       tl.scrollTrigger?.kill();
       tl.kill();
     };
-  }, [ready, totalFrames, scrollDistance, pin, tailHold, leadHold, scrubSmooth, draw]);
+  }, [ready, reducedMotion, totalFrames, scrollDistance, pin, tailHold, leadHold, scrubSmooth, draw]);
 
   return { canvasRef, sectionRef, stickyRef, ready, loaded, scrollDistance };
 }

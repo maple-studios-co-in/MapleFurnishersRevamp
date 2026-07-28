@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 /**
@@ -46,6 +47,7 @@ const SOCIALS = [
  * own social links.
  */
 export default function SocialRail() {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [footerInView, setFooterInView] = useState(false);
 
@@ -68,6 +70,9 @@ export default function SocialRail() {
   }, []);
 
   const visible = scrolled && !footerInView;
+
+  // Home-scroll chrome only — /customize and future routes go without it.
+  if (pathname !== "/") return null;
 
   return (
     <div

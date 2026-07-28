@@ -78,7 +78,9 @@ export default function ScrollCue({ visible }: { visible: boolean }) {
           ~14px longer than the label — glyphs past a path's end are
           dropped entirely, so the margin guards against fallback-font
           metrics while Red Hat Display loads. */}
-      <svg viewBox="0 0 300 195" className="h-[195px] w-[300px]">
+      {/* Rendered at ~77% of the viewBox scale — two zoom-out steps, per
+          the user; everything inside (type, ring, line) scales together. */}
+      <svg viewBox="0 0 300 195" className="h-[151px] w-[232px]">
         <defs>
           <path id="mf-scroll-arc" d="M 32,108 Q 150,-20 268,108" fill="none" />
         </defs>
