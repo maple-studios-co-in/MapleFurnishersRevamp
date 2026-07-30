@@ -326,7 +326,14 @@ export default function HeroFilm() {
           style={{
             fontFamily: "var(--font-hero)",
             fontWeight: 400,
-            fontSize: "clamp(3rem, 8.33vw, 7.5rem)",
+            // The 8.33vw spec is WIDTH-driven, but this card is anchored by
+            // top-[24.7%] — a percentage of HEIGHT. On a short viewport
+            // (e.g. 1536×730, a maximized window on a 1080p screen at 125%
+            // scaling) the capped 120px type made the two-line box 112% of
+            // the viewport — the "zoomed in" report. min(…,13dvh) lets height
+            // win when height is the scarce axis; on 1440×900 and up the vw
+            // term still governs, so the calibrated look is unchanged.
+            fontSize: "clamp(3rem, min(8.33vw, 13dvh), 7.5rem)",
             fontStyle: "normal",
             lineHeight: "normal",
             letterSpacing: "0.05em",

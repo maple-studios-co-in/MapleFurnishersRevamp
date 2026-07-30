@@ -412,7 +412,14 @@ export default function ChairShowcase() {
                   // stroked glyphs collided with the "— CRAFTMANSHIP"
                   // eyebrow — 240px at the 41% centre clears it by ~30px
                   // (glyph top ≈ 41% − 0.475em vs eyebrow bottom ≈ 20.5%).
-                  fontSize: "clamp(5.5rem, 16.6vw, 15rem)",
+                  // Same units mismatch as the hero title: 16.6vw is
+                  // WIDTH-driven while this sits at top-[41%] and the
+                  // "— CRAFTMANSHIP" eyebrow at top-[17.5%] — both HEIGHT.
+                  // Measured clearance on the deployed build: +56px at
+                  // 1920×1080, +14px at 1440×900, −26px at 1536×730 (the
+                  // collision). min(…,24dvh) restores +18px at 730 while
+                  // leaving 1920×1080 on the 240px ceiling exactly as before.
+                  fontSize: "clamp(5.5rem, min(16.6vw, 24dvh), 15rem)",
                   fontStyle: "normal",
                   lineHeight: "normal",
                   letterSpacing: "0.05em",
