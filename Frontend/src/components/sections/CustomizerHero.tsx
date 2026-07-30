@@ -4,63 +4,43 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { gsap, useGSAP } from "@/lib/gsap";
 
-/**
- * "Make It Yours" — step 06/07 product customizer, single-viewport.
- *
- * The chair is the one raster asset (alpha cutout, frame-001 of the chair
- * sequence). Options genuinely change it: a canvas engine classifies every
- * pixel as WOOD or FABRIC by hue (the olive velvet and walnut timber
- * separate cleanly), then re-tints each region toward the selected swatch
- * while preserving the photo's own shading; the stitching toggle accents
- * the fabric/wood boundary seam. Each change plays a GSAP 3D turntable
- * swing (perspective rotateY + scale on the stage) with an SVG light-sweep
- * masked to the chair's silhouette — the recolor lands at the apex of the
- * turn.
- *
- * No cart/wishlist system exists in this app yet — ADD TO CART and the
- * heart keep local state with obvious single-line extension points.
- */
 
-/* ---- design tokens (pixel-sampled from the reference) ---- */
+
+
+const PANEL_EXTEND_PX = 52;
+const PANEL_W = 470 + PANEL_EXTEND_PX;
+const CARD_W = 456 + PANEL_EXTEND_PX;
+
+
 const T = {
   bgBase: "#0A0705",
-  panelBg: "rgba(16,13,10,0.85)",
   gold: "#DFA35C",
   goldBtn: "#CAA676",
   textOnGold: "#4D3D28",
 } as const;
 
+
 const FINISHES = [
-  { name: "Natural Ash", hex: "#835836" },
-  { name: "Walnut", hex: "#472F22" },
-  { name: "Dark Oak", hex: "#29190D" },
-  { name: "Ebony", hex: "#0B0A0A" },
+  { name: "Natural Ash", hex: "#d6883b", img: "/media/customizer/swatches/finish-natural-ash.png" },
+  { name: "Walnut Brown", hex: "#5e4230", img: "/media/customizer/swatches/finish-walnut-brown.png" },
+  { name: "Dark Oak", hex: "#9c8364", img: "/media/customizer/swatches/finish-dark-oak.png" },
+  { name: "Ebony", hex: "#63595a", img: "/media/customizer/swatches/finish-ebony.png" },
 ] as const;
 
 const FABRICS = [
-  { name: "Ivory Linen", hex: "#948574" },
-  { name: "Sand", hex: "#77634D" },
-  { name: "Olive", hex: "#2B2A1E" },
-  { name: "Charcoal", hex: "#292929" },
-  { name: "Rust", hex: "#6D3E27" },
+  { name: "Ivory", label: "Ivory", hex: "#beb4a5", img: "/media/customizer/swatches/fabric-ivory.png" },
+  { name: "Sand", label: "Sand", hex: "#958068", img: "/media/customizer/swatches/fabric-sand.png" },
+  { name: "Mauve", label: "Dark Oak", hex: "#6a5759", img: "/media/customizer/swatches/fabric-mauve.png" },
+  { name: "Charcoal", label: "Dark Oak", hex: "#6b6b6b", img: "/media/customizer/swatches/fabric-charcoal.png" },
 ] as const;
 
-const BASE_STYLES = ["Signature Curve", "Sculpted Sled", "Classic Taper"] as const;
+const ANGLES = [
+  { src: "/media/customizer/axtra-chair.png", label: "Three-quarter view" },
+  { src: "/media/customizer/angles/side.png", label: "Side view" },
+  { src: "/media/customizer/angles/front.png", label: "Front view" },
+  { src: "/media/customizer/angles/back.png", label: "Back view" },
+] as const;
 
-/** The hero product render (portrait alpha cutout, rembg'd from the
- *  supplied moody render — scripts/cutout-customizer.py regenerates it).
- *  Thumbnails reuse it as placeholders until real angle shots exist. */
-const CHAIR_SRC = "/media/customizer/axtra-chair.png";
-const ANGLES = [CHAIR_SRC, CHAIR_SRC, CHAIR_SRC, CHAIR_SRC];
-
-const STEPS = ["01", "02", "03", "04", "05", "06", "07"] as const;
-const ACTIVE_STEP = "06";
-
-/** CALIBRATION — pixel classification thresholds, measured from the
- *  photo's hue histogram: the wood reads 0–35° (mode 10–30°, low in the
- *  frame), the "olive" velvet reads 38–52° (mode 42–45°, high in the
- *  frame), valley at 27–33°. Nudge FABRIC_HUE_MIN if a re-shot chair
- *  splits differently. */
 const FABRIC_HUE_MIN = 38;
 const FABRIC_HUE_MAX = 190;
 const FABRIC_SAT_MIN = 0.04;
@@ -72,13 +52,20 @@ type ChairMask = {
   h: number;
   /** 0 = empty, 1 = wood, 2 = fabric */
   cls: Uint8Array;
-  /** fabric px adjacent to wood — the "stitch seam" */
-  boundary: Uint8Array;
-  /** per-pixel lightness 0..1 */
   lum: Float32Array;
   alpha: Uint8ClampedArray;
-  avgL: [number, number, number]; // [_, wood, fabric]
+  avgL: [number, number, number];
   bbox: { x: number; y: number; w: number; h: number };
+};
+
+type AngleCache = {
+  mask: ChairMask;
+  /** pristine pixels — the "original chair" */
+  srcData: ImageData;
+  /** working buffer */
+  out: ImageData;
+  /** offscreen canvas the stage blits from */
+  off: HTMLCanvasElement;
 };
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
@@ -115,9 +102,6 @@ function hexToHsl(hex: string): [number, number, number] {
   return rgbToHsl((n >> 16) & 255, (n >> 8) & 255, n & 255);
 }
 
-/** One-time pass: classify chair pixels and cache everything the recolor
- *  loop needs. Fabric = green-ish hues (the olive velvet), wood = the
- *  warm browns; low-alpha edges keep their class for clean antialiasing. */
 function buildMask(img: HTMLImageElement): { mask: ChairMask; src: ImageData } {
   const w = img.naturalWidth, h = img.naturalHeight;
   const c = document.createElement("canvas");
@@ -146,55 +130,37 @@ function buildMask(img: HTMLImageElement): { mask: ChairMask; src: ImageData } {
     if (y < minY) minY = y; if (y > maxY) maxY = y;
   }
 
-  // Majority-vote denoise: hue classification speckles inside the velvet
-  // (shadow pixels dipping under the hue split) read as scattered wood
-  // dots — and later as bogus stitch specks. A 3×3 vote flips isolated
-  // minorities to their surroundings.
+  // Majority-vote denoise (skip for tiny angle shots: 3×3 voting on an
+  // 83px image eats real detail).
   const cls = new Uint8Array(rawCls);
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const i = y * w + x;
-      if (!rawCls[i]) continue;
-      let fab = 0, wood = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const k = rawCls[i + dy * w + dx];
-          if (k === 2) fab++;
-          else if (k === 1) wood++;
+  if (w > 200) {
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        if (!rawCls[i]) continue;
+        let fab = 0, wood = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const k = rawCls[i + dy * w + dx];
+            if (k === 2) fab++;
+            else if (k === 1) wood++;
+          }
         }
+        if (fab >= 6) cls[i] = 2;
+        else if (wood >= 6) cls[i] = 1;
       }
-      if (fab >= 6) cls[i] = 2;
-      else if (wood >= 6) cls[i] = 1;
     }
   }
 
-  // Class averages AFTER denoising.
   const sums = [0, 0, 0]; const counts = [0, 0, 0];
   for (let i = 0; i < w * h; i++) {
     const k = cls[i];
     if (k) { sums[k] += lum[i]; counts[k]++; }
   }
 
-  // Seam = fabric pixels with a SUBSTANTIAL wood presence nearby (≥6 of
-  // the 5×5 window) — a real piping line, never lone specks.
-  const boundary = new Uint8Array(w * h);
-  for (let y = 2; y < h - 2; y++) {
-    for (let x = 2; x < w - 2; x++) {
-      const i = y * w + x;
-      if (cls[i] !== 2) continue;
-      let wood = 0;
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
-          if (cls[i + dy * w + dx] === 1) wood++;
-        }
-      }
-      if (wood >= 6) boundary[i] = 1;
-    }
-  }
-
   return {
     mask: {
-      w, h, cls, boundary, lum, alpha,
+      w, h, cls, lum, alpha,
       avgL: [0, sums[1] / Math.max(1, counts[1]), sums[2] / Math.max(1, counts[2])],
       bbox: { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 },
     },
@@ -202,147 +168,99 @@ function buildMask(img: HTMLImageElement): { mask: ChairMask; src: ImageData } {
   };
 }
 
-/** Retint: keep each pixel's shading (lightness), swap in the target's
- *  hue/sat, and scale lightness by target-vs-original class average so
- *  Ebony really goes dark and Ash really lightens. */
+/** Retint toward the targets; a null target leaves that material class at
+ *  its ORIGINAL pixels — so the untouched aspect of the chair stays real. */
 function recolor(
-  mask: ChairMask,
-  out: ImageData,
-  finishHex: string,
-  fabricHex: string,
-  stitching: boolean,
+  cache: AngleCache,
+  finishHex: string | null,
+  fabricHex: string | null,
 ) {
-  const targets = [null, hexToHsl(finishHex), hexToHsl(fabricHex)] as const;
+  const { mask, srcData, out } = cache;
+  const targets = [
+    null,
+    finishHex ? hexToHsl(finishHex) : null,
+    fabricHex ? hexToHsl(fabricHex) : null,
+  ] as const;
   const d = out.data;
-  const { cls, lum, alpha, boundary, avgL, w, h } = mask;
+  const s = srcData.data;
+  const { cls, lum, alpha, avgL, w, h } = mask;
   for (let i = 0; i < w * h; i++) {
     const k = cls[i];
-    if (k === 0) { d[i * 4 + 3] = alpha[i]; continue; }
-    const t = targets[k]!;
-    // Ratio floored at 0.16: very dark targets (Ebony) still keep some of
-    // the photo's shading instead of crushing to a mottled black mass.
-    const l = Math.min(1, Math.max(0.02, lum[i] * Math.max(0.16, t[2] / avgL[k])));
-    let [r, g, b] = hslToRgb(t[0], t[1], l);
-    if (stitching && boundary[i]) {
-      // Contrast piping along the seam — subtle, not painted-on.
-      r = r * 0.65 + 232 * 0.35;
-      g = g * 0.65 + 219 * 0.35;
-      b = b * 0.65 + 197 * 0.35;
+    const t = k ? targets[k] : null;
+    if (!t) {
+      d[i * 4] = s[i * 4];
+      d[i * 4 + 1] = s[i * 4 + 1];
+      d[i * 4 + 2] = s[i * 4 + 2];
+      d[i * 4 + 3] = alpha[i];
+      continue;
     }
+    const l = Math.min(1, Math.max(0.02, lum[i] * Math.max(0.16, t[2] / avgL[k])));
+    const [r, g, b] = hslToRgb(t[0], t[1], l);
     d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b; d[i * 4 + 3] = alpha[i];
   }
+  cache.off.getContext("2d")!.putImageData(out, 0, 0);
 }
 
-/* ---- inline icons (currentColor-themed, no deps) ---- */
-const PlayIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-    <path d="M4 2.5L13 8L4 13.5V2.5Z" fill="currentColor" />
-  </svg>
-);
-const ChevronIcon = () => (
+/* ---- inline icons ---- */
+const CloseIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <polyline points="6 9 12 15 18 9" />
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
-const HeartIcon = ({ filled }: { filled: boolean }) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z" />
+const ArrowLeftIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <line x1="19" y1="12" x2="5" y2="12" />
+    <polyline points="12 19 5 12 12 5" />
   </svg>
 );
-const TruckIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <rect x="1" y="6" width="14" height="11" />
-    <path d="M15 9h4l3 4v4h-7z" />
-    <circle cx="6" cy="19" r="2" />
-    <circle cx="18" cy="19" r="2" />
-  </svg>
-);
-const RotateIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M21 12a9 9 0 1 1-3-6.7" />
-    <polyline points="21 3 21 9 15 9" />
+const ArrowRightIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <line x1="5" y1="12" x2="19" y2="12" />
+    <polyline points="12 5 19 12 12 19" />
   </svg>
 );
 
-const panelHeaderClass =
-  "uppercase tracking-[0.08em] text-[11px] font-semibold text-white/48";
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#DFA35C] focus-visible:outline-offset-2";
 
-/** Figma-frame material tile: rounded square with CSS-built material
- *  shading (no texture photos exist — wood gets a faint diagonal grain,
- *  fabric a soft weave sheen), gold border when selected. */
 function Swatch({
-  name, hex, kind, selected, onSelect,
+  name, label, img, selected, onSelect,
 }: {
-  name: string; hex: string; kind: "wood" | "fabric"; selected: boolean; onSelect: () => void;
+  name: string; label?: string; img: string; selected: boolean; onSelect: () => void;
 }) {
-  const material =
-    kind === "wood"
-      ? `linear-gradient(115deg, rgba(255,255,255,0.14), transparent 45%), repeating-linear-gradient(100deg, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0.16) 2px, transparent 2px, transparent 6px)`
-      : `radial-gradient(130% 130% at 30% 20%, rgba(255,255,255,0.16), transparent 55%), repeating-linear-gradient(0deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px)`;
   return (
-    <div className="flex w-[52px] shrink-0 flex-col items-center gap-1.5">
+    <div className="flex flex-col items-center gap-2">
       <button
         type="button"
         aria-pressed={selected}
         aria-label={name}
         onClick={onSelect}
-        className={`h-[46px] w-[46px] rounded-xl transition-transform duration-150 hover:scale-105 ${focusRing}`}
+        className={`h-[68px] w-[68px] overflow-hidden rounded-full transition-all duration-200 hover:scale-110 ${focusRing}`}
         style={{
-          backgroundImage: material,
-          backgroundColor: hex,
-          border: selected ? `2px solid ${T.gold}` : "1px solid rgba(255,255,255,0.14)",
-          boxShadow: selected ? "0 0 12px rgba(223,163,92,0.25)" : undefined,
+          boxShadow: selected
+            ? `0 0 0 2.5px ${T.gold}, 0 0 16px rgba(223,163,92,0.35)`
+            : "none",
         }}
-      />
-      {/* 60% (not the 48% muted) — 48% fails WCAG AA at this size. */}
-      <span className="text-center text-[10px] leading-[1.3] text-white/60">{name}</span>
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={img} alt="" className="h-full w-full object-cover" />
+      </button>
+      <span className="text-center text-[11px] leading-[1.3] text-white/70">{label ?? name}</span>
     </div>
-  );
-}
-
-function Stepper({ horizontal }: { horizontal?: boolean }) {
-  return (
-    <ol
-      aria-label="Customization steps"
-      className={horizontal ? "flex flex-row items-center gap-5" : "flex flex-col gap-6"}
-    >
-      {STEPS.map((s) => {
-        const active = s === ACTIVE_STEP;
-        return (
-          <li key={s} className="flex items-center gap-3">
-            <span
-              className={active ? "text-[15px] font-semibold" : "text-[13px] font-normal text-white/48"}
-              style={active ? { color: T.gold } : undefined}
-              aria-current={active ? "step" : undefined}
-            >
-              {s}
-            </span>
-            {active && <span aria-hidden className="h-px w-6" style={{ backgroundColor: T.gold }} />}
-          </li>
-        );
-      })}
-    </ol>
   );
 }
 
 /* ================================================================= */
 
 export default function CustomizerHero() {
-  const [finish, setFinish] = useState<(typeof FINISHES)[number]["name"]>("Walnut");
-  const [fabric, setFabric] = useState<(typeof FABRICS)[number]["name"]>("Olive");
-  const [stitching, setStitching] = useState(true);
-  const [baseStyle, setBaseStyle] = useState<(typeof BASE_STYLES)[number]>(BASE_STYLES[0]);
-  const [ddOpen, setDdOpen] = useState(false);
+  /** null = untouched: that aspect of the chair keeps its original pixels. */
+  const [finish, setFinish] = useState<(typeof FINISHES)[number]["name"] | null>(null);
+  const [fabric, setFabric] = useState<(typeof FABRICS)[number]["name"] | null>(null);
   const [angle, setAngle] = useState(0);
-  const [wishlisted, setWishlisted] = useState(false);
-  const [added, setAdded] = useState(false);
-  const ddRef = useRef<HTMLDivElement>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
 
-  /* ---- panel fit-to-height zoom (desktop) ----
-     The menu scales to FILL the right column's height — up to 1.3× on
-     tall screens, and never past what fits without a scrollbar. */
+  /* ---- panel fit-to-height zoom (desktop) ---- */
   const panelInnerRef = useRef<HTMLDivElement>(null);
   const [panelFit, setPanelFit] = useState<{ scale: number; h: number } | null>(null);
 
@@ -355,142 +273,112 @@ export default function CustomizerHero() {
         return;
       }
       const natural = el.offsetHeight;
-      const avail = window.innerHeight - 96 - 20; // navbar band + breathing room
-      const scale = Math.min(1.3, Math.max(0.75, avail / natural));
+      // 94 = the frame's box-top measure (clears the navbar's Shop Now);
+      // 82 reserves the bottom-nav band so the card never collides.
+      const avail = window.innerHeight - 94 - 82;
+      const scale = Math.min(1, Math.max(0.6, avail / natural));
       setPanelFit({ scale, h: natural });
     };
     measure();
     window.addEventListener("resize", measure, { passive: true });
     return () => window.removeEventListener("resize", measure);
-  }, []);
+  }, [panelOpen]);
 
-  /* ---- chair stage refs ---- */
-  const stageRef = useRef<HTMLDivElement>(null);   // pointer tilt (outer)
-  const swingRef = useRef<HTMLDivElement>(null);   // swap turntable (inner)
+  /* ---- stage refs + per-angle engine caches ---- */
+  const stageRef = useRef<HTMLDivElement>(null);
+  const swingRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sheenWrapRef = useRef<HTMLDivElement>(null);
   const sheenBandRef = useRef<SVGRectElement>(null);
   const groundRef = useRef<HTMLDivElement>(null);
-  const maskRef = useRef<ChairMask | null>(null);
-  const outRef = useRef<ImageData | null>(null);
-  const offRef = useRef<HTMLCanvasElement | null>(null);
+  const cachesRef = useRef<Map<number, AngleCache>>(new Map());
+  const angleRef = useRef(0);
   const spinDirRef = useRef(1);
-  const firstPaintRef = useRef(true);
+  const bootedRef = useRef(false);
 
-  const finishHex = FINISHES.find((f) => f.name === finish)!.hex;
-  const fabricHex = FABRICS.find((f) => f.name === fabric)!.hex;
-  const variant = `${finish} / ${fabric} / ${baseStyle}`;
+  const finishHex = finish ? FINISHES.find((f) => f.name === finish)!.hex : null;
+  const fabricHex = fabric ? FABRICS.find((f) => f.name === fabric)!.hex : null;
 
-  /** Blit the recolored bbox crop into the display canvas, contain-fit,
-   *  and park the silhouette-masked sheen overlay on the drawn rect. */
+  const ensureCache = useCallback(async (idx: number): Promise<AngleCache | null> => {
+    const existing = cachesRef.current.get(idx);
+    if (existing) return existing;
+    try {
+      const img = new Image();
+      img.src = ANGLES[idx].src;
+      await img.decode();
+      const { mask, src } = buildMask(img);
+      const off = document.createElement("canvas");
+      off.width = mask.w; off.height = mask.h;
+      off.getContext("2d")!.putImageData(src, 0, 0); // original pixels
+      const cache: AngleCache = {
+        mask,
+        srcData: src,
+        out: new ImageData(new Uint8ClampedArray(src.data), mask.w, mask.h),
+        off,
+      };
+      cachesRef.current.set(idx, cache);
+      return cache;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  /** Blit the active angle's offscreen into the display canvas. */
   const blit = useCallback(() => {
     const canvas = canvasRef.current;
-    const off = offRef.current;
-    const mask = maskRef.current;
     const stage = stageRef.current;
-    if (!canvas || !off || !mask || !stage) return;
+    const cache = cachesRef.current.get(angleRef.current);
+    if (!canvas || !stage || !cache) return;
     const dpr = Math.min(devicePixelRatio || 1, 2);
     const { width, height } = stage.getBoundingClientRect();
     if (!width || !height) return;
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
-    const { bbox } = mask;
-    const s = Math.min((width * dpr) / bbox.w, (height * dpr) / bbox.h) * 0.96;
+    const { bbox } = cache.mask;
+    const s = Math.min((canvas.width) / bbox.w, (canvas.height) / bbox.h) * 0.99;
     const dw = bbox.w * s, dh = bbox.h * s;
     const dx = (canvas.width - dw) / 2, dy = (canvas.height - dh) / 2;
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(off, bbox.x, bbox.y, bbox.w, bbox.h, dx, dy, dw, dh);
+    ctx.drawImage(cache.off, bbox.x, bbox.y, bbox.w, bbox.h, dx, dy, dw, dh);
 
-    // Sheen overlay hugs the drawn rect; its CSS mask replays the same
-    // crop so the sweep only ever lights the chair itself.
     const sheen = sheenWrapRef.current;
     if (sheen) {
-      const left = dx / dpr, top = dy / dpr, w = dw / dpr, h = dh / dpr;
-      sheen.style.left = `${left}px`;
-      sheen.style.top = `${top}px`;
-      sheen.style.width = `${w}px`;
-      sheen.style.height = `${h}px`;
+      const { mask } = cache;
+      sheen.style.left = `${dx / dpr}px`;
+      sheen.style.top = `${dy / dpr}px`;
+      sheen.style.width = `${dw / dpr}px`;
+      sheen.style.height = `${dh / dpr}px`;
       const px = mask.w === bbox.w ? 0 : (bbox.x / (mask.w - bbox.w)) * 100;
       const py = mask.h === bbox.h ? 0 : (bbox.y / (mask.h - bbox.h)) * 100;
-      const sz = `${(mask.w / bbox.w) * 100}% ${(mask.h / bbox.h) * 100}%`;
-      sheen.style.maskImage = `url(${CHAIR_SRC})`;
-      sheen.style.maskSize = sz;
+      sheen.style.maskImage = `url(${ANGLES[angleRef.current].src})`;
+      sheen.style.maskSize = `${(mask.w / bbox.w) * 100}% ${(mask.h / bbox.h) * 100}%`;
       sheen.style.maskPosition = `${px}% ${py}%`;
     }
     const ground = groundRef.current;
-    if (ground) {
-      ground.style.top = `${(dy + dh) / dpr - 14}px`;
-    }
+    if (ground) ground.style.top = `${(dy + dh) / dpr - 14}px`;
   }, []);
 
-  const applyColors = useCallback(
-    (fin: string, fab: string, stitch: boolean) => {
-      const mask = maskRef.current;
-      const out = outRef.current;
-      const off = offRef.current;
-      if (!mask || !out || !off) return;
-      recolor(mask, out, fin, fab, stitch);
-      off.getContext("2d")!.putImageData(out, 0, 0);
+  /** The one driver: ensure the angle's cache, apply the selections (or
+   *  originals), draw, and — after boot — play the 3D swing. */
+  useEffect(() => {
+    let stale = false;
+    (async () => {
+      angleRef.current = angle;
+      const cache = await ensureCache(angle);
+      if (!cache || stale) return;
+      recolor(cache, finishHex, fabricHex);
       blit();
-    },
-    [blit],
-  );
 
-  /* ---- load the photo, build the mask, first paint ---- */
-  useEffect(() => {
-    let cancelled = false;
-    const img = new Image();
-    img.src = CHAIR_SRC;
-    img
-      .decode()
-      .then(() => {
-        if (cancelled) return;
-        const { mask, src } = buildMask(img);
-        maskRef.current = mask;
-        outRef.current = new ImageData(new Uint8ClampedArray(src.data), mask.w, mask.h);
-        const off = document.createElement("canvas");
-        off.width = mask.w; off.height = mask.h;
-        offRef.current = off;
-        applyColors(finishHex, fabricHex, stitching);
-        firstPaintRef.current = false;
-      })
-      .catch(() => {
-        // Photo missing: the stage just stays empty; the panel still works.
-      });
-    return () => {
-      cancelled = true;
-    };
-    // Initial paint only — later changes go through the animated effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const onResize = () => blit();
-    window.addEventListener("resize", onResize, { passive: true });
-    return () => window.removeEventListener("resize", onResize);
-  }, [blit]);
-
-  /* ---- 3D turntable swing on every option change ---- */
-  useGSAP(
-    () => {
-      if (firstPaintRef.current) return; // skip mount
-      const swing = swingRef.current;
-      const band = sheenBandRef.current;
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduce || !swing) {
-        applyColors(finishHex, fabricHex, stitching);
-        return;
+      if (!bootedRef.current) {
+        bootedRef.current = true;
+        return; // first paint: the original chair, no motion
       }
-      // Recolor SYNCHRONOUSLY — never inside the timeline: a callback at
-      // the swing's apex depends on rAF ticking, which pauses in
-      // background tabs (and never runs in headless panes), leaving the
-      // chair on stale colors. The sheen sweeping over the swap covers
-      // the instant change.
-      applyColors(finishHex, fabricHex, stitching);
-
+      const swing = swingRef.current;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduce || !swing) return;
       const dir = (spinDirRef.current *= -1);
       gsap.set(swing, { transformPerspective: 1200, transformOrigin: "50% 60%" });
       const tl = gsap.timeline();
@@ -499,9 +387,9 @@ export default function CustomizerHero() {
         { rotationY: 18 * dir, scale: 1.05 },
         { rotationY: 0, scale: 1, duration: 0.8, ease: "power3.out" },
       );
-      if (band) {
+      if (sheenBandRef.current) {
         tl.fromTo(
-          band,
+          sheenBandRef.current,
           { xPercent: -140 },
           { xPercent: 140, duration: 0.65, ease: "power2.inOut" },
           0.18,
@@ -515,11 +403,19 @@ export default function CustomizerHero() {
           0,
         );
       }
-    },
-    { dependencies: [finish, fabric, stitching, baseStyle], scope: stageRef },
-  );
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [angle, finishHex, fabricHex, ensureCache, blit]);
 
-  /* ---- standing pointer tilt (the craft chapter's 3D feel) ---- */
+  useEffect(() => {
+    const onResize = () => blit();
+    window.addEventListener("resize", onResize, { passive: true });
+    return () => window.removeEventListener("resize", onResize);
+  }, [blit]);
+
+  /* ---- standing pointer tilt ---- */
   useGSAP(
     () => {
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -530,126 +426,94 @@ export default function CustomizerHero() {
       const tiltY = gsap.quickTo(stage, "rotationX", { duration: 0.7, ease: "power2.out" });
       const onMove = (e: PointerEvent) => {
         const r = stage.getBoundingClientRect();
-        tiltX(((e.clientX - r.left) / r.width - 0.5) * 7);
-        tiltY(-((e.clientY - r.top) / r.height - 0.5) * 5);
+        tiltX(((e.clientX - r.left) / r.width - 0.5) * 6);
+        tiltY(-((e.clientY - r.top) / r.height - 0.5) * 4);
       };
-      const parent = stage.parentElement ?? stage;
-      parent.addEventListener("pointermove", onMove);
-      return () => parent.removeEventListener("pointermove", onMove);
+      const section = stage.closest("section") ?? stage;
+      section.addEventListener("pointermove", onMove as EventListener);
+      return () => section.removeEventListener("pointermove", onMove as EventListener);
     },
     { scope: stageRef },
   );
 
-  /* ---- dropdown dismissal ---- */
-  useEffect(() => {
-    if (!ddOpen) return;
-    const onDown = (e: PointerEvent) => {
-      if (!ddRef.current?.contains(e.target as Node)) setDdOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDdOpen(false);
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [ddOpen]);
-
-  const addToCart = useCallback(() => {
-    // EXTENSION POINT: call the real cart handler here once one exists —
-    // the configured variant is `variant` and the price is fixed below.
-    setAdded(true);
-    window.setTimeout(() => setAdded(false), 2200);
-  }, []);
-
   return (
     <section
       aria-label="Make it yours — customize the Axtra Lounge Chair"
-      className="relative overflow-hidden pt-24 lg:h-[100dvh]"
+      className="relative overflow-hidden lg:h-[100dvh]"
       style={{ backgroundColor: T.bgBase }}
     >
-      {/* warm ambient glow, upper-right — stands in for shelf lighting */}
+      {/* chairless interior — the canvas chair is the only chair */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-[10%] right-[5%] h-[60%] w-[45%] blur-[60px]"
-        style={{ background: "radial-gradient(circle, rgba(223,163,92,0.16), transparent 70%)" }}
+        className="pointer-events-none absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url(/media/customizer/bg-interior.webp)" }}
       />
-      {/* faint vertical fluting — suggests the wood panelling */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 40px)",
+            "linear-gradient(90deg, rgba(10,7,5,0.45) 0%, rgba(10,7,5,0.1) 26%, rgba(10,7,5,0) 42%, rgba(10,7,5,0) 60%, rgba(10,7,5,0.3) 100%)",
         }}
       />
 
-      {/* vertical stepper rail (desktop) */}
-      <div className="absolute left-8 top-1/2 z-10 hidden -translate-y-1/2 lg:block">
-        <Stepper />
-      </div>
-
-      <div className="relative mx-auto flex h-full max-w-[1440px] flex-col items-center gap-8 px-6 pb-10 lg:flex-row lg:gap-10 lg:px-20 lg:pb-6">
-        {/* horizontal stepper (mobile) */}
-        <div className="self-start lg:hidden">
-          <Stepper horizontal />
-        </div>
-
-        {/* ---- left: copy column (per the Figma frame) ---- */}
-        <div className="w-full lg:w-auto lg:flex-[0_0_310px]">
-          <p
-            className="uppercase tracking-[0.22em] text-[12px] font-semibold"
-            style={{ color: T.gold }}
-          >
-            Your style. Your piece.
-          </p>
+      <div className="relative flex h-full w-full flex-col gap-6 px-6 pb-10 pt-28 lg:block lg:px-0 lg:pb-0 lg:pt-0">
+        {/* ---- left: copy — frame coords x162.85 / y240.62 (25.8% of the
+            934-tall frame); the two-line heading ends right at the chair's
+            top edge, overlapping it slightly like the frame. ---- */}
+        <div className="w-full lg:absolute lg:left-[8%] lg:top-[25.8%] lg:w-[440px]">
+          {/* whitespace-nowrap: "Crafted around" must hold ONE line (Pearl
+              at 48px needs ~460px; without this it wrapped to three lines
+              on narrower desktops). */}
           <h1
-            className="mt-4 text-white"
+            className="text-white lg:whitespace-nowrap"
             style={{
-              fontFamily: "var(--font-display)",
+              // TAN PEARL (registered via next/font as --font-pearl).
+              fontFamily: "var(--font-pearl), var(--font-hero)",
+              fontSize: "clamp(2rem, 3.33vw, 48px)",
+              fontStyle: "normal",
               fontWeight: 400,
-              fontSize: "clamp(2rem, 3.6vw, 3.4rem)",
-              lineHeight: 1.18,
+              lineHeight: "normal",
+              letterSpacing: "2.4px",
+              WebkitTextStrokeWidth: 1,
+              WebkitTextStrokeColor: "#FFF",
             }}
           >
             Crafted around
             <br />
             you.
           </h1>
-          <p className="mt-5 max-w-[30ch] text-[14.5px] leading-[1.75] text-white/68">
-            Choose the materials, finishes and details that reflect your
+          <p className="mt-5 max-w-[30ch] text-[14.5px] leading-[1.75] text-white/70">
+            Choose the materials, finishes and details that reflet your
             taste. Each piece is made to order, exclusively for you.
           </p>
-          <div aria-hidden className="mt-5 h-px w-12" style={{ backgroundColor: T.gold }} />
-          <Link href="/#craft" className={`mt-6 inline-flex items-center gap-3 ${focusRing}`}>
-            <span
-              className="flex h-9 w-9 items-center justify-center rounded-full border transition-transform duration-150 hover:scale-105"
-              style={{ borderColor: T.gold, color: T.gold }}
-            >
-              <PlayIcon />
-            </span>
-            <span className="uppercase tracking-[0.14em] text-[12px] font-semibold text-white/90">
-              See how it&rsquo;s made
-            </span>
-          </Link>
+          <div aria-hidden className="mt-5 h-px w-14 bg-white/40" />
+          <button
+            type="button"
+            aria-label="View in 360 degrees"
+            className={`mt-6 inline-flex h-10 items-center justify-center rounded-full border px-5 text-[12px] font-semibold tracking-wide transition-colors hover:border-white/50 ${focusRing}`}
+            style={{ borderColor: "rgba(255,255,255,0.3)", color: "rgba(255,255,255,0.75)" }}
+          >
+            360°
+          </button>
         </div>
 
-        {/* ---- the chair: canvas + SVG sheen, GSAP 3D stage ---- */}
-        <div className="relative h-[46vh] w-full flex-1 lg:h-full">
+        {/* ---- the chair stage ---- */}
+        {/* Scene-24 chair box: measured chair extent x434–1031, y311–859
+            of the 1440×934 frame → these insets. */}
+        <div className="relative order-last h-[46vh] w-full lg:absolute lg:bottom-[8%] lg:left-[30%] lg:right-[28%] lg:top-[33%] lg:order-none lg:h-auto lg:w-auto">
           <div
             ref={stageRef}
             role="img"
-            aria-label={`Axtra Lounge Chair in ${finish} finish with ${fabric} fabric`}
+            aria-label={`Axtra Lounge Chair, ${ANGLES[angle].label}${finish ? `, ${finish} finish` : ""}${fabric ? `, ${fabric} fabric` : ""}`}
             className="relative h-full w-full"
           >
             <div ref={swingRef} className="relative h-full w-full">
               <canvas
                 ref={canvasRef}
                 className="absolute inset-0 h-full w-full"
-                style={{ filter: "drop-shadow(0 40px 70px rgba(0,0,0,0.55))" }}
+                style={{ filter: "drop-shadow(0 30px 50px rgba(0,0,0,0.45))" }}
               />
-              {/* SVG light sweep, CSS-masked to the chair silhouette so the
-                  band only crosses the chair, never the background. */}
               <div
                 ref={sheenWrapRef}
                 aria-hidden
@@ -677,7 +541,6 @@ export default function CustomizerHero() {
               </div>
             </div>
           </div>
-          {/* grounding pool — reacts to the turntable swing */}
           <div
             ref={groundRef}
             aria-hidden
@@ -686,229 +549,176 @@ export default function CustomizerHero() {
           />
         </div>
 
-        {/* ---- right: customizer menu (Figma frame: no card — the menu
-             sits directly on the scene, hairline-divided). The sizing
-             wrapper reserves the SCALED footprint while the inner column
-             zooms to fill the height with no scrollbar. ---- */}
-        <div
-          className="w-full lg:w-auto lg:shrink-0"
-          style={
-            panelFit
-              ? { width: 310 * panelFit.scale, height: panelFit.h * panelFit.scale }
-              : undefined
-          }
-        >
-        <div
-          ref={panelInnerRef}
-          className="w-full lg:w-[310px] lg:origin-top-left"
-          style={panelFit ? { transform: `scale(${panelFit.scale})` } : undefined}
-        >
-          {/* 1 — finish */}
-          <p className={panelHeaderClass}>1. Choose your finish</p>
-          <div className="mt-2.5 flex gap-2">
-            {FINISHES.map((f) => (
-              <Swatch
-                key={f.name}
-                name={f.name}
-                hex={f.hex}
-                kind="wood"
-                selected={finish === f.name}
-                onSelect={() => setFinish(f.name)}
-              />
-            ))}
-          </div>
-
-          <div className="my-3 h-px bg-white/[0.08]" />
-
-          {/* 2 — fabric */}
-          <p className={panelHeaderClass}>2. Choose your fabric</p>
-          <div className="mt-2.5 flex gap-2">
-            {FABRICS.map((f) => (
-              <Swatch
-                key={f.name}
-                name={f.name}
-                hex={f.hex}
-                kind="fabric"
-                selected={fabric === f.name}
-                onSelect={() => setFabric(f.name)}
-              />
-            ))}
-          </div>
-
-          <div className="my-3 h-px bg-white/[0.08]" />
-
-          {/* 3 — detail options */}
-          <p className={panelHeaderClass}>3. Detail options</p>
-          <div className="mt-2.5 flex items-center justify-between">
-            <span id="stitching-label" className="text-[12.5px] text-white/68">
-              Contrast Stitching
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={stitching}
-              aria-labelledby="stitching-label"
-              onClick={() => setStitching((v) => !v)}
-              className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${focusRing}`}
-              style={{ backgroundColor: stitching ? T.gold : "rgba(255,255,255,0.15)" }}
-            >
-              <span
-                aria-hidden
-                className="absolute left-[3px] top-[3px] h-[18px] w-[18px] rounded-full bg-white transition-transform duration-200 ease-out"
-                style={{ transform: stitching ? "translateX(20px)" : "translateX(0)" }}
-              />
-            </button>
-          </div>
-          <div ref={ddRef} className="relative mt-2.5 flex items-center justify-between">
-            <span className="text-[12.5px] text-white/68">Base Style</span>
-            <button
-              type="button"
-              aria-expanded={ddOpen}
-              aria-haspopup="listbox"
-              onClick={() => setDdOpen((v) => !v)}
-              className={`flex items-center gap-2 rounded-md border border-white/15 px-3 py-1.5 text-[13px] text-white transition-colors hover:border-white/35 ${focusRing}`}
-            >
-              {baseStyle}
-              <span className="text-white/60">
-                <ChevronIcon />
-              </span>
-            </button>
-            {ddOpen && (
-              <ul
-                role="listbox"
-                aria-label="Base style"
-                className="absolute right-0 top-full z-20 mt-2 w-48 overflow-hidden rounded-md border border-white/15 shadow-xl"
-                style={{ backgroundColor: "#17120D" }}
-              >
-                {BASE_STYLES.map((s) => (
-                  <li key={s} role="option" aria-selected={s === baseStyle}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBaseStyle(s);
-                        setDdOpen(false);
-                      }}
-                      className={`w-full px-3 py-2 text-left text-[13px] transition-colors hover:bg-white/10 ${
-                        s === baseStyle ? "text-[#DFA35C]" : "text-white/80"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="my-3 h-px bg-white/[0.08]" />
-
-          {/* 4 — preview */}
-          <div className="flex items-center justify-between">
-            <p className={panelHeaderClass}>4. Preview your piece</p>
-            <div className="flex items-center gap-2 text-white/70">
-              <span className="flex h-6 items-center rounded-full border border-white/20 px-2 text-[9px] font-semibold tracking-wide">
-                360°
-              </span>
-              <button
-                type="button"
-                aria-label="Rotate preview"
-                className={`flex h-6 w-6 items-center justify-center rounded-full border border-white/20 transition-colors hover:border-white/45 ${focusRing}`}
-              >
-                <RotateIcon />
-              </button>
-            </div>
-          </div>
-          <div className="mt-2.5 flex gap-2.5">
-            {/* Placeholder state, not a bug: all four slots reuse the one
-                photo until real angle shots exist. */}
-            {ANGLES.map((src, i) => (
-              <button
-                key={i}
-                type="button"
-                aria-label={`View angle ${i + 1}`}
-                aria-pressed={angle === i}
-                onClick={() => setAngle(i)}
-                className={`h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-black/40 transition-transform duration-150 hover:scale-105 ${focusRing}`}
-                style={{
-                  border: angle === i ? `2px solid ${T.gold}` : "1px solid rgba(255,255,255,0.1)",
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="" className="h-full w-full object-cover" />
-              </button>
-            ))}
-          </div>
-
-          {/* product bar — the mock's elevated dark card */}
+        {/* ---- right: the Figma menu — x970 (flush right), y94 (the
+            frame's red measure — clears the navbar band) ---- */}
+        {panelOpen ? (
           <div
-            className="mt-4 rounded-xl p-3.5"
-            style={{ backgroundColor: "rgba(23,18,13,0.92)", border: "1px solid rgba(255,255,255,0.07)" }}
+            className="w-full lg:absolute lg:right-0 lg:top-[94px] lg:w-auto"
+            style={{
+              // Widths are consumed by the lg: arbitrary-value classes below,
+              // so the mobile stack stays w-full.
+              "--panel-w": `${PANEL_W}px`,
+              "--card-w": `${CARD_W}px`,
+              ...(panelFit
+                ? { width: PANEL_W * panelFit.scale, height: panelFit.h * panelFit.scale }
+                : null),
+            } as React.CSSProperties}
           >
-            <p className="text-[15px] font-semibold uppercase tracking-wide text-white">
-              Axtra Lounge Chair
-            </p>
-            <p className="mt-0.5 text-[12px] text-white/48">{variant}</p>
-            <p className="mt-1.5 text-[15px] font-semibold text-white">₹ 78,900</p>
-            <div className="mt-2.5 flex items-center gap-3">
+            <div
+              ref={panelInnerRef}
+              className="relative w-full lg:absolute lg:right-0 lg:top-0 lg:w-[var(--panel-w)] lg:origin-top-right"
+              style={panelFit ? { transform: `scale(${panelFit.scale})` } : undefined}
+            >
+              {/* close ⊗ above the box's top-right */}
               <button
                 type="button"
-                onClick={addToCart}
-                className={`flex-1 rounded-full py-2.5 text-[12px] font-semibold uppercase tracking-[0.1em] transition-transform duration-150 hover:scale-[1.02] ${focusRing}`}
-                style={{ backgroundColor: T.goldBtn, color: T.textOnGold }}
+                aria-label="Close customizer panel"
+                onClick={() => setPanelOpen(false)}
+                className={`absolute -top-9 right-4 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 text-white/60 transition-colors hover:border-white/55 hover:text-white/90 ${focusRing}`}
               >
-                {added ? "Added to cart ✓" : "Add to cart"}
+                <CloseIcon />
               </button>
-              <button
-                type="button"
-                aria-pressed={wishlisted}
-                aria-label="Save to wishlist"
-                onClick={() => setWishlisted((v) => !v)}
-                className={`flex h-10 w-10 items-center justify-center rounded-full border border-white/20 transition-colors hover:border-white/45 ${focusRing}`}
-                style={{ color: wishlisted ? T.gold : "rgba(255,255,255,0.8)" }}
+
+              {/* THE BOX — 470×561, #000 @ 33% */}
+              <div
+                className="flex w-full flex-col justify-between px-[29px] py-7 lg:h-[561px] lg:w-[var(--panel-w)]"
+                style={{ backgroundColor: "rgba(0,0,0,0.33)" }}
               >
-                <HeartIcon filled={wishlisted} />
-              </button>
+                <div>
+                  <p className="text-[14px] font-semibold uppercase tracking-[0.06em] text-white">
+                    1. Choose your finish
+                  </p>
+                  <div className="mt-3.5 flex justify-between">
+                    {FINISHES.map((f) => (
+                      <Swatch
+                        key={f.name}
+                        name={f.name}
+                        img={f.img}
+                        selected={finish === f.name}
+                        onSelect={() => setFinish(f.name)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[14px] font-semibold uppercase tracking-[0.06em] text-white">
+                    2. Choose your fabric
+                  </p>
+                  <div className="mt-3.5 flex justify-between">
+                    {FABRICS.map((f) => (
+                      <Swatch
+                        key={f.name}
+                        name={f.name}
+                        label={f.label}
+                        img={f.img}
+                        selected={fabric === f.name}
+                        onSelect={() => setFabric(f.name)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[14px] font-semibold uppercase tracking-[0.06em] text-white">
+                    3. Preview your piece
+                  </p>
+                  <div className="mt-3.5 flex justify-between">
+                    {ANGLES.map((a, i) => (
+                      <button
+                        key={a.src}
+                        type="button"
+                        aria-label={a.label}
+                        aria-pressed={angle === i}
+                        onClick={() => setAngle(i)}
+                        className={`h-[94px] w-[94px] shrink-0 overflow-hidden rounded-lg transition-transform duration-150 hover:scale-105 ${focusRing}`}
+                        style={{
+                          background:
+                            "linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05))",
+                          border: angle === i ? `2px solid ${T.gold}` : "1.5px solid rgba(255,255,255,0.45)",
+                          boxShadow: angle === i ? "0 0 14px rgba(223,163,92,0.3)" : undefined,
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={a.src} alt="" className="h-full w-full object-contain p-2" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* product card — Figma spec: 456×167, r8, #000 @ 54%, 15px
+                  in from the right edge, 44px below the box (y683). */}
+              <div
+                className="mt-5 flex w-full flex-col justify-center rounded-lg px-6 py-4 lg:ml-auto lg:mr-[15px] lg:mt-[44px] lg:h-[167px] lg:w-[var(--card-w)]"
+                style={{ backgroundColor: "rgba(0,0,0,0.54)" }}
+              >
+                <p className="text-[14px] font-semibold uppercase tracking-[0.1em] text-white/95">
+                  Axtra Lounge Chair
+                </p>
+                <p className="mt-0.5 text-[12px] text-white/50">
+                  {finish ?? "Walnut Brown"}/{fabric ?? "Olive"}
+                </p>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <p className="text-[15px] font-semibold text-white/90">Rs. 75000.00</p>
+                  <button
+                    type="button"
+                    className={`px-5 py-2 text-[11px] font-bold uppercase tracking-[0.1em] transition-transform duration-150 hover:scale-[1.03] ${focusRing}`}
+                    style={{ backgroundColor: T.goldBtn, color: T.textOnGold, borderRadius: 3 }}
+                  >
+                    Shop Now
+                  </button>
+                </div>
+                <div className="mt-2.5 h-px bg-white/[0.12]" />
+                {/* nowrap + tight tracking: TAN PEARL's wide advance made
+                    this line wrap and burst the 167px card. */}
+                <p className="mt-2 whitespace-nowrap text-center text-[9.5px] uppercase tracking-[0.01em] text-white/45">
+                  Delivery in 12-15 days&ensp;|&ensp;Contact our team for best prices
+                </p>
+              </div>
             </div>
-            <div className="mt-2.5 h-px bg-white/[0.08]" />
-            <p className="mt-2 flex items-center gap-2 text-[11px] uppercase tracking-wide text-white/48">
-              <TruckIcon />
-              Made to order&ensp;|&ensp;Delivery in 6–8 weeks
-            </p>
           </div>
-        </div>
-        </div>
-      </div>
-
-      {/* bottom-left step mark */}
-      <div className="absolute bottom-8 left-8 hidden xl:block">
-        <div
-          aria-hidden
-          className="absolute -left-8 bottom-0 h-24 w-px"
-          style={{ backgroundColor: T.gold }}
-        />
-        <p className="leading-none">
-          <span
-            style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 56, color: T.gold }}
+        ) : (
+          <button
+            type="button"
+            aria-label="Open customizer panel"
+            onClick={() => setPanelOpen(true)}
+            className={`hidden h-9 w-9 rotate-45 items-center justify-center rounded-full border border-white/25 text-white/55 transition-colors hover:border-white/50 hover:text-white/85 lg:absolute lg:right-6 lg:top-[90px] lg:flex ${focusRing}`}
           >
-            06
-          </span>
-          <span className="ml-2 text-[24px] text-white/48">/ 07</span>
-        </p>
-        <p className="mt-2 uppercase tracking-[0.18em] text-[13px] text-white/68">
-          Make it yours
-        </p>
+            <CloseIcon />
+          </button>
+        )}
       </div>
 
-      {/* scroll indicator (per the Figma frame) */}
-      <div
-        aria-hidden
-        className="absolute bottom-5 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-1.5 lg:flex"
-      >
-        <p className="uppercase tracking-[0.24em] text-[11px] text-white/55">
-          Scroll to continue
-        </p>
-        <span className="block h-6 w-px bg-white/30" />
-        <span className="scroll-cue-dot block h-1.5 w-1.5 rounded-full bg-white/70" />
+      {/* ---- bottom product navigation — both links grouped side by side
+          at the bottom-left, per the frame ---- */}
+      <div className="absolute bottom-6 left-0 right-0 z-10 hidden lg:block">
+        <div className="flex w-full items-end justify-start gap-16 px-10">
+          <Link
+            href="#"
+            className={`group flex flex-col gap-1.5 opacity-80 transition-opacity hover:opacity-100 ${focusRing}`}
+          >
+            <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-white/50">
+              <ArrowLeftIcon />
+              Previous
+            </span>
+            <span className="text-[14px] font-semibold uppercase tracking-[0.12em] text-white/85 transition-colors group-hover:text-white">
+              Arm Chair
+            </span>
+          </Link>
+          <Link
+            href="#"
+            className={`group flex flex-col items-start gap-1.5 opacity-80 transition-opacity hover:opacity-100 ${focusRing}`}
+          >
+            <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-white/50">
+              Next
+              <ArrowRightIcon />
+            </span>
+            <span className="text-[14px] font-semibold uppercase tracking-[0.12em] text-white/85 transition-colors group-hover:text-white">
+              Sectional Sofa
+            </span>
+          </Link>
+        </div>
       </div>
     </section>
   );

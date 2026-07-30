@@ -63,11 +63,10 @@ const CALLOUTS = [
   {
     title: "Every Curve Has A Purpose.",
     body: "Sculpted for comfort. Refined through precision.",
-    // w-[17.625rem]: the heading's first line renders 280px wide, so a
-    // 282px box makes the centered text FILL it — the left-edge eyebrow
-    // rule then sits flush with the text instead of floating 16px out,
-    // and the body wraps at the period like the key frame.
-    className: "w-[17.625rem] text-center",
+    // Box sized so the heading's first line fills it and the left-edge
+    // eyebrow rule sits flush with the text (re-measured for TAN PEARL
+    // at 22px — was 282px for Catilde at 30px).
+    className: "w-[15rem] text-center",
     // Anchored via `right` on purpose — a translateX(-100%) here would be
     // clobbered by the cursor-parallax gsap x/y writes.
     style: { right: "calc(50% + clamp(13rem, 20vw, 20rem))", top: "46%" },
@@ -375,7 +374,7 @@ export default function ChairShowcase() {
               className="absolute inset-0"
               style={{
                 background:
-                  "radial-gradient(120% 90% at 50% 38%, #F2EBDF 0%, #E8E0D5 48%, #DBD1C1 100%)",
+                  "radial-gradient(69.68% 69.68% at 50% 50%, #E7DDD4 0%, #BCAB98 100%)",
               }}
             />
 
@@ -393,25 +392,32 @@ export default function ChairShowcase() {
                 One element for both would break: gsap's x/y/yPercent writes
                 replace the Tailwind -translate-x-1/2 transform, which is
                 exactly what shoved the wordmark half a screen to the right. */}
+            {/* top-[41%] (was 37%): clears the "— CRAFTMANSHIP" eyebrow —
+                Pearl's tall stroked caps at 260px reached it at 37%. */}
             <span
               aria-hidden
-              className="absolute left-1/2 top-[37%] -translate-x-1/2 -translate-y-1/2"
+              className="absolute left-1/2 top-[41%] -translate-x-1/2 -translate-y-1/2"
             >
               <span
                 data-wordmark
                 data-assembled-copy
                 className="block select-none whitespace-nowrap text-center"
                 style={{
+                  // User spec: TAN PEARL 300px / 400, #741A14 with a 4px
+                  // #741A14 stroke, ls 15px @300 = 0.05em.
                   color: "#741A14",
                   fontFamily: "var(--font-hero)",
-                  fontWeight: 300,
-                  // 350px on the 1440px key frame (24.3vw) — the frame's
-                  // ~1006px wordmark = 2.87em of 350px incl. tracking —
-                  // with the glyph centre at ~37% of the stage height.
-                  fontSize: "clamp(8rem, 24.3vw, 21.875rem)",
+                  fontWeight: 400,
+                  // 240px cap (down from the spec's 300): Pearl's tall
+                  // stroked glyphs collided with the "— CRAFTMANSHIP"
+                  // eyebrow — 240px at the 41% centre clears it by ~30px
+                  // (glyph top ≈ 41% − 0.475em vs eyebrow bottom ≈ 20.5%).
+                  fontSize: "clamp(5.5rem, 16.6vw, 15rem)",
                   fontStyle: "normal",
                   lineHeight: "normal",
                   letterSpacing: "0.05em",
+                  WebkitTextStrokeWidth: 4,
+                  WebkitTextStrokeColor: "#741A14",
                 }}
               >
                 Maple
@@ -423,11 +429,10 @@ export default function ChairShowcase() {
               data-depth="12"
               className="absolute left-[11.3%] top-[57.7%] max-w-[18rem]"
             >
-              {/* Catilde per the alignment key frame — the mock's thin
-                  high-contrast letterforms are the hero face, not
-                  Playfair. */}
+              {/* Stepped down for TAN PEARL (was 1.75rem — ran oversized
+                  in the wider face), per the user. */}
               <p
-                className="text-[1.75rem] leading-snug text-timber-900"
+                className="text-[20px] leading-snug text-timber-900"
                 style={{
                   fontFamily: "var(--font-hero)",
                   fontWeight: 300,
@@ -458,15 +463,16 @@ export default function ChairShowcase() {
                   aria-hidden
                   className="mb-3 block h-px w-10 bg-[#741A14]/80"
                 />
-                {/* Key-frame spec: Catilde 30px/300 headings in the deep
-                    clay, Red Hat Display 18.544px/300 black body, both at
-                    0.05em/0.1em tracking respectively. */}
+                {/* Sized to the section-4 pairing per the user (TAN PEARL
+                    ran the old 30/18.5px sizes far too large): heading ≈
+                    the outro's stacked heading scale, body = the outro's
+                    14px body. */}
                 <h3
                   className={c.nowrapTitle ? "whitespace-nowrap" : undefined}
                   style={{
                     color: "#741A14",
                     fontFamily: "var(--font-hero)",
-                    fontSize: "30px",
+                    fontSize: "22px",
                     fontStyle: "normal",
                     fontWeight: 300,
                     lineHeight: "normal",
@@ -476,15 +482,15 @@ export default function ChairShowcase() {
                   {c.title}
                 </h3>
                 <p
-                  className="mt-2.5"
+                  className="mt-2"
                   style={{
                     color: "#000",
-                    fontFamily: "var(--font-redhat)",
-                    fontSize: "18.544px",
+                    fontFamily: "var(--font-pearl), var(--font-redhat)",
+                    fontSize: "14px",
                     fontStyle: "normal",
                     fontWeight: 300,
                     lineHeight: "normal",
-                    letterSpacing: "1.854px",
+                    letterSpacing: "1.4px",
                   }}
                 >
                   {c.body}

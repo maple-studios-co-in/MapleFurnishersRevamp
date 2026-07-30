@@ -7,28 +7,13 @@ import ScrollCue from "@/components/ui/ScrollCue";
 import { useSmoothScroll } from "@/components/layout/SmoothScroll";
 import { SEQUENCES } from "@/lib/sequences";
 
-/**
- * Where the film freezes — on the formed, sunlit room with the DOM title
- * card up and the scroll cue beneath it. The intro plays the clean
- * re-render (hero-intro-clean.mp4 — title-free, bars cropped out), and
- * "Every home has a story." is DOM text in Catilde Light, the same face
- * the footage's card was set in, timed to appear exactly when the baked
- * card used to. On the first scroll the canvas crossfades in and the
- * title lifts away — reversibly.
- */
 const INTRO_END_S = 5.4;
 const INTRO_MAX_MS = 16_000;
 
 /** Video time at which the title card rises (when the baked one did). */
 const TITLE_IN_S = 4.3;
 
-/** Frame progress at which "Let's furnish yours." plus the kicker fade in
- *  over the film — effectively the LAST frame (user: only after the whole
- *  sequence has played), which then rests on screen through the tail
- *  hold while the entrance tween plays. Not 1.0 exactly: frame decoding
- *  can lag a fast scrub by a frame or two, and the reveal must still
- *  fire. (The social rings are the fixed SocialRail now — they persist
- *  across every scrubbed chapter.) */
+
 const SUB_AT = 0.985;
 
 /** Dev-only sequencing trail (window.__mfIntroLog). */
@@ -299,7 +284,10 @@ export default function HeroFilm() {
           style={{
             fontFamily: "var(--font-hero)",
             fontWeight: 300,
-            fontSize: "clamp(3rem, 9.11vw, 8.75rem)",
+            // Narrowed for TAN PEARL's wider glyphs (was 9.11vw for
+            // Catilde) — the nowrap line must never exceed the viewport;
+            // 7vw lands it at ~90vw like the key frame.
+            fontSize: "clamp(2.4rem, 7vw, 6.75rem)",
             fontStyle: "normal",
             lineHeight: "normal",
             letterSpacing: "0.05em",
@@ -329,19 +317,22 @@ export default function HeroFilm() {
             line = 930/1440 = 64.6vw ⇒ 10.93vw type (Catilde runs
             5.91em/line incl. 0.05em tracking), 270px over two lines ⇒
             0.858 leading, top gap 238/963 = 24.7%. */}
+        {/* User spec: TAN PEARL 120px / 400, #FFF with a 2px #FFF stroke,
+            line-height normal (the tight 0.858 leading collided with
+            Pearl's tall glyphs), letter-spacing 6px @120 = 0.05em. */}
         <h1
           ref={titleARef}
           className="invisible absolute inset-x-0 top-[24.7%] z-10 text-center opacity-0"
           style={{
             fontFamily: "var(--font-hero)",
-            fontWeight: 300,
-            // 9.1vw: two zoom-out steps from the key frame's box-exact
-            // 10.93vw, per the user.
-            fontSize: "clamp(3.2rem, 9.1vw, 10.5rem)",
+            fontWeight: 400,
+            fontSize: "clamp(3rem, 8.33vw, 7.5rem)",
             fontStyle: "normal",
-            lineHeight: 0.858,
+            lineHeight: "normal",
             letterSpacing: "0.05em",
-            color: "#F4F2EC",
+            color: "#FFF",
+            WebkitTextStrokeWidth: 2,
+            WebkitTextStrokeColor: "#FFF",
             textShadow: "0 4px 40px rgba(23,19,16,0.35)",
           }}
         >

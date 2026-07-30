@@ -28,12 +28,18 @@
   --color-maple-nav: #e8e2d6;
   --color-maple-divider: #322d28;
 
-  --font-display: var(--font-playfair), ui-serif, Georgia, serif;
-  --font-hero: var(--font-catilde), var(--font-italiana), ui-serif, Georgia,
+  /* TAN PEARL is the site-wide face per the user's direction — every
+     token points at it (weights/sizes/alignment stay as declared where
+     they're used); the previous faces remain as fallbacks while the
+     webfont loads. */
+  --font-display: var(--font-pearl), var(--font-playfair), ui-serif, Georgia,
     serif;
-  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  /* UI / nav / body type for the Brand Promise section */
-  --font-ui: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-hero: var(--font-pearl), var(--font-catilde), var(--font-italiana),
+    ui-serif, Georgia, serif;
+  --font-body: var(--font-pearl), var(--font-inter), ui-sans-serif, system-ui,
+    sans-serif;
+  --font-ui: var(--font-pearl), var(--font-montserrat), ui-sans-serif,
+    system-ui, sans-serif;
 }
 
 /* --- Fixed-chrome theming -------------------------------------------

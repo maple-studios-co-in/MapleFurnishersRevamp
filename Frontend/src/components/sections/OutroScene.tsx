@@ -90,8 +90,9 @@ const SCENES: readonly Scene[] = [
     hotspotFrames: [37, 47],
     copy: {
       // max-w-3xl: wide enough for the headline to run as ONE line.
+      // eyebrowAbove (not inline): the rule sits ABOVE the headline.
       className: "left-[9%] top-[22%] max-w-3xl lg:left-[10%]",
-      eyebrow: true,
+      eyebrowAbove: true,
       font: "display",
       headline: "Comfort, Curated Beautifully.",
       body: "Where everyday moments become lasting memories.",
@@ -184,8 +185,9 @@ const SCENES: readonly Scene[] = [
     hotspotFrames: [115, 120],
     copy: {
       // The dining key frame: eyebrow rule ABOVE, headline at the shared
-      // chapter size, wide enough to run as a single line.
-      className: "left-[9%] top-[18%] max-w-4xl",
+      // chapter size. max-w-5xl: TAN PEARL needs ~940px for the headline
+      // to run as a single line (4xl wrapped it).
+      className: "left-[9%] top-[18%] max-w-5xl",
       eyebrowAbove: true,
       headline: "Gather Around Something Meaningful.",
       subBold: "Designed For Conversations That Last.",

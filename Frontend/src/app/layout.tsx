@@ -48,6 +48,16 @@ const redHat = Red_Hat_Display({
   display: "swap",
 });
 
+// TAN PEARL — the site-wide face per the user's direction (single Regular
+// weight; heavier CSS weights render synthesized). NOTE: verify the
+// commercial license before production launch, same as Catilde.
+const tanPearl = localFont({
+  src: "../fonts/TAN-PEARL.otf",
+  weight: "400",
+  variable: "--font-pearl",
+  display: "swap",
+});
+
 // Hero title font, matching the film's baked-in typography.
 // NOTE: free demo version (personal use). Buy the commercial license
 // (Creative Market) before production launch.
@@ -86,7 +96,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${playfair.variable} ${italiana.variable} ${catilde.variable} ${montserrat.variable} ${redHat.variable}`}
+      className={`${inter.variable} ${playfair.variable} ${italiana.variable} ${catilde.variable} ${montserrat.variable} ${redHat.variable} ${tanPearl.variable}`}
     >
       <body>
         {/* Chrome lives outside <main> so it never sits inside a pinned

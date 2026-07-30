@@ -88,7 +88,10 @@ export default function ScrollCue({ visible }: { visible: boolean }) {
           fill="#F4F2EC"
           fontSize="21.863"
           fontWeight="500"
-          style={{ fontFamily: "var(--font-redhat)", letterSpacing: "9.2px" }}
+          // Tracking reduced for TAN PEARL's wider advance — glyphs past
+          // the arc path's end are DROPPED, so the label must stay
+          // shorter than the ~276px path.
+          style={{ fontFamily: "var(--font-pearl), var(--font-redhat)", letterSpacing: "5px" }}
         >
           <textPath href="#mf-scroll-arc" startOffset="50%" textAnchor="middle">
             SCROLL DOWN
