@@ -8,21 +8,40 @@ interface StatsCardsProps {
   isLoading: boolean;
 }
 
-const WavyLine = () => (
-  <svg
-    viewBox="0 0 120 20"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className="w-full h-4 mt-3"
-  >
-    <path
-      d="M0 10 Q 15 2, 30 10 T 60 10 T 90 10 T 120 10"
-      stroke="#741A14"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-  </svg>
+/**
+ * Card footer. Replaces the decorative wave that used to sit here: a card
+ * of numbers is a better place for one more real number than for an
+ * ornament. Where a card has a meaningful denominator it draws the share
+ * as a thin meter; where it does not, it prints the caption alone so the
+ * four cards still line up.
+ */
+const CardMeter = ({
+  label,
+  ratio,
+}: {
+  label: string;
+  ratio: number | null;
+}) => (
+  <div className="mt-4 border-t border-[#F2E7D0] pt-3">
+    {ratio !== null && (
+      <div className="mb-1.5 h-1 w-full overflow-hidden rounded-full bg-[#F5EDDD]">
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${Math.round(ratio * 100)}%`,
+            backgroundColor: "#741A14",
+          }}
+        />
+      </div>
+    )}
+    <p className="text-[11px] tracking-wide text-[#8A8078]">{label}</p>
+  </div>
 );
+
+/** Share of a total, guarded against divide-by-zero. */
+const pct = (part: number, total: number) => (total > 0 ? part / total : 0);
+const pctLabel = (part: number, total: number) =>
+  `${total > 0 ? Math.round((part / total) * 100) : 0}%`;
 
 export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
   if (isLoading) {
@@ -47,24 +66,32 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
       value: stats.products.total,
       subtext: `${stats.products.published} Published · ${stats.products.draft} Draft`,
       icon: Package,
+      meter: pct(stats.products.published, stats.products.total),
+      meterLabel: `${pctLabel(stats.products.published, stats.products.total)} live on the site`,
     },
     {
       title: "NEW INQUIRIES",
       value: stats.inquiries.new,
       subtext: "Requires follow-up response",
       icon: AlertCircle,
+      meter: pct(stats.inquiries.new, stats.inquiries.total),
+      meterLabel: `${pctLabel(stats.inquiries.new, stats.inquiries.total)} of all inquiries`,
     },
     {
       title: "TOTAL INQUIRIES",
       value: stats.inquiries.total,
       subtext: `${stats.inquiries.contacted} Contacted · ${stats.inquiries.closed} Closed`,
       icon: MessageSquare,
+      meter: pct(stats.inquiries.closed, stats.inquiries.total),
+      meterLabel: `${pctLabel(stats.inquiries.closed, stats.inquiries.total)} resolved`,
     },
     {
       title: "ACTIVE SUBSCRIBERS",
       value: stats.subscribers.active,
       subtext: "Audience newsletter list",
       icon: Mail,
+      meter: null,
+      meterLabel: "Opted in through the site",
     },
   ];
 
@@ -102,7 +129,7 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
               </span>
             </div>
             <p className="mt-1.5 text-xs text-[#665E55]">{card.subtext}</p>
-            <WavyLine />
+            <CardMeter label={card.meterLabel} ratio={card.meter} />
           </div>
         );
       })}
