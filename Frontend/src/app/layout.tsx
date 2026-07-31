@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import {
   Inter,
   Italiana,
+  Manrope,
   Montserrat,
   Playfair_Display,
   Red_Hat_Display,
@@ -37,6 +38,14 @@ const italiana = Italiana({
   weight: "400",
   subsets: ["latin"],
   variable: "--font-italiana",
+  display: "swap",
+});
+
+// Chrome face — navbar links and the Shop Now button, per the spec.
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-manrope",
   display: "swap",
 });
 
@@ -96,7 +105,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${playfair.variable} ${italiana.variable} ${catilde.variable} ${montserrat.variable} ${redHat.variable} ${tanPearl.variable}`}
+      className={`${inter.variable} ${playfair.variable} ${italiana.variable} ${catilde.variable} ${montserrat.variable} ${manrope.variable} ${redHat.variable} ${tanPearl.variable}`}
     >
       <body>
         {/* Chrome lives outside <main> so it never sits inside a pinned

@@ -230,6 +230,67 @@ export function useFrameSequence(
       const sh = ch / s;
       ctx.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, cw, ch);
     }
+
+    /* ---- Erase baked-in watermark (Gemini sparkle, bottom-right) ----
+       The source frames carry a small (~40×40 px in 1280×720 image space)
+       sparkle icon in the bottom-right corner. We sample a strip from
+       just outside the watermark zone and paint over the corner with a
+       smooth gradient fill. This is cheaper than re-encoding 500+ images. */
+    {
+      // Patch covers ~5% width × 7% height of canvas — safely covers
+      // the watermark at any viewport size.
+      const patchW = Math.ceil(cw * 0.05);
+      const patchH = Math.ceil(ch * 0.07);
+      const px = cw - patchW;
+      const py = ch - patchH;
+
+      try {
+        // Sample a 4px-tall strip just LEFT of the patch, near its vertical
+        // centre, and average the RGBA values for a stable local colour.
+        const sampleX = Math.max(0, px - 4);
+        const sampleH = 4;
+        const sampleY = py + Math.floor(patchH / 2) - Math.floor(sampleH / 2);
+        const strip = ctx.getImageData(sampleX, Math.max(0, sampleY), 1, sampleH).data;
+        let rSum = 0, gSum = 0, bSum = 0, aSum = 0;
+        for (let i = 0; i < strip.length; i += 4) {
+          rSum += strip[i]; gSum += strip[i + 1]; bSum += strip[i + 2]; aSum += strip[i + 3];
+        }
+        const n = sampleH;
+        const r = Math.round(rSum / n);
+        const g = Math.round(gSum / n);
+        const b = Math.round(bSum / n);
+        const af = Math.min(1, aSum / n / 255);
+
+        ctx.save();
+
+        // Horizontal gradient: fades from transparent to the sampled colour
+        // across the left 40% of the patch, then solid for the rest.
+        const featherL = Math.ceil(patchW * 0.4);
+        const grad = ctx.createLinearGradient(px - featherL, 0, px + Math.ceil(patchW * 0.15), 0);
+        grad.addColorStop(0, `rgba(${r},${g},${b},0)`);
+        grad.addColorStop(1, `rgba(${r},${g},${b},${af})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(px - featherL, py, patchW + featherL, patchH);
+
+        // Vertical gradient: feathers the top edge so the patch blends
+        // into the image above without a hard seam.
+        const featherT = Math.ceil(patchH * 0.4);
+        const gradV = ctx.createLinearGradient(0, py - featherT, 0, py + Math.ceil(patchH * 0.2));
+        gradV.addColorStop(0, `rgba(${r},${g},${b},0)`);
+        gradV.addColorStop(1, `rgba(${r},${g},${b},${af})`);
+        ctx.fillStyle = gradV;
+        ctx.fillRect(px, py - featherT, patchW, patchH + featherT);
+
+        // Solid fill for the innermost corner to fully cover the sparkle.
+        ctx.fillStyle = `rgba(${r},${g},${b},${af})`;
+        ctx.fillRect(px + Math.ceil(patchW * 0.15), py + Math.ceil(patchH * 0.2), patchW, patchH);
+
+        ctx.restore();
+      } catch {
+        // getImageData can throw on tainted canvases — fail silently.
+      }
+    }
+
     drawnRef.current = idx;
     // Progress is emitted from the ACTUAL paint, not the request: while
     // frames are still streaming in, a fast scrub outruns the decoder and
@@ -247,8 +308,17 @@ export function useFrameSequence(
       // Measure the wrapper, not the canvas: the canvas carries gsap
       // transforms (cursor tilt) that inflate its bounding box, and as a
       // replaced element its layout height tracks the bitmap, not the box.
+      //
+      // offset* rather than getBoundingClientRect(): the RECT IS SCALED BY
+      // ANCESTOR TRANSFORMS. The hero→craft hand-off scales
+      // [data-hero-stage] — this canvas's own parent — down to 0.04, so a
+      // resize landing mid-bridge sized the bitmap to ~4% of the viewport
+      // and left it there, and every later frame was smeared back up to
+      // full size. offsetWidth/Height read the untransformed layout box,
+      // so the bitmap is always allocated at true resolution.
       const box = canvas.parentElement ?? canvas;
-      const { width, height } = box.getBoundingClientRect();
+      const width = box.offsetWidth;
+      const height = box.offsetHeight;
       if (!width || !height) return;
       const w = Math.round(width * dpr);
       const h = Math.round(height * dpr);

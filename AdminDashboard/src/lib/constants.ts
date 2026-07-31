@@ -5,6 +5,8 @@ export const ROUTES = {
   PRODUCTS: "/dashboard/products",
   INQUIRIES: "/dashboard/inquiries",
   SUBSCRIBERS: "/dashboard/subscribers",
+  ANALYTICS: "/dashboard/analytics",
+  SETTINGS: "/dashboard/settings",
 } as const;
 
 /** Human-readable labels for inquiry statuses. */

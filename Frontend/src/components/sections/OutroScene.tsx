@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, type CSSProperties } from "react";
 import FrameSequence from "@/components/sequence/FrameSequence";
 import { gsap } from "@/lib/gsap";
 import { SEQUENCES } from "@/lib/sequences";
+import { heading, subText } from "@/lib/typography";
 
 /* ------------------------------------------------------------------ */
 /*  Scene script                                                       */
@@ -45,15 +46,14 @@ interface SceneCopy {
   /** Render the eyebrow rule ABOVE the headline instead of inline before it. */
   eyebrowAbove?: boolean;
   headline: string;
-  /**
-   * Headline typeface. "display" = Playfair (the classic serif of the
-   * "Comfort, Curated Beautifully." key frame); "hero" = Catilde.
-   */
-  font?: "display" | "hero";
   subBold?: string;
+  /**
+   * Per-scene override for the subBold line. Chapters 05 and 06 spec their
+   * closing lines as bold Red Hat Display headings rather than the shared
+   * weight-300 sub-text treatment.
+   */
+  subBoldStyle?: CSSProperties;
   body?: string;
-  /** Override for the stacked body's size class (default text-[14px]). */
-  bodySizeClass?: string;
   /**
    * When set, subBold + body render as their OWN positioned block instead
    * of stacking under the headline — the bedroom key frame splits its copy
@@ -93,10 +93,8 @@ const SCENES: readonly Scene[] = [
       // eyebrowAbove (not inline): the rule sits ABOVE the headline.
       className: "left-[9%] top-[22%] max-w-3xl lg:left-[10%]",
       eyebrowAbove: true,
-      font: "display",
       headline: "Comfort, Curated Beautifully.",
       body: "Where everyday moments become lasting memories.",
-      bodySizeClass: "text-[16px]",
     },
     hotspots: [
       {
@@ -191,6 +189,9 @@ const SCENES: readonly Scene[] = [
       eyebrowAbove: true,
       headline: "Gather Around Something Meaningful.",
       subBold: "Designed For Conversations That Last.",
+      // Bold, per the user — the sub-text spec's weight 300 read too
+      // light against the headline here.
+      subBoldStyle: { fontWeight: 700 },
       body: "Made for shared meals, celebrations and everything in between.",
     },
     hotspots: [
@@ -239,6 +240,16 @@ const SCENES: readonly Scene[] = [
       eyebrowAbove: true,
       headline: "The Best Part Of Every Day…",
       subBold: "Begins And Ends Here.",
+      // Chapter 05 spec.
+      subBoldStyle: {
+        color: "#F4F2EC",
+        fontFamily: "var(--font-redhat)",
+        fontSize: "24px",
+        fontStyle: "normal",
+        fontWeight: 700,
+        lineHeight: "150%",
+        letterSpacing: "2.4px",
+      },
       body: "Comfort designed to welcome you home.",
       // Bedroom key frame position (1536×1024): x154 (10%), y613 (60%).
       // The block's type mirrors the terrace scene's stacked sub/body
@@ -287,6 +298,16 @@ const SCENES: readonly Scene[] = [
       className: "left-[8%] top-[22%] max-w-4xl lg:left-[10%]",
       headline: "Luxury Doesn't End At The Door.",
       subBold: "Bring The Comfort Outside.",
+      // Chapter 06 spec.
+      subBoldStyle: {
+        color: "#F4F2EC",
+        fontFamily: "var(--font-redhat)",
+        fontSize: "23.5px",
+        fontStyle: "normal",
+        fontWeight: 700,
+        lineHeight: "150%",
+        letterSpacing: "2.35px",
+      },
       body: "Designed for open skies, quiet mornings and unforgettable evenings.",
     },
     // The camera pushes in across the window, so each dot carries TWO
@@ -400,18 +421,52 @@ function HotspotDot({ spot }: { spot: Hotspot }) {
             />
           )}
           <div className="min-w-0">
+            {/* Hotspot card, per spec. NOTE: "News701 BT" is a licensed
+                Bitstream face that is not in this repo — it is declared
+                first so it takes over the moment the file is added, with
+                the project's serifs as the fallback until then. */}
             <p
-              className="truncate text-[15px] font-semibold text-clay-700"
-              style={{ fontFamily: "var(--font-display)" }}
+              className="truncate"
+              style={{
+                color: "#741A14",
+                fontFamily: '"News701 BT", var(--font-playfair), ui-serif, Georgia, serif',
+                fontSize: "14px",
+                fontStyle: "normal",
+                fontWeight: 700,
+                lineHeight: "150%",
+                letterSpacing: "1.4px",
+              }}
             >
               {spot.name}
             </p>
-            <p className="mt-0.5 font-ui text-[11.5px] leading-snug text-ink/60">
+            <p
+              className="mt-0.5"
+              style={{
+                color: "#000",
+                fontFamily: "var(--font-redhat)",
+                fontSize: "12px",
+                fontStyle: "normal",
+                fontWeight: 300,
+                lineHeight: "150%",
+                letterSpacing: "1.2px",
+              }}
+            >
               {spot.desc}
             </p>
+            {/* Design spec: Red Hat Display 12px/400, 150% leading (18px),
+                ls 1.2px, #FFF. */}
             <button
               type="button"
-              className="mt-2 rounded bg-clay-700 px-3 py-1.5 font-ui text-[10.5px] font-medium text-cream transition-colors hover:bg-clay-900"
+              className="mt-2 rounded bg-clay-700 px-3 py-1.5 transition-colors hover:bg-clay-900"
+              style={{
+                color: "#FFF",
+                fontFamily: "var(--font-redhat)",
+                fontSize: "12px",
+                fontStyle: "normal",
+                fontWeight: 400,
+                lineHeight: "150%",
+                letterSpacing: "1.2px",
+              }}
             >
               View More
             </button>
@@ -689,18 +744,13 @@ export default function OutroScene() {
                   )}
                   {/* whitespace-pre-line honours explicit \n breaks in a
                       headline (evening room) without affecting the rest. */}
+                  {/* Design spec: TAN PEARL 32px/400, stroked 1px #FFF,
+                      ls 1.6px — one treatment for every chapter 04–06
+                      headline (the old Playfair variant is retired). */}
                   <h2
-                    className={
-                      scene.copy.font === "display"
-                        ? "whitespace-pre-line text-[1.9rem] leading-snug tracking-[0.02em] text-cream sm:text-[2.4rem]"
-                        : "whitespace-pre-line text-[1.95rem] leading-snug tracking-[0.05em] text-cream sm:text-[2.5rem]"
-                    }
+                    className="whitespace-pre-line"
                     style={{
-                      fontFamily:
-                        scene.copy.font === "display"
-                          ? "var(--font-display)"
-                          : "var(--font-hero)",
-                      fontWeight: scene.copy.font === "display" ? 500 : 400,
+                      ...heading("#FFF", "32px", "1.6px"),
                       textShadow: "0 2px 24px rgba(23,19,16,0.5)",
                     }}
                   >
@@ -709,18 +759,28 @@ export default function OutroScene() {
                     )}
                     {scene.copy.headline}
                   </h2>
+                  {/* Sub-text spec: Red Hat Display 18.544px/300, ls
+                      1.854px, #FFF — same treatment for the bold close and
+                      the body line. */}
                   {!scene.copy.subClassName && scene.copy.subBold && (
                     <p
-                      className="mt-2.5 font-ui text-[16.5px] font-semibold tracking-[0.02em] text-cream"
-                      style={{ textShadow: "0 1px 14px rgba(23,19,16,0.55)" }}
+                      className="mt-2.5"
+                      style={{
+                        ...subText("#FFF"),
+                        ...scene.copy.subBoldStyle,
+                        textShadow: "0 1px 14px rgba(23,19,16,0.55)",
+                      }}
                     >
                       {scene.copy.subBold}
                     </p>
                   )}
                   {!scene.copy.subClassName && scene.copy.body && (
                     <p
-                      className={`mt-1.5 max-w-sm font-ui ${scene.copy.bodySizeClass ?? "text-[14px]"} leading-relaxed text-cream/85`}
-                      style={{ textShadow: "0 1px 12px rgba(23,19,16,0.5)" }}
+                      className="mt-1.5 max-w-md"
+                      style={{
+                        ...subText("#FFF"),
+                        textShadow: "0 1px 12px rgba(23,19,16,0.5)",
+                      }}
                     >
                       {scene.copy.body}
                     </p>
@@ -734,20 +794,29 @@ export default function OutroScene() {
                 <div
                   className={`invisible absolute opacity-0 ${scene.copy.subClassName}`}
                 >
-                  {/* The terrace's stacked-sub treatment, one size step up
-                      (19/16 vs 16.5/14) — per the user for section 5. */}
+                  {/* Split block (bedroom key frame) — same sub-text spec
+                      as the stacked variant above. */}
                   {scene.copy.subBold && (
                     <p
-                      className="font-ui text-[19px] font-semibold tracking-[0.02em] text-cream"
-                      style={{ textShadow: "0 1px 14px rgba(23,19,16,0.55)" }}
+                      style={{
+                        ...subText("#FFF"),
+                        ...scene.copy.subBoldStyle,
+                        textShadow: "0 1px 14px rgba(23,19,16,0.55)",
+                      }}
                     >
                       {scene.copy.subBold}
                     </p>
                   )}
+                  {/* -mt-1: the bold line above carries 150% leading, which
+                      left too much air under it in the bedroom scene.
+                      Tightened per the user. */}
                   {scene.copy.body && (
                     <p
-                      className="mt-1.5 font-ui text-[16px] leading-relaxed text-cream/85"
-                      style={{ textShadow: "0 1px 12px rgba(23,19,16,0.5)" }}
+                      className="-mt-1"
+                      style={{
+                        ...subText("#FFF"),
+                        textShadow: "0 1px 12px rgba(23,19,16,0.5)",
+                      }}
                     >
                       {scene.copy.body}
                     </p>

@@ -19,22 +19,29 @@ export default function Topbar({ collapsed }: { collapsed: boolean }) {
   return (
     <header
       className={`
-        sticky top-0 z-30 flex h-20 items-center justify-between border-b border-admin-border bg-admin-bg/80 px-8 backdrop-blur-md
+        sticky top-0 z-30 flex h-20 items-center justify-between border-b border-[#E8BDB6] px-8 backdrop-blur-md
         transition-all duration-300
         ${collapsed ? "pl-28" : "pl-72"}
       `}
+      style={{ backgroundColor: "#FDECC8" }}
     >
       <div>
-        <h1 className="text-xl font-medium text-admin-text" style={{ fontFamily: "var(--font-display)" }}>
+        <h1
+          className="text-2xl font-semibold"
+          style={{ fontFamily: "var(--font-display)", color: "#741A14" }}
+        >
           {meta.title}
         </h1>
-        <p className="text-xs text-admin-text-muted">{meta.subtitle}</p>
+        <p className="text-xs text-[#665E55] mt-0.5">{meta.subtitle}</p>
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2.5 rounded-full border border-admin-border bg-admin-surface px-4 py-1.5">
-          <span className="h-2 w-2 rounded-full bg-admin-success animate-pulse" />
-          <span className="text-xs font-medium text-admin-text-muted">System Active</span>
+        <div
+          className="flex items-center gap-2.5 rounded-full px-4 py-1.5 shadow-sm"
+          style={{ backgroundColor: "#FFFFFF", border: "1px solid #E8BDB6" }}
+        >
+          <span className="h-2 w-2 rounded-full bg-[#15803d] animate-pulse" />
+          <span className="text-xs font-semibold text-[#1E1E1E]">System Active</span>
         </div>
       </div>
     </header>

@@ -3,9 +3,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { gsap, useGSAP } from "@/lib/gsap";
+import Icon360 from "@/components/ui/Icon360";
 
 
 
+
+/* Page type, per spec: Red Hat Display 18px / 400, ls 1.8px, #FFF —
+ * applied across the page INCLUDING the right menu. Two captions keep
+ * their calibrated sizes and only inherit the family/weight/colour: the
+ * swatch labels (68px circles sit ~65px apart, so an 18px "Walnut Brown"
+ * would collide with its neighbour) and the delivery line (nowrap inside
+ * a 508px card — 18px measures ~900px and would burst it). */
+const PAGE_TYPE = {
+  color: "#FFF",
+  fontFamily: "var(--font-redhat)",
+  fontSize: "18px",
+  fontStyle: "normal",
+  fontWeight: 400,
+  lineHeight: "normal",
+  letterSpacing: "1.8px",
+} as const;
 
 const PANEL_EXTEND_PX = 52;
 const PANEL_W = 470 + PANEL_EXTEND_PX;
@@ -246,7 +263,12 @@ function Swatch({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={img} alt="" className="h-full w-full object-cover" />
       </button>
-      <span className="text-center text-[11px] leading-[1.3] text-white/70">{label ?? name}</span>
+      <span
+        className="text-center leading-[1.3] text-white/70"
+        style={{ ...PAGE_TYPE, fontSize: "11px", letterSpacing: "1.1px", color: undefined }}
+      >
+        {label ?? name}
+      </span>
     </div>
   );
 }
@@ -483,7 +505,9 @@ export default function CustomizerHero() {
             <br />
             you.
           </h1>
-          <p className="mt-5 max-w-[30ch] text-[14.5px] leading-[1.75] text-white/70">
+          {/* 30ch (was 34): pulls the longest line in so it clears the
+              chair's leftmost edge instead of overlapping it by 14px. */}
+          <p className="mt-5 max-w-[30ch] leading-[1.75]" style={{ ...PAGE_TYPE, color: "rgba(255,255,255,0.7)" }}>
             Choose the materials, finishes and details that reflet your
             taste. Each piece is made to order, exclusively for you.
           </p>
@@ -491,17 +515,25 @@ export default function CustomizerHero() {
           <button
             type="button"
             aria-label="View in 360 degrees"
-            className={`mt-6 inline-flex h-10 items-center justify-center rounded-full border px-5 text-[12px] font-semibold tracking-wide transition-colors hover:border-white/50 ${focusRing}`}
+            className={`mt-6 inline-flex h-10 items-center justify-center rounded-full border px-5 transition-colors hover:border-white/50 ${focusRing}`}
             style={{ borderColor: "rgba(255,255,255,0.3)", color: "rgba(255,255,255,0.75)" }}
           >
-            360°
+            <Icon360 className="h-[18px] w-auto" />
           </button>
         </div>
 
         {/* ---- the chair stage ---- */}
         {/* Scene-24 chair box: measured chair extent x434–1031, y311–859
             of the 1440×934 frame → these insets. */}
-        <div className="relative order-last h-[46vh] w-full lg:absolute lg:bottom-[8%] lg:left-[30%] lg:right-[28%] lg:top-[33%] lg:order-none lg:h-auto lg:w-auto">
+        {/* Stage box sized so NO angle collides with the copy or the right
+            menu. The four renders have very different aspect ratios — the
+            ¾ hero is portrait (0.94) but Side is landscape (1.45) — and a
+            contain fit makes the landscape ones far wider, which is why
+            Side/Back used to run under the panel by ~40-58px. Insets
+            measured at 1440×900: the box spans the free band between the
+            copy and the menu (~465–957), so even the widest angle stays
+            inside it. Bottom stays at 8% so the base meets the carpet. */}
+        <div className="relative order-last h-[46vh] w-full lg:absolute lg:bottom-[8%] lg:left-[32.3%] lg:right-[33.5%] lg:top-[38.5%] lg:order-none lg:h-auto lg:w-auto">
           <div
             ref={stageRef}
             role="img"
@@ -512,7 +544,7 @@ export default function CustomizerHero() {
               <canvas
                 ref={canvasRef}
                 className="absolute inset-0 h-full w-full"
-                style={{ filter: "drop-shadow(0 30px 50px rgba(0,0,0,0.45))" }}
+                style={{ filter: "drop-shadow(0 26px 42px rgba(0,0,0,0.55))" }}
               />
               <div
                 ref={sheenWrapRef}
@@ -544,8 +576,16 @@ export default function CustomizerHero() {
           <div
             ref={groundRef}
             aria-hidden
-            className="pointer-events-none absolute left-1/2 h-8 w-[46%] -translate-x-1/2 rounded-[50%] blur-[26px]"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            /* Contact shadow. Its top is written per-draw from the chair's
+               measured base (see fit()), so it tracks every angle. Deepened
+               and graded for the new interior plate: a hard core right under
+               the chair falling off to nothing sells it as sitting ON the
+               carpet rather than floating over it. */
+            className="pointer-events-none absolute left-1/2 h-10 w-[54%] -translate-x-1/2 rounded-[50%] blur-[22px]"
+            style={{
+              background:
+                "radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.4) 48%, rgba(0,0,0,0) 76%)",
+            }}
           />
         </div>
 
@@ -585,7 +625,7 @@ export default function CustomizerHero() {
                 style={{ backgroundColor: "rgba(0,0,0,0.33)" }}
               >
                 <div>
-                  <p className="text-[14px] font-semibold uppercase tracking-[0.06em] text-white">
+                  <p className="uppercase" style={PAGE_TYPE}>
                     1. Choose your finish
                   </p>
                   <div className="mt-3.5 flex justify-between">
@@ -602,7 +642,7 @@ export default function CustomizerHero() {
                 </div>
 
                 <div>
-                  <p className="text-[14px] font-semibold uppercase tracking-[0.06em] text-white">
+                  <p className="uppercase" style={PAGE_TYPE}>
                     2. Choose your fabric
                   </p>
                   <div className="mt-3.5 flex justify-between">
@@ -620,7 +660,7 @@ export default function CustomizerHero() {
                 </div>
 
                 <div>
-                  <p className="text-[14px] font-semibold uppercase tracking-[0.06em] text-white">
+                  <p className="uppercase" style={PAGE_TYPE}>
                     3. Preview your piece
                   </p>
                   <div className="mt-3.5 flex justify-between">
@@ -653,14 +693,14 @@ export default function CustomizerHero() {
                 className="mt-5 flex w-full flex-col justify-center rounded-lg px-6 py-4 lg:ml-auto lg:mr-[15px] lg:mt-[44px] lg:h-[167px] lg:w-[var(--card-w)]"
                 style={{ backgroundColor: "rgba(0,0,0,0.54)" }}
               >
-                <p className="text-[14px] font-semibold uppercase tracking-[0.1em] text-white/95">
+                <p className="uppercase" style={PAGE_TYPE}>
                   Axtra Lounge Chair
                 </p>
-                <p className="mt-0.5 text-[12px] text-white/50">
+                <p className="mt-0.5" style={{ ...PAGE_TYPE, fontSize: "14px", letterSpacing: "1.4px", color: "rgba(255,255,255,0.55)" }}>
                   {finish ?? "Walnut Brown"}/{fabric ?? "Olive"}
                 </p>
                 <div className="mt-1.5 flex items-center justify-between">
-                  <p className="text-[15px] font-semibold text-white/90">Rs. 75000.00</p>
+                  <p style={PAGE_TYPE}>Rs. 75000.00</p>
                   <button
                     type="button"
                     className={`px-5 py-2 text-[11px] font-bold uppercase tracking-[0.1em] transition-transform duration-150 hover:scale-[1.03] ${focusRing}`}
@@ -672,7 +712,10 @@ export default function CustomizerHero() {
                 <div className="mt-2.5 h-px bg-white/[0.12]" />
                 {/* nowrap + tight tracking: TAN PEARL's wide advance made
                     this line wrap and burst the 167px card. */}
-                <p className="mt-2 whitespace-nowrap text-center text-[9.5px] uppercase tracking-[0.01em] text-white/45">
+                <p
+                  className="mt-2 whitespace-nowrap text-center uppercase"
+                  style={{ ...PAGE_TYPE, fontSize: "9.5px", letterSpacing: "0.1px", color: "rgba(255,255,255,0.45)" }}
+                >
                   Delivery in 12-15 days&ensp;|&ensp;Contact our team for best prices
                 </p>
               </div>
@@ -698,11 +741,11 @@ export default function CustomizerHero() {
             href="#"
             className={`group flex flex-col gap-1.5 opacity-80 transition-opacity hover:opacity-100 ${focusRing}`}
           >
-            <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-white/50">
+            <span className="flex items-center gap-1.5 uppercase" style={{ ...PAGE_TYPE, fontSize: "12px", letterSpacing: "1.2px", color: "rgba(255,255,255,0.5)" }}>
               <ArrowLeftIcon />
               Previous
             </span>
-            <span className="text-[14px] font-semibold uppercase tracking-[0.12em] text-white/85 transition-colors group-hover:text-white">
+            <span className="uppercase transition-colors group-hover:text-white" style={{ ...PAGE_TYPE, color: "rgba(255,255,255,0.85)" }}>
               Arm Chair
             </span>
           </Link>
@@ -710,11 +753,11 @@ export default function CustomizerHero() {
             href="#"
             className={`group flex flex-col items-start gap-1.5 opacity-80 transition-opacity hover:opacity-100 ${focusRing}`}
           >
-            <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-white/50">
+            <span className="flex items-center gap-1.5 uppercase" style={{ ...PAGE_TYPE, fontSize: "12px", letterSpacing: "1.2px", color: "rgba(255,255,255,0.5)" }}>
               Next
               <ArrowRightIcon />
             </span>
-            <span className="text-[14px] font-semibold uppercase tracking-[0.12em] text-white/85 transition-colors group-hover:text-white">
+            <span className="uppercase transition-colors group-hover:text-white" style={{ ...PAGE_TYPE, color: "rgba(255,255,255,0.85)" }}>
               Sectional Sofa
             </span>
           </Link>

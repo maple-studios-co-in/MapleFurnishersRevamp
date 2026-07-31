@@ -2,6 +2,8 @@
 
 import { ShoppingBag } from "lucide-react";
 import { NAV_LINKS } from "@/lib/sections";
+import MapleLogo from "@/components/ui/MapleLogo";
+import { chromeType } from "@/lib/typography";
 import { useSmoothScroll } from "./SmoothScroll";
 
 /**
@@ -28,24 +30,27 @@ export default function SiteHeader() {
           className="group shrink-0 text-left leading-none"
           aria-label="Maple Furnishers — back to top"
         >
-          <span
-            className="block text-xl text-[rgb(var(--chrome-fg))] transition-colors duration-500 group-hover:text-[rgb(var(--chrome-accent))] sm:text-[1.6rem]"
-            style={{ fontFamily: "var(--font-display)", fontWeight: 500 }}
-          >
-            Maple
-          </span>
-          <span className="mt-0.5 block font-ui text-[8px] tracking-[0.38em] text-[rgb(var(--chrome-accent))] transition-colors duration-500">
-            FURNISHERS
-          </span>
+          {/* The supplied wordmark carries both "Maple" and "FURNISHERS",
+              so it replaces the old two-span text lockup outright. */}
+          <MapleLogo className="h-[52px] w-auto text-[rgb(var(--chrome-fg))] transition-colors duration-500 group-hover:text-[rgb(var(--chrome-accent))]" />
         </button>
 
-        <nav className="hidden lg:flex lg:items-center lg:gap-10">
+        {/* Gap measured off the user's header inspect: at a 1440 frame
+            "About Us" sits 555 from the left / 805 from the right, which
+            works out to ~154px between links (was 40). Capped by a vw term
+            so narrower desktops shrink it instead of overflowing. */}
+        {/* ml: justify-between centres the row between the logo and the
+            button, landing the links ~45px left of the inspect. The margin
+            eats free space that then re-splits evenly, so it moves the nav
+            by only HALF its value — 90px buys the 45px shift. */}
+        <nav className="hidden lg:flex lg:items-center lg:gap-[min(154px,10.7vw)] lg:ml-[min(90px,6.25vw)]">
           {NAV_LINKS.map((l) => (
             <button
               key={l.label}
               type="button"
               onClick={() => scrollTo(l.href)}
-              className="font-ui text-[12px] tracking-[0.08em] text-[rgb(var(--chrome-fg))]/80 transition-colors duration-300 hover:text-[rgb(var(--chrome-accent))]"
+              className="transition-colors duration-300 hover:text-[rgb(var(--chrome-accent))]"
+              style={chromeType(400)}
             >
               {l.label}
             </button>
@@ -55,8 +60,8 @@ export default function SiteHeader() {
         <button
           type="button"
           onClick={() => scrollTo("#contact")}
-          className="flex items-center gap-2.5 rounded-full border border-[rgb(var(--chrome-border))]/50 bg-[rgb(var(--chrome-fg))]/10 px-5 py-2 text-[13px] tracking-[0.08em] text-[rgb(var(--chrome-fg))] backdrop-blur-sm transition-colors duration-300 hover:border-[rgb(var(--chrome-accent))]/60 hover:text-[rgb(var(--chrome-accent))] sm:px-6"
-          style={{ fontFamily: "var(--font-display)", fontWeight: 500 }}
+          className="flex items-center gap-2.5 rounded-full border border-[rgb(var(--chrome-border))]/50 bg-[rgb(var(--chrome-fg))]/10 px-5 py-2 backdrop-blur-sm transition-colors duration-300 hover:border-[rgb(var(--chrome-accent))]/60 hover:text-[rgb(var(--chrome-accent))] sm:px-6"
+          style={chromeType(500)}
         >
           Shop Now
           <ShoppingBag className="h-3.5 w-3.5" strokeWidth={1.5} />

@@ -8,6 +8,22 @@ interface StatsCardsProps {
   isLoading: boolean;
 }
 
+const WavyLine = () => (
+  <svg
+    viewBox="0 0 120 20"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className="w-full h-4 mt-3"
+  >
+    <path
+      d="M0 10 Q 15 2, 30 10 T 60 10 T 90 10 T 120 10"
+      stroke="#741A14"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
   if (isLoading) {
     return (
@@ -27,32 +43,28 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
 
   const cards = [
     {
-      title: "Total Products",
+      title: "TOTAL PRODUCTS",
       value: stats.products.total,
       subtext: `${stats.products.published} Published · ${stats.products.draft} Draft`,
       icon: Package,
-      accent: "text-admin-accent",
     },
     {
-      title: "New Inquiries",
+      title: "NEW INQUIRIES",
       value: stats.inquiries.new,
       subtext: "Requires follow-up response",
       icon: AlertCircle,
-      accent: "text-admin-warning",
     },
     {
-      title: "Total Inquiries",
+      title: "TOTAL INQUIRIES",
       value: stats.inquiries.total,
       subtext: `${stats.inquiries.contacted} Contacted · ${stats.inquiries.closed} Closed`,
       icon: MessageSquare,
-      accent: "text-admin-info",
     },
     {
-      title: "Active Subscribers",
+      title: "ACTIVE SUBSCRIBERS",
       value: stats.subscribers.active,
       subtext: "Audience newsletter list",
       icon: Mail,
-      accent: "text-admin-success",
     },
   ];
 
@@ -64,21 +76,33 @@ export default function StatsCards({ stats, isLoading }: StatsCardsProps) {
           <div
             key={card.title}
             className={`glass-card p-6 animate-fade-in-up stagger-${idx + 1}`}
+            style={{
+              backgroundColor: "#FFFFFF",
+              border: "1px solid #EFE2C9",
+              boxShadow: "0 4px 16px rgba(116, 26, 20, 0.04)",
+            }}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium uppercase tracking-wider text-admin-text-muted">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#665E55]">
                 {card.title}
               </span>
-              <div className="rounded-xl bg-admin-surface p-2.5">
-                <Icon className={`h-5 w-5 ${card.accent}`} strokeWidth={1.75} />
+              <div
+                className="rounded-xl p-2.5"
+                style={{ backgroundColor: "#FAF5EB" }}
+              >
+                <Icon className="h-5 w-5 text-[#741A14]" strokeWidth={1.75} />
               </div>
             </div>
-            <div className="mt-3">
-              <span className="text-3xl font-semibold text-admin-text" style={{ fontFamily: "var(--font-display)" }}>
+            <div className="mt-4">
+              <span
+                className="text-4xl font-semibold text-[#741A14]"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
                 {card.value}
               </span>
             </div>
-            <p className="mt-2 text-xs text-admin-text-muted">{card.subtext}</p>
+            <p className="mt-1.5 text-xs text-[#665E55]">{card.subtext}</p>
+            <WavyLine />
           </div>
         );
       })}

@@ -2,9 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, MessageSquare, Mail, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  LayoutDashboard,
+  Package,
+  MessageSquare,
+  Mail,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  BarChart3,
+  Settings,
+} from "lucide-react";
 import { ROUTES } from "@/lib/constants";
 import { useAuth } from "@/hooks/useAuth";
+import MapleLogoSvg from "@/components/ui/MapleLogoSvg";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -16,6 +27,8 @@ const NAV_ITEMS = [
   { label: "Products", href: ROUTES.PRODUCTS, icon: Package },
   { label: "Inquiries", href: ROUTES.INQUIRIES, icon: MessageSquare },
   { label: "Subscribers", href: ROUTES.SUBSCRIBERS, icon: Mail },
+  { label: "Analytics", href: ROUTES.ANALYTICS, icon: BarChart3 },
+  { label: "Settings", href: ROUTES.SETTINGS, icon: Settings },
 ];
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
@@ -25,29 +38,30 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={`
-        fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-admin-border bg-admin-surface/90 backdrop-blur-xl
-        transition-all duration-300 ease-in-out
+        fixed left-0 top-0 z-40 flex h-screen flex-col transition-all duration-300 ease-in-out shadow-2xl
         ${collapsed ? "w-20" : "w-64"}
       `}
+      style={{
+        backgroundColor: "#741A14",
+        borderRight: "1px solid rgba(0, 0, 0, 0.15)",
+      }}
     >
       {/* Brand Header */}
-      <div className="flex h-20 items-center justify-between px-6 border-b border-admin-border/50">
+      <div className="flex h-24 items-center justify-between px-5 border-b border-white/10">
         {!collapsed ? (
-          <Link href={ROUTES.DASHBOARD} className="group">
+          <Link href={ROUTES.DASHBOARD} className="group block py-2">
+            <MapleLogoSvg width={140} height={45} light />
             <span
-              className="block text-xl text-admin-text transition-colors group-hover:text-admin-accent"
-              style={{ fontFamily: "var(--font-display)", fontWeight: 500 }}
+              className="block text-[9px] tracking-[0.25em] font-semibold mt-1"
+              style={{ color: "#FFF3D3", opacity: 0.8 }}
             >
-              Maple
-            </span>
-            <span className="block text-[8px] tracking-[0.3em] text-admin-accent">
               ADMIN DASHBOARD
             </span>
           </Link>
         ) : (
           <span
-            className="block text-xl text-admin-accent"
-            style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}
+            className="block text-xl font-bold"
+            style={{ color: "#FFF3D3", fontFamily: "var(--font-display)" }}
           >
             M
           </span>
@@ -56,7 +70,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <button
           type="button"
           onClick={onToggle}
-          className="rounded-lg p-1.5 text-admin-text-muted hover:bg-admin-surface-hover hover:text-admin-text transition-colors"
+          className="rounded-lg p-1.5 text-[#FFF3D3]/70 hover:bg-white/10 hover:text-[#FFF3D3] transition-colors"
           aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -64,43 +78,46 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1.5 px-3 py-6">
+      <nav className="flex-1 space-y-2 px-3 py-6">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
           return (
             <Link
-              key={item.href}
+              key={item.label}
               href={item.href}
               className={`
-                flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-sm font-medium transition-all duration-200
+                flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200
                 ${
                   isActive
-                    ? "bg-admin-accent/15 text-admin-accent border border-admin-accent/20 shadow-[0_0_15px_rgba(192,133,82,0.1)]"
-                    : "text-admin-text-muted hover:bg-admin-surface-hover hover:text-admin-text"
+                    ? "shadow-md"
+                    : "hover:bg-white/10"
                 }
               `}
+              style={{
+                backgroundColor: isActive ? "#58120D" : "transparent",
+                color: "#FFF3D3",
+                border: isActive ? "1px solid rgba(255, 243, 211, 0.2)" : "1px solid transparent",
+              }}
               title={collapsed ? item.label : undefined}
             >
-              <Icon className={`h-5 w-5 shrink-0 ${isActive ? "text-admin-accent" : "text-admin-text-muted"}`} />
-              {!collapsed && <span>{item.label}</span>}
+              <Icon className="h-5 w-5 shrink-0" style={{ color: "#FFF3D3" }} />
+              {!collapsed && <span style={{ color: "#FFF3D3" }}>{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
       {/* Footer / Logout */}
-      <div className="p-3 border-t border-admin-border/50">
+      <div className="p-3 border-t border-white/10">
         <button
           type="button"
           onClick={logout}
-          className={`
-            flex w-full items-center gap-3.5 rounded-xl px-3.5 py-3 text-sm font-medium text-admin-danger/80
-            hover:bg-admin-danger/10 hover:text-admin-danger transition-colors duration-200
-          `}
+          className="flex w-full items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium transition-colors duration-200 hover:bg-white/10"
+          style={{ color: "#FFF3D3" }}
           title={collapsed ? "Logout" : undefined}
         >
-          <LogOut className="h-5 w-5 shrink-0" />
+          <LogOut className="h-5 w-5 shrink-0" style={{ color: "#FFF3D3" }} />
           {!collapsed && <span>Sign Out</span>}
         </button>
       </div>

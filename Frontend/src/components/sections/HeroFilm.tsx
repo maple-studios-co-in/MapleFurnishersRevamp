@@ -6,6 +6,7 @@ import { useFrameSequence } from "@/components/sequence/useFrameSequence";
 import ScrollCue from "@/components/ui/ScrollCue";
 import { useSmoothScroll } from "@/components/layout/SmoothScroll";
 import { SEQUENCES } from "@/lib/sequences";
+import { chromeType } from "@/lib/typography";
 
 const INTRO_END_S = 5.4;
 const INTRO_MAX_MS = 16_000;
@@ -124,10 +125,12 @@ export default function HeroFilm() {
     scrollPerFrame: seq.scrollPerFrame,
     fit: "cover",
     /* Tail: the settled frame — chair, room, landed title — rests, and the
-       hero→craft hand-off bridge runs INSIDE this rest (0.3 × 4560 ≈
-       1368px ≥ ChairShowcase's BRIDGE_SCROLL_PX + margin). Widened from
-       0.22 with scrollPerFrame 17→19 so the film's pace is unchanged. */
-    tailHold: 0.3,
+       hero→craft hand-off bridge runs INSIDE this rest (0.435 × 5520 ≈
+       2401px ≥ ChairShowcase's BRIDGE_SCROLL_PX of 2200 + margin).
+       Widened 0.3→0.435 with scrollPerFrame 19→23 so the film's own pace
+       is unchanged (~3120px of play vs ~3192 before) while the rest that
+       funds the hand-off nearly doubles. */
+    tailHold: 0.435,
     onProgress: handleProgress,
   });
 
@@ -282,16 +285,21 @@ export default function HeroFilm() {
           ref={titleBRef}
           className="invisible absolute inset-x-0 top-[26%] z-10 whitespace-nowrap text-center opacity-0"
           style={{
-            fontFamily: "var(--font-hero)",
-            fontWeight: 300,
-            // Narrowed for TAN PEARL's wider glyphs (was 9.11vw for
-            // Catilde) — the nowrap line must never exceed the viewport;
-            // 7vw lands it at ~90vw like the key frame.
-            fontSize: "clamp(2.4rem, 7vw, 6.75rem)",
-            fontStyle: "normal",
-            lineHeight: "normal",
-            letterSpacing: "0.05em",
+            // Design spec: TAN PEARL 95px/400, ls 4.75px, #F4F2EC with a
+            // 2px #FFF stroke, centred. The 95px is capped by a vw term so
+            // the nowrap line can never outrun a narrow viewport, and by a
+            // dvh term for the same short-viewport reason as the hero
+            // title — at 1440×900 and up it resolves to the full 95px.
             color: "#F4F2EC",
+            textAlign: "center",
+            WebkitTextStrokeWidth: 2,
+            WebkitTextStrokeColor: "#FFF",
+            fontFamily: "var(--font-hero)",
+            fontSize: "clamp(2.4rem, min(7vw, 14dvh), 95px)",
+            fontStyle: "normal",
+            fontWeight: 400,
+            lineHeight: "normal",
+            letterSpacing: "4.75px",
             textShadow: "0 4px 40px rgba(23,19,16,0.5)",
           }}
         >
@@ -304,11 +312,31 @@ export default function HeroFilm() {
           ref={subRef}
           className="invisible absolute bottom-[24%] left-[7%] z-10 opacity-0"
         >
+          {/* Chapter 02 copy, per spec: Red Hat Display 30px/300, ls 3px,
+              uppercase, #FFF. Line breaks are explicit (see below), so the
+              box only needs to clear the longest of the three. */}
           <p
-            className="max-w-[26rem] font-ui text-[clamp(13px,1.05vw,19px)] font-medium uppercase leading-relaxed tracking-[0.22em] text-cream/85"
-            style={{ textShadow: "0 2px 16px rgba(23,19,16,0.5)" }}
+            className="max-w-[32rem]"
+            style={{
+              color: "#FFF",
+              fontFamily: "var(--font-redhat)",
+              fontSize: "30px",
+              fontStyle: "normal",
+              fontWeight: 300,
+              lineHeight: "normal",
+              letterSpacing: "3px",
+              textTransform: "uppercase",
+              textShadow: "0 2px 16px rgba(23,19,16,0.5)",
+            }}
           >
-            Crafted for the moments you&apos;ll remember.
+            {/* Explicit breaks, not width-driven wrapping: the key frame
+                sets these exact three lines, and a max-width would re-flow
+                them at other viewport sizes. */}
+            Crafted for the
+            <br />
+            moments you&apos;ll
+            <br />
+            remember.
           </p>
         </div>
 
@@ -354,7 +382,9 @@ export default function HeroFilm() {
           <button
             type="button"
             onClick={finishIntro}
-            className="absolute bottom-6 right-6 z-30 rounded-full border border-cream/40 px-4 py-1.5 font-ui text-[10px] uppercase tracking-[0.2em] text-cream/80 backdrop-blur-sm transition hover:border-cream hover:text-cream"
+            /* Same pill as the header's Shop Now, per the user. */
+            className="absolute bottom-6 right-6 z-30 flex items-center rounded-full border border-[rgb(var(--chrome-border))]/50 bg-[rgb(var(--chrome-fg))]/10 px-5 py-2 backdrop-blur-sm transition-colors duration-300 hover:border-[rgb(var(--chrome-accent))]/60 hover:text-[rgb(var(--chrome-accent))] sm:px-6"
+            style={chromeType(500)}
           >
             Skip intro
           </button>

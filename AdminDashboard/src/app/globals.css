@@ -1,26 +1,30 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Brand palette — pulled from the main site's maple tokens ── */
-  --color-admin-bg: #0c0b09;
-  --color-admin-surface: #1a1816;
-  --color-admin-surface-hover: #242220;
-  --color-admin-border: #322d28;
-  --color-admin-accent: #c08552;
-  --color-admin-accent-hover: #d4965e;
-  --color-admin-text: #f2ece1;
-  --color-admin-text-muted: #a39c91;
-  --color-admin-success: #4ade80;
-  --color-admin-warning: #fbbf24;
-  --color-admin-info: #60a5fa;
-  --color-admin-danger: #f87171;
+  /* ── Brand palette — background #FDECC8 per the user ── */
+  --color-admin-bg: #FDECC8;
+  --color-admin-surface: #FFFFFF;
+  --color-admin-surface-hover: #FFF8F7;
+  --color-admin-sidebar: #741A14;
+  --color-admin-sidebar-active: #58120D;
+  --color-admin-border: #E8BDB6;
+  --color-admin-accent: #741A14;
+  --color-admin-accent-hover: #58120D;
+  --color-admin-text: #1E1E1E;
+  --color-admin-text-muted: #665E55;
+  --color-admin-maroon: #741A14;
+  --color-admin-success: #15803d;
+  --color-admin-warning: #b45309;
+  --color-admin-info: #1d4ed8;
+  --color-admin-danger: #b91c1c;
 
   /* Glassmorphism surface */
-  --color-glass: rgba(255, 255, 255, 0.04);
-  --color-glass-border: rgba(255, 255, 255, 0.06);
-  --color-glass-hover: rgba(255, 255, 255, 0.07);
+  --color-glass: #FFFFFF;
+  --color-glass-border: #E8BDB6;
+  --color-glass-hover: #FFF8F7;
 
   /* Typography */
+  --font-redhat: var(--font-redhat), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-playfair), ui-serif, Georgia, serif;
   --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
@@ -31,10 +35,18 @@ html {
 }
 
 body {
-  background-color: var(--color-admin-bg);
-  color: var(--color-admin-text);
+  background-color: #FDECC8;
+  color: #1E1E1E;
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Hide watermarks and floating badges */
+[class*="watermark"],
+[id*="watermark"],
+[class*="gemini"],
+[id*="gemini"] {
+  display: none !important;
 }
 
 /* ── Scrollbar ── */
@@ -48,12 +60,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-admin-border);
+  background: #E8BDB6;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-admin-accent);
+  background: #741A14;
 }
 
 /* ── Animations ── */
@@ -121,13 +133,23 @@ body {
   }
 }
 
-@keyframes pulse-glow {
+@keyframes shake {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(192, 133, 82, 0.4);
+    transform: translateX(0);
   }
-  50% {
-    box-shadow: 0 0 0 8px rgba(192, 133, 82, 0);
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-4px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(4px);
   }
 }
 
@@ -150,26 +172,6 @@ body {
   to {
     opacity: 0;
     transform: translateX(100%);
-  }
-}
-
-@keyframes shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  10%,
-  30%,
-  50%,
-  70%,
-  90% {
-    transform: translateX(-4px);
-  }
-  20%,
-  40%,
-  60%,
-  80% {
-    transform: translateX(4px);
   }
 }
 
@@ -209,9 +211,9 @@ body {
 .skeleton {
   background: linear-gradient(
     90deg,
-    var(--color-admin-surface) 25%,
-    var(--color-admin-surface-hover) 50%,
-    var(--color-admin-surface) 75%
+    #FFF8F7 25%,
+    #FCE4E0 50%,
+    #FFF8F7 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
@@ -220,20 +222,19 @@ body {
 
 /* ── Glass card utility ── */
 .glass-card {
-  background: var(--color-glass);
-  border: 1px solid var(--color-glass-border);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: #FFFFFF;
+  border: 1px solid #E8BDB6;
   border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(116, 26, 20, 0.04);
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .glass-card:hover {
-  background: var(--color-glass-hover);
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: #DF9B90;
+  box-shadow: 0 6px 24px rgba(116, 26, 20, 0.06);
 }
 
-/* ── Staggered animation delays for dashboard cards ── */
+/* ── Staggered animation delays ── */
 .stagger-1 {
   animation-delay: 0.05s;
 }

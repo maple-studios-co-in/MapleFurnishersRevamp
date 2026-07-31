@@ -190,3 +190,13 @@ body {
     transform: none;
   }
 }
+
+/* ── Remove floating dev overlays and badges ── */
+#next-toast-container,
+.nextjs-toast-errors-parent,
+next-route-announcer {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

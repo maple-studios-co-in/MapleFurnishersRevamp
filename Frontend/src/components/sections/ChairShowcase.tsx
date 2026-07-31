@@ -4,6 +4,7 @@ import { useCallback, useRef } from "react";
 import FrameSequence from "@/components/sequence/FrameSequence";
 import { gsap, useGSAP } from "@/lib/gsap";
 import { SEQUENCES } from "@/lib/sequences";
+import { heading, subText } from "@/lib/typography";
 
 /**
  * Scrub progress at which the chair has visibly begun exploding — the
@@ -14,32 +15,75 @@ const EXPLODE_AT = 0.32;
 
 /* ---- Hero → Craft hand-off bridge -----------------------------------
    The craft section overlaps the hero's tail-hold rest by BRIDGE_SCROLL_PX
-   of scroll (negative margin on the scope div). Over that range, a
-   scrubbed timeline pins the alpha chair at full craft size over the
-   hero, shrinks/dims the hero's whole scene beneath it, and grows the
-   cream craft stage in around the constant chair. Desktop (lg) only;
-   reduced-motion and mobile degrade below. ---------------------------- */
+   of scroll (negative margin on the scope div). Over that range a scrubbed
+   timeline hands section 02 over to section 03 around a chair that never
+   moves. Desktop (lg) only; reduced-motion and mobile degrade below.
+
+   STICKY-POD MECHANIC (per the user's reference, quietcubes.com):
+   ONE pod stays put and only the things AROUND it change. Nothing scales,
+   nothing is swapped, and there is never a frame where neither section is
+   painted — so no black flash and no chance of cropping the chair.
+
+   This replaces the previous two-phase zoom, which shrank the whole hero
+   scene to a 4% speck, blinked it out, then grew the craft plate back up
+   from 4%. That read exactly as the user described: the screen going
+   black and a "new" chair appearing, rather than one continuous chair.
+
+   The order matters. The cream plate is OPAQUE and fades in ON TOP of the
+   hero; the hero is only switched off afterwards, once it is already
+   covered. Cross-fading both at once would leave both layers partly
+   transparent mid-way and let the page's dark ink bleed through — the
+   very darkening we are removing. ---------------------------------- */
 
 /** Scroll px the hand-off occupies. Must stay UNDER the hero's tail-hold
- *  rest (~1368px = 0.3 × 4560 — widened specifically to slow this
+ *  rest (~2401px = 0.435 × 5520 — widened specifically to slow this
  *  transition down), or the hero unpins mid-crossfade. Funded by the
  *  chair sequence's leadHold — frames rest on the assembled chair until
- *  the bridge completes. */
-const BRIDGE_SCROLL_PX = 1250;
+ *  the bridge completes.
+ *
+ *  1250 → 2200 per the user: the hand-off read too fast even on a slow
+ *  scroll. Everything below is expressed as a fraction of the timeline,
+ *  so the beats stretch with it automatically. */
+const BRIDGE_SCROLL_PX = 2200;
 
-/* The chair itself stays PINNED at the craft stage geometry for the whole
- * hand-off (per the user: no chair glide/scale) — the zoom choreography
- * lives on the BACKGROUNDS, in two sequential phases: section 2's scene
- * shrinks down to a tiny card and vanishes, THEN section 3's stage grows
- * up from the same tiny size around the constant chair. */
+/** CALIBRATION KNOB — how far the pod drifts DOWN as section 03 settles
+ *  in around it, matching the reference's nudge. This is the ONLY
+ *  movement in the whole hand-off. */
+const POD_SETTLE_Y = 70;
 
-/** CALIBRATION KNOB — how far section 2's stage shrinks before it
- *  disappears (0.04 ≈ vanishing into a speck, per the user: "more
- *  extreme"). */
-const HERO_BG_EXIT = { toScale: 0.04, cardRadius: 24 };
+/** Bottom ink row of the chair inside a frame (measured: row 662 of
+ *  720), as a fraction. The footage carries empty alpha below the chair,
+ *  so the frame box is taller than the chair actually is. */
+const CHAIR_INK_BOTTOM = 662 / 720;
 
-/** CALIBRATION KNOB — the size section 3's stage grows FROM. */
-const CRAFT_BG_ENTER = { fromScale: 0.04, cardRadius: 24 };
+/**
+ * The drift the current viewport can actually afford.
+ *
+ * The pod MUST start at y=0: at that offset the cut-out chair lands
+ * exactly on top of the chair baked into the hero's settled footage
+ * (verified by compositing the two — they read as a single chair). Any
+ * starting offset would show the cut-out ghosting away from the filmed
+ * one, which is the "a new chair is appearing" the user reported.
+ *
+ * So the drift can only go DOWN, and is bounded by the gap between the
+ * chair's base and the bottom of the viewport. That gap is generous on a
+ * tall window (~71px at 900) but nearly nothing on a short one (~10px at
+ * 730), where a fixed 70px drift would saw the legs off. Below the margin
+ * this simply returns 0 — no drift beats a cropped chair.
+ */
+function podSettle() {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  // Mirrors the canvas wrapper: inset-x-0, top 36px, bottom -50px.
+  const boxTop = 36;
+  const boxH = vh + 50 - boxTop;
+  const s = Math.min(vw / 1920, boxH / 1080);
+  const drawnH = 1080 * s;
+  const drawnTop = boxTop + (boxH - drawnH) / 2;
+  const inkBottom = drawnTop + CHAIR_INK_BOTTOM * drawnH;
+  const roomBelow = vh - inkBottom;
+  return Math.max(0, Math.min(POD_SETTLE_Y, Math.round(roomBelow - 10)));
+}
 
 /**
  * Callouts hug the chair rather than the screen edges: positioned off the
@@ -62,12 +106,18 @@ const CALLOUTS = [
     nowrapTitle: true,
   },
   {
-    title: "Every Curve Has A Purpose.",
+    // Explicit break (rendered via whitespace-pre-line): "Every Curve Has"
+    // on line 1, "A Purpose." on line 2 — width-driven wrapping would
+    // re-flow it as the box scales.
+    title: "Every Curve Has\nA Purpose.",
     body: "Sculpted for comfort. Refined through precision.",
     // Right-aligned per the user's key frame: both heading lines, both
     // body lines and the eyebrow rule all hang off the box's RIGHT edge,
     // so the block reads as a mirror of the two left-anchored callouts.
-    className: "w-[15rem] text-right",
+    // w-18rem (288px): "Every Curve Has" measures 277px in TAN PEARL at
+    // the spec'd 25px/1.25px, so the old 15rem (240px) split it across a
+    // third line. The body copy still wraps inside this width.
+    className: "w-[18rem] text-right",
     ruleClassName: "ml-auto",
     // Anchored via `right` on purpose — a translateX(-100%) here would be
     // clobbered by the cursor-parallax gsap x/y writes.
@@ -183,62 +233,105 @@ export default function ChairShowcase() {
           if (!motionOK || !section || !bridgeLayer || !chairWrap) return;
 
           if (lg) {
-            // Stage + chair invisible while the section approaches under
-            // the resting hero; the scrubbed timeline runs the take-over
-            // across the overlap. The chair carries NO transform — it
-            // appears already pinned at the craft geometry and never
-            // moves; the backgrounds do the zooming.
+            // The pod is the ONLY constant. It is laid out at its final
+            // craft geometry from the very first frame and never scales,
+            // so it cannot be cropped or re-fitted mid-transition — it is
+            // literally the same canvas continuing into section 03.
             const heroStage = document.querySelector("[data-hero-stage]");
-            gsap.set(bridgeLayer, {
+            const settle = podSettle();
+            const podShadow = stage.querySelector("[data-pod-shadow]");
+            const plate = stage.querySelector("[data-craft-plate]");
+            const craftCopy = stage.querySelectorAll("[data-assembled-copy]");
+            // Everything that must stay locked together as the pod settles.
+            const pod = [chairWrap, podShadow].filter(
+              Boolean,
+            ) as Element[];
+            // The container stays visible; its CHILDREN are timed
+            // separately so the plate, the pod and the copy can each
+            // arrive on their own beat instead of popping in as one block.
+            gsap.set(bridgeLayer, { autoAlpha: 1, scale: 1, borderRadius: 0 });
+            gsap.set([plate, podShadow].filter(Boolean), {
               autoAlpha: 0,
-              scale: CRAFT_BG_ENTER.fromScale,
-              borderRadius: CRAFT_BG_ENTER.cardRadius,
-              overflow: "hidden",
-              transformOrigin: "50% 50%",
             });
+            gsap.set(craftCopy, { autoAlpha: 0, y: 26 });
+            // Hidden until the timeline brings it in. Nothing belonging to
+            // section 03 may paint before the bridge starts: the craft
+            // stage sits further down the page until it pins, so anything
+            // left switched on is seen sliding up from the bottom of the
+            // screen while the hero is still playing.
             gsap.set(chairWrap, { autoAlpha: 0 });
+            gsap.set(pod, { y: 0 });
             const tl = gsap.timeline({
               scrollTrigger: {
                 trigger: section,
                 start: "top top",
                 end: `+=${BRIDGE_SCROLL_PX}`,
-                // Lazier lerp than the house 0.6 — the zoom drifts after
-                // the wheel instead of snapping with it.
+                // Lazier lerp than the house 0.6 — the hand-off drifts
+                // after the wheel instead of snapping with it.
                 scrub: 1,
                 invalidateOnRefresh: true,
               },
             });
             tl
-              // 1 — the pinned chair fades on, full size, over the hero.
-              .to(chairWrap, { autoAlpha: 1, duration: 0.1, ease: "none" }, 0);
-            if (heroStage) {
-              tl
-                // 2 — PHASE ONE: section 2's whole scene collapses down to
-                //     a tiny card behind the constant chair…
-                .to(
-                  heroStage,
-                  {
-                    scale: HERO_BG_EXIT.toScale,
-                    borderRadius: HERO_BG_EXIT.cardRadius,
-                    transformOrigin: "50% 50%",
-                    duration: 0.46,
-                    ease: "power2.inOut",
-                  },
-                  0.02,
-                )
-                //     …and blinks out right as it bottoms.
-                .to(heroStage, { autoAlpha: 0, duration: 0.1, ease: "none" }, 0.42);
-            }
-            tl
-              // 3 — PHASE TWO: section 3's stage appears at the same tiny
-              //     size and grows smoothly to full around the chair;
-              //     opaque well before the hero unpins beneath.
-              .to(bridgeLayer, { autoAlpha: 1, duration: 0.08, ease: "none" }, 0.5)
+              // 1 — BACKGROUND CROSS-FADE, exactly the demo's mechanic:
+              //     section 02's room washes out to section 03's plate and
+              //     nothing else about the frame moves. Deliberately quick
+              //     (the first 38% of the bridge) so the beige arrives gently,
+              //     the footage is gone almost immediately.
+              //
+              //     There is no separate "pod still" any more. It could
+              //     only line up with the filmed chair if its stage were
+              //     pinned at the exact instant the bridge began — it is
+              //     not, so it rendered offset and read as a second chair
+              //     sitting below the first. Removing it is the only way
+              //     that cannot happen.
               .to(
-                bridgeLayer,
-                { scale: 1, borderRadius: 0, duration: 0.48, ease: "power2.out" },
-                0.5,
-              );
+                [plate, podShadow].filter(Boolean),
+                { autoAlpha: 1, duration: 0.38, ease: "power1.inOut" },
+                0,
+              )
+              // 2 — the pod arrives as the room leaves. It starts at 0.14,
+              //     by which point the plate is ~68% opaque, so the filmed
+              //     chair is already mostly gone: a chair is on screen the
+              //     whole way through, but never two solid ones at once.
+              .to(
+                chairWrap,
+                { autoAlpha: 1, duration: 0.20, ease: "power2.out" },
+                0.26,
+              )
+              // 3 — the pod drifts a little lower as section 03 settles,
+              //     the one movement in the whole hand-off. The contact
+              //     shadow rides the same offset or it would detach.
+              .to(pod, { y: settle, duration: 0.16, ease: "power2.out" }, 0.46)
+              // 4 — the three copy blocks arrive ONE AT A TIME, each on its
+              //     own stretch of scroll, only after the chair is settled
+              //     on the bare cream plate. Order per the user: the Maple
+              //     wordmark, then the "— Craftmanship" eyebrow, then the
+              //     "Beauty You Can See" block. Separate tweens rather than
+              //     a stagger, so each has a real gap of scroll before the
+              //     next begins instead of overlapping.
+              .to(
+                stage.querySelector("[data-wordmark]"),
+                { autoAlpha: 1, y: 0, duration: 0.10, ease: "power2.out" },
+                0.66,
+              )
+              .to(
+                stage.querySelector("[data-craft-eyebrow]"),
+                { autoAlpha: 1, y: 0, duration: 0.10, ease: "power2.out" },
+                0.77,
+              )
+              .to(
+                stage.querySelector("[data-craft-beauty]"),
+                { autoAlpha: 1, y: 0, duration: 0.10, ease: "power2.out" },
+                0.88,
+              )
+              ;
+            if (heroStage) {
+              // 4 — only once the plate is fully opaque does the hero stop
+              //     compositing. Purely a cleanup: it is already hidden
+              //     behind the plate, so this is visually a no-op.
+              tl.set(heroStage, { autoAlpha: 0 }, 0.72);
+            }
           } else {
             // <lg: no overlap margin (CSS) and no glide — just a plain
             // scrubbed crossfade of the stage as the section scrolls in.
@@ -374,6 +467,7 @@ export default function ChairShowcase() {
             {/* Full-bleed studio falloff — the page IS the backdrop, no
                 inner panel. */}
             <div
+              data-craft-plate
               className="absolute inset-0"
               style={{
                 background:
@@ -386,6 +480,7 @@ export default function ChairShowcase() {
                 edge) ------- */}
             <p
               data-assembled-copy
+              data-craft-eyebrow
               className="absolute left-[17.7%] top-[17.5%] font-ui text-[22px] font-medium uppercase tracking-[0.2em] text-timber-900"
             >
               — Craftmanship
@@ -436,17 +531,24 @@ export default function ChairShowcase() {
 
             <div
               data-assembled-copy
+              data-craft-beauty
               data-depth="12"
-              className="absolute left-[11.3%] top-[57.7%] max-w-[18rem]"
+              /* Widened from 18rem: at the spec'd 30px + 3px tracking the
+                 longest line ("Craftsmanship You") needs ~305px. */
+              className="absolute left-[11.3%] top-[57.7%] max-w-[26rem]"
             >
-              {/* Stepped down for TAN PEARL (was 1.75rem — ran oversized
-                  in the wider face), per the user. */}
+              {/* Design spec, verbatim: Red Hat Display 30px/400, 150%
+                  leading (45px), ls 3px, capitalised, #1E1E1E. */}
               <p
-                className="text-[20px] leading-snug text-timber-900"
                 style={{
-                  fontFamily: "var(--font-hero)",
-                  fontWeight: 300,
-                  letterSpacing: "1.4px",
+                  color: "#1E1E1E",
+                  fontFamily: "var(--font-redhat)",
+                  fontSize: "30px",
+                  fontStyle: "normal",
+                  fontWeight: 400,
+                  lineHeight: "150%",
+                  letterSpacing: "3px",
+                  textTransform: "capitalize",
                 }}
               >
                 Beauty You Can See.
@@ -473,39 +575,17 @@ export default function ChairShowcase() {
                   aria-hidden
                   className={`mb-3 block h-px w-10 bg-[#741A14]/80 ${c.ruleClassName}`}
                 />
-                {/* Sized to the section-4 pairing per the user (TAN PEARL
-                    ran the old 30/18.5px sizes far too large): heading ≈
-                    the outro's stacked heading scale, body = the outro's
-                    14px body. */}
+                {/* Design spec: heading TAN PEARL 25px/400 stroked 1px in
+                    #741A14; sub-text Red Hat Display 18.544px/300 in #000. */}
                 <h3
-                  className={c.nowrapTitle ? "whitespace-nowrap" : undefined}
-                  style={{
-                    color: "#741A14",
-                    fontFamily: "var(--font-hero)",
-                    fontSize: "22px",
-                    fontStyle: "normal",
-                    fontWeight: 300,
-                    lineHeight: "normal",
-                    letterSpacing: "1.5px",
-                  }}
+                  className={
+                    c.nowrapTitle ? "whitespace-nowrap" : "whitespace-pre-line"
+                  }
+                  style={heading("#741A14", "25px", "1.25px")}
                 >
                   {c.title}
                 </h3>
-                <p
-                  className="mt-2"
-                  style={{
-                    color: "#000",
-                    // Sub-text runs Catilde while the heading above stays
-                    // TAN PEARL — the token carries the size-adjust, so
-                    // 14px still reads at the size it did in Pearl.
-                    fontFamily: "var(--font-ui)",
-                    fontSize: "14px",
-                    fontStyle: "normal",
-                    fontWeight: 300,
-                    lineHeight: "normal",
-                    letterSpacing: "1.4px",
-                  }}
-                >
+                <p className="mt-2" style={subText("#000")}>
                   {c.body}
                 </p>
               </div>
@@ -518,6 +598,7 @@ export default function ChairShowcase() {
                 instead of drifting when the stage geometry changes. */}
             <div
               aria-hidden
+              data-pod-shadow
               className="absolute inset-x-0 bottom-[-50px] top-[36px]"
             >
               <div
