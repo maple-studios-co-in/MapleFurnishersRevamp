@@ -56,6 +56,7 @@ const CALLOUTS = [
     title: "Comfort Is Engineered.",
     body: "Balanced support beneath every moment of relaxation.",
     className: "text-left",
+    ruleClassName: "",
     style: { left: "calc(50% + clamp(11rem, 14.5vw, 17rem))", top: "17%" },
     /** Keep the heading on a single line per the key frame. */
     nowrapTitle: true,
@@ -63,10 +64,11 @@ const CALLOUTS = [
   {
     title: "Every Curve Has A Purpose.",
     body: "Sculpted for comfort. Refined through precision.",
-    // Box sized so the heading's first line fills it and the left-edge
-    // eyebrow rule sits flush with the text (re-measured for TAN PEARL
-    // at 22px — was 282px for Catilde at 30px).
-    className: "w-[15rem] text-center",
+    // Right-aligned per the user's key frame: both heading lines, both
+    // body lines and the eyebrow rule all hang off the box's RIGHT edge,
+    // so the block reads as a mirror of the two left-anchored callouts.
+    className: "w-[15rem] text-right",
+    ruleClassName: "ml-auto",
     // Anchored via `right` on purpose — a translateX(-100%) here would be
     // clobbered by the cursor-parallax gsap x/y writes.
     style: { right: "calc(50% + clamp(13rem, 20vw, 20rem))", top: "46%" },
@@ -76,6 +78,7 @@ const CALLOUTS = [
     title: "Strength Hidden In Plain Sight.",
     body: "Solid wood craftsmanship that defines every silhouette.",
     className: "text-left",
+    ruleClassName: "",
     style: { left: "calc(50% + clamp(11rem, 14.5vw, 17rem))", top: "66%" },
     nowrapTitle: false,
   },
@@ -464,11 +467,11 @@ export default function ChairShowcase() {
                 className={`invisible absolute max-w-[19.5rem] opacity-0 ${c.className}`}
                 style={c.style}
               >
-                {/* `block` so the rule hugs the LEFT edge even inside the
-                    text-centered middle callout, per the key frame. */}
+                {/* `block` pins the rule to the box's left edge; the
+                    right-aligned callout passes ml-auto to flip it. */}
                 <span
                   aria-hidden
-                  className="mb-3 block h-px w-10 bg-[#741A14]/80"
+                  className={`mb-3 block h-px w-10 bg-[#741A14]/80 ${c.ruleClassName}`}
                 />
                 {/* Sized to the section-4 pairing per the user (TAN PEARL
                     ran the old 30/18.5px sizes far too large): heading ≈
@@ -492,7 +495,10 @@ export default function ChairShowcase() {
                   className="mt-2"
                   style={{
                     color: "#000",
-                    fontFamily: "var(--font-pearl), var(--font-redhat)",
+                    // Sub-text runs Catilde while the heading above stays
+                    // TAN PEARL — the token carries the size-adjust, so
+                    // 14px still reads at the size it did in Pearl.
+                    fontFamily: "var(--font-ui)",
                     fontSize: "14px",
                     fontStyle: "normal",
                     fontWeight: 300,

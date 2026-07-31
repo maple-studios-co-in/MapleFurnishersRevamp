@@ -1,5 +1,38 @@
 @import "tailwindcss";
 
+/* ---- Catilde, size-matched to TAN PEARL --------------------------------
+   Headings stay TAN PEARL; navbar, chapter rail and all sub-text run in
+   Catilde (per the user). The two faces are wildly different per px —
+   measured at 100px: Pearl cap 100 / x 71, Catilde cap 62 / x 47 — so a
+   straight family swap would render the nav and sub-copy ~40% too small.
+
+   size-adjust does the compensation ONCE here instead of retuning every
+   font-size in the codebase, so every calibrated px value in the
+   components keeps its apparent size. 145% measured against Pearl:
+   x-height 97%, cap 90%, advance 105% — the best perceptual match that
+   still keeps line lengths close enough not to break the hand-tuned
+   nowrap lines (139% matches width exactly but reads 7% small).
+
+   next/font's --font-catilde is kept as the immediate fallback: it is the
+   SAME typeface and is already preloaded, so the swap-in is invisible. */
+@font-face {
+  font-family: "Catilde Fit";
+  src: url("/fonts/Catilde-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 145%;
+}
+
+@font-face {
+  font-family: "Catilde Fit";
+  src: url("/fonts/Catilde-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 145%;
+}
+
 @theme {
   /* Brand palette pulled from the hero film: blueprint terracotta -> golden-hour interior */
   --color-clay-50: #faf3ef;
@@ -28,18 +61,17 @@
   --color-maple-nav: #e8e2d6;
   --color-maple-divider: #322d28;
 
-  /* TAN PEARL is the site-wide face per the user's direction — every
-     token points at it (weights/sizes/alignment stay as declared where
-     they're used); the previous faces remain as fallbacks while the
-     webfont loads. */
-  --font-display: var(--font-pearl), var(--font-playfair), ui-serif, Georgia,
-    serif;
+  /* Two faces, split by ROLE (per the user):
+       --font-hero    → TAN PEARL. Headings only.
+       everything else → Catilde Fit (size-adjusted above).
+     So "Comfort Is Engineered." is Pearl while its sub-line, the navbar
+     and the chapter rail are Catilde — on both / and /customize, since
+     both pages read these same tokens. */
   --font-hero: var(--font-pearl), var(--font-catilde), var(--font-italiana),
     ui-serif, Georgia, serif;
-  --font-body: var(--font-pearl), var(--font-inter), ui-sans-serif, system-ui,
-    sans-serif;
-  --font-ui: var(--font-pearl), var(--font-montserrat), ui-sans-serif,
-    system-ui, sans-serif;
+  --font-display: "Catilde Fit", var(--font-catilde), ui-serif, Georgia, serif;
+  --font-body: "Catilde Fit", var(--font-catilde), ui-serif, Georgia, serif;
+  --font-ui: "Catilde Fit", var(--font-catilde), ui-serif, Georgia, serif;
 }
 
 /* --- Fixed-chrome theming -------------------------------------------
