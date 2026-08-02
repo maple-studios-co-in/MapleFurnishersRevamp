@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -18,6 +19,12 @@ export default function Modal({
   children,
   maxWidth = "max-w-lg",
 }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   /* onClose is an inline arrow in every caller, so it is a new function on
      each parent render. Holding it in a ref keeps the effect below out of
      the dependency list — otherwise every parent re-render tore down and
@@ -69,9 +76,9 @@ export default function Modal({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop. The click handler lives HERE, not on the overlay: this
           element covers the overlay completely, so it is what the pointer
@@ -118,6 +125,7 @@ export default function Modal({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
