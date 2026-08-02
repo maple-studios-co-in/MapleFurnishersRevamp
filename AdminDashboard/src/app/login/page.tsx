@@ -32,9 +32,13 @@ function LoginForm() {
       const unreachable =
         err instanceof TypeError ||
         (err instanceof Error && /fetch|network|failed to fetch/i.test(err.message));
+      // Name the endpoint actually being called. The previous wording said
+      // "port 4000" unconditionally, which is wrong — and confusing — on a
+      // deployed build that talks to the hosted API.
+      const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
       setError(
         unreachable
-          ? "Cannot reach the API server. Is the Backend running on port 4000?"
+          ? `Cannot reach the API server at ${api}. Check that it is running and reachable.`
           : err instanceof Error
             ? err.message
             : "Invalid email or password",
@@ -61,7 +65,8 @@ function LoginForm() {
       >
         {/* Header with SVG Logo */}
         <div className="flex flex-col items-center text-center">
-          <MapleLogoSvg width={220} height={85} />
+          {/* 274×98 logo box, per the supplied SVG frame. */}
+          <MapleLogoSvg width={274} height={98} />
 
           {/* Heading typography requested by user */}
           <h2
@@ -70,7 +75,7 @@ function LoginForm() {
               color: "#1E1E1E",
               textAlign: "center",
               fontFamily: "var(--font-redhat)",
-              fontSize: "22px",
+              fontSize: "18px",
               fontStyle: "normal",
               fontWeight: 400,
               lineHeight: "1.4",

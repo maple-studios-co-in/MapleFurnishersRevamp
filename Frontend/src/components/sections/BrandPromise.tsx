@@ -295,6 +295,10 @@ export default function BrandPromise() {
     <>
       {/* 06 — the promise + contact/sign-off. (05 is the sun-dappled beat
           inside the outro scrub — a marker there, not a DOM section.) */}
+      {/* This section owns id="contact" — the header's Shop Now scrolls
+          here, and the chapter rail's 06 marker resolves to it. The outro
+          film deliberately no longer carries a 06 marker, so the id is
+          unique. */}
       <section id="contact" className="relative z-10 bg-maple-bg">
         <div className="mx-auto max-w-[1600px] px-6 py-28 lg:px-20 lg:py-32">
           <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">

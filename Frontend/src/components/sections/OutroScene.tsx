@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, type CSSProperties } from "react";
 import FrameSequence from "@/components/sequence/FrameSequence";
 import { gsap } from "@/lib/gsap";
 import { SEQUENCES } from "@/lib/sequences";
+import type { SceneProducts } from "@/lib/api";
 import { heading, subText } from "@/lib/typography";
 
 /* ------------------------------------------------------------------ */
@@ -486,7 +487,18 @@ function HotspotDot({ spot }: { spot: Hotspot }) {
  * own copy and shoppable hotspots that live only while their scene is on
  * screen. Ends on the brand card: the film IS the closing page.
  */
-export default function OutroScene() {
+export default function OutroScene({
+  sceneProducts,
+}: {
+  /**
+   * Hotspots from the API, keyed by scene. Fetched on the SERVER and passed
+   * in, so the dot count is fixed before first paint — the per-scene DOM
+   * caches below match hotspots positionally and cannot survive the list
+   * changing underneath them. Omitted or null falls back to the built-in
+   * SCENES data, so the film still works with the API down.
+   */
+  sceneProducts?: SceneProducts | null;
+} = {}) {
   const stageRef = useRef<HTMLDivElement>(null);
   const shownRef = useRef<Record<string, boolean>>({});
   /**
@@ -496,6 +508,25 @@ export default function OutroScene() {
    */
   const trackRef = useRef<Record<string, HTMLElement[]>>({});
   const seq = SEQUENCES.outro;
+
+  /** API hotspots for this scene if we have them, else the built-in list. */
+  const hotspotsFor = useCallback(
+    (scene: Scene): Hotspot[] => {
+      const live = sceneProducts?.[scene.key];
+      if (!live?.length) return scene.hotspots ?? [];
+      return live.map((p) => ({
+        x: p.x,
+        y: p.y,
+        x0: p.x0 ?? undefined,
+        y0: p.y0 ?? undefined,
+        side: p.side,
+        name: p.name,
+        desc: p.desc,
+        img: p.img,
+      }));
+    },
+    [sceneProducts],
+  );
 
   /**
    * Place every dot by projecting its image-space coords through the cover
@@ -513,7 +544,7 @@ export default function OutroScene() {
           `[data-scene="${scene.key}"] [data-spot]`,
         );
         els.forEach((el, i) => {
-          const spot = scene.hotspots?.[i];
+          const spot = hotspotsFor(scene)[i];
           if (!spot) return;
           const pos = projectSpot(spot.x, spot.y);
           el.style.left = `${pos.left}px`;
@@ -659,7 +690,7 @@ export default function OutroScene() {
 
         // Camera-tracked dots: lerp each (x0,y0)→(x,y) across the window
         // so they ride the push-in instead of drifting off their furniture.
-        const spots = scene.hotspots;
+        const spots = hotspotsFor(scene);
         if (spotsIn && spots?.some((h) => h.x0 !== undefined)) {
           const cacheKey = `${scene.key}/dots`;
           let els = trackRef.current[cacheKey];
@@ -717,6 +748,12 @@ export default function OutroScene() {
               top: `calc(${frameToScrollPx(CHAPTER_05_FRAME, seq.frames * seq.scrollPerFrame)}px + 50dvh)`,
             }}
           />
+          {/* Chapter 06 anchor. Lives here because the film is the last
+              thing on the page — BrandPromise, which briefly owned a real
+              <section id="contact">, is unmounted. If it ever comes back,
+              DELETE this marker: two elements sharing an id is invalid and
+              scrollTo("#contact") matches the first, which would drop the
+              user mid-scrub instead of on the section. */}
           <div
             id="contact"
             aria-hidden
@@ -826,7 +863,7 @@ export default function OutroScene() {
               </div>
 
               <div data-group="spots" className="absolute inset-0">
-                {scene.hotspots?.map((spot) => (
+                {hotspotsFor(scene).map((spot) => (
                   <div
                     key={spot.name}
                     className="invisible absolute inset-0 opacity-0"

@@ -71,6 +71,75 @@ function frameSrc(base: string, idx: number, pattern: string) {
 }
 
 /**
+ * Frames decode()d ahead of the playhead on both sides. drawImage on a
+ * cold image decodes it SYNCHRONOUSLY on the main thread (~10–30ms for
+ * these 1080p frames) — a per-frame hitch on the first pass through a
+ * film. decode() runs off the main thread, so a ~10-frame head start
+ * (150ms+ at scrub pace) keeps the paint path stall-free.
+ */
+const DECODE_AHEAD = 10;
+
+interface PatchColor {
+  r: number;
+  g: number;
+  b: number;
+  af: number;
+}
+
+/** Shared 1×4 sampling canvas — CPU-backed via willReadFrequently, so
+ *  reading it back never touches the display canvas's GPU queue. */
+let sampler: CanvasRenderingContext2D | null = null;
+
+/**
+ * Average colour of a 1×4 strip just left of the watermark zone, read from
+ * the SOURCE image — never from the display canvas. getImageData on the
+ * display canvas forces a synchronous GPU→CPU readback (and repeated reads
+ * make Chrome demote the canvas to software raster), which stalled the
+ * whole Lenis/ScrollTrigger pipeline on every frame advance.
+ */
+function samplePatchColor(img: HTMLImageElement): PatchColor | null {
+  try {
+    if (!sampler) {
+      const c = document.createElement("canvas");
+      c.width = 1;
+      c.height = 4;
+      sampler = c.getContext("2d", { willReadFrequently: true });
+      if (!sampler) return null;
+    }
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    // Image-space mirror of the old canvas-space sample point: just left
+    // of the 5% × 7% corner zone, at its vertical centre.
+    const zoneW = Math.ceil(iw * 0.05);
+    const zoneH = Math.ceil(ih * 0.07);
+    const sx = Math.max(0, iw - zoneW - 4);
+    const sy = Math.max(0, ih - Math.ceil(zoneH / 2) - 2);
+    sampler.clearRect(0, 0, 1, 4);
+    sampler.drawImage(img, sx, sy, 1, 4, 0, 0, 1, 4);
+    const d = sampler.getImageData(0, 0, 1, 4).data;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let a = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      r += d[i];
+      g += d[i + 1];
+      b += d[i + 2];
+      a += d[i + 3];
+    }
+    return {
+      r: Math.round(r / 4),
+      g: Math.round(g / 4),
+      b: Math.round(b / 4),
+      af: Math.min(1, a / 4 / 255),
+    };
+  } catch {
+    // Tainted canvas — leave the frame unpatched.
+    return null;
+  }
+}
+
+/**
  * Scroll-scrubbed frame sequence, driven by GSAP ScrollTrigger.
  *
  * ScrollTrigger owns the pinning and the scroll→progress mapping; `scrub`
@@ -101,6 +170,13 @@ export function useFrameSequence(
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const stickyRef = useRef<HTMLDivElement | null>(null);
   const imagesRef = useRef<HTMLImageElement[]>([]);
+  /** 2D context, created once — repeated getContext calls are pointless
+   *  and the alpha option below must be applied on first creation. */
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  /** Watermark patch colour per frame — sampled once, reused forever. */
+  const patchColorsRef = useRef<(PatchColor | null | undefined)[]>([]);
+  /** 1 = decode() already requested for that frame. */
+  const decodeQueuedRef = useRef<Uint8Array | null>(null);
   const drawnRef = useRef(-1);
   /** Most recently REQUESTED frame — stale decode callbacks check it. */
   const pendingRef = useRef(-1);
@@ -159,6 +235,9 @@ export function useFrameSequence(
     let cancelled = false;
     const imgs: HTMLImageElement[] = new Array(totalFrames);
     imagesRef.current = imgs;
+    patchColorsRef.current = new Array(totalFrames);
+    const decodeQueued = new Uint8Array(totalFrames);
+    decodeQueuedRef.current = decodeQueued;
     let count = 0;
 
     for (let i = 0; i < totalFrames; i++) {
@@ -175,6 +254,13 @@ export function useFrameSequence(
       img.onload = settle;
       img.onerror = settle;
       img.src = frameSrc(framePath, i, framePattern);
+      if (i === 0) {
+        // The first frame paints the moment the scrub mounts — decode it
+        // off-thread now so that paint can't stall. Later frames are
+        // decoded ahead of the playhead from draw().
+        decodeQueued[0] = 1;
+        img.decode?.().catch(() => {});
+      }
       if (img.complete) settle();
     }
     return () => {
@@ -190,6 +276,21 @@ export function useFrameSequence(
     pendingRef.current = idx;
     if (idx === drawnRef.current) return;
 
+    // Warm the decoder for the frames the scrub is about to hit (both
+    // directions — the playhead reverses). Each frame is requested once.
+    const flags = decodeQueuedRef.current;
+    if (flags) {
+      const imgs = imagesRef.current;
+      const lo = Math.max(0, idx - DECODE_AHEAD);
+      const hi = Math.min(imgs.length - 1, idx + DECODE_AHEAD);
+      for (let j = lo; j <= hi; j++) {
+        if (!flags[j] && imgs[j]) {
+          flags[j] = 1;
+          imgs[j].decode?.().catch(() => {});
+        }
+      }
+    }
+
     if (!img.complete || !img.naturalWidth) {
       // Repaint when the frame decodes — but only if no newer frame has
       // been requested meanwhile, or a slow decode would paint an old
@@ -203,7 +304,14 @@ export function useFrameSequence(
       );
       return;
     }
-    const ctx = canvas.getContext("2d");
+    let ctx = ctxRef.current;
+    if (!ctx) {
+      // Opaque sequences (cover-fit footage) declare alpha:false — the
+      // compositor skips blending an 8-megapixel layer against the page.
+      // Transparent stages (the chair cutout) keep their alpha channel.
+      ctx = canvas.getContext("2d", { alpha: transparent });
+      ctxRef.current = ctx;
+    }
     if (!ctx) return;
 
     const cw = canvas.width;
@@ -232,11 +340,23 @@ export function useFrameSequence(
     }
 
     /* ---- Erase baked-in watermark (Gemini sparkle, bottom-right) ----
-       The source frames carry a small (~40×40 px in 1280×720 image space)
-       sparkle icon in the bottom-right corner. We sample a strip from
-       just outside the watermark zone and paint over the corner with a
-       smooth gradient fill. This is cheaper than re-encoding 500+ images. */
-    {
+       The source frames carry a small (~40×40 px in image space) sparkle
+       icon in the bottom-right corner. We paint over the corner with a
+       smooth gradient fill matched to the local footage colour. This is
+       cheaper than re-encoding 500+ images.
+
+       PERF — this must never read the display canvas back. The old
+       per-paint ctx.getImageData here forced a synchronous GPU→CPU
+       readback on every frame advance of every film, which stalled the
+       Lenis/ScrollTrigger pipeline (scroll itself is main-thread) and
+       could demote the canvas to software raster. The colour now comes
+       from samplePatchColor (source image, tiny CPU canvas), once per
+       frame index, cached for the life of the sequence.
+
+       Transparent sequences skip the patch entirely: their contain-fit
+       corner is empty alpha, so the sampled colour was rgba(x,x,x,0) and
+       the fills painted nothing — full cost, zero pixels. */
+    if (!transparent) {
       // Patch covers ~5% width × 7% height of canvas — safely covers
       // the watermark at any viewport size.
       const patchW = Math.ceil(cw * 0.05);
@@ -244,23 +364,13 @@ export function useFrameSequence(
       const px = cw - patchW;
       const py = ch - patchH;
 
-      try {
-        // Sample a 4px-tall strip just LEFT of the patch, near its vertical
-        // centre, and average the RGBA values for a stable local colour.
-        const sampleX = Math.max(0, px - 4);
-        const sampleH = 4;
-        const sampleY = py + Math.floor(patchH / 2) - Math.floor(sampleH / 2);
-        const strip = ctx.getImageData(sampleX, Math.max(0, sampleY), 1, sampleH).data;
-        let rSum = 0, gSum = 0, bSum = 0, aSum = 0;
-        for (let i = 0; i < strip.length; i += 4) {
-          rSum += strip[i]; gSum += strip[i + 1]; bSum += strip[i + 2]; aSum += strip[i + 3];
-        }
-        const n = sampleH;
-        const r = Math.round(rSum / n);
-        const g = Math.round(gSum / n);
-        const b = Math.round(bSum / n);
-        const af = Math.min(1, aSum / n / 255);
-
+      let c = patchColorsRef.current[idx];
+      if (c === undefined) {
+        c = samplePatchColor(img);
+        patchColorsRef.current[idx] = c;
+      }
+      if (c) {
+        const { r, g, b, af } = c;
         ctx.save();
 
         // Horizontal gradient: fades from transparent to the sampled colour
@@ -286,8 +396,6 @@ export function useFrameSequence(
         ctx.fillRect(px + Math.ceil(patchW * 0.15), py + Math.ceil(patchH * 0.2), patchW, patchH);
 
         ctx.restore();
-      } catch {
-        // getImageData can throw on tainted canvases — fail silently.
       }
     }
 

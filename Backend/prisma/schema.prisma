@@ -20,6 +20,49 @@ model Product {
   isPublished Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  placements ProductPlacement[]
+}
+
+/// Where a product sits on the outro film's shoppable scenes.
+///
+/// This is a separate table rather than columns on Product because a single
+/// product legitimately appears in more than one scene — the Aria Lounge
+/// Chair, Haven Sectional and Orbit Coffee Table are all in both the day
+/// room and the evening room, and the Glow Table Lamp is in the evening
+/// room and the dining room. One scene column could not express that.
+model ProductPlacement {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// day-room | evening-room | dining | bedroom | terrace
+  scene String
+
+  /// Position as a percentage of the 1280x720 FOOTAGE, not of the screen.
+  /// OutroScene's projectSpot() runs these through the canvas's cover
+  /// transform so a dot stays on its furniture at any viewport size.
+  x Float
+  y Float
+
+  /// Optional start position. The terrace scene pushes the camera in, so
+  /// its dots lerp from (x0,y0) to (x,y) across the window. Null elsewhere.
+  x0 Float?
+  y0 Float?
+
+  /// Which way the product card opens, so cards near an edge stay on screen.
+  side String @default("right")
+
+  /// Order of the dots WITHIN a scene. Load-bearing: the camera-track lerp
+  /// matches cached DOM nodes to hotspots positionally, so an unstable
+  /// order would swap dots between pieces of furniture.
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, scene])
+  @@index([scene])
 }
 
 model Subscriber {

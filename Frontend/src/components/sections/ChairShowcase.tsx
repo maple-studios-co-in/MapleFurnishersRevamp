@@ -148,6 +148,10 @@ export default function ChairShowcase() {
   const scopeRef = useRef<HTMLDivElement>(null);
   const explodedRef = useRef(false);
   const wordmarkToRef = useRef<((v: number) => void) | null>(null);
+  /** Cached copy-state nodes — handleProgress runs on every painted frame
+   *  of the scrub, and the section's DOM is static for its whole life. */
+  const assembledRef = useRef<HTMLElement[] | null>(null);
+  const calloutsRef = useRef<HTMLElement[] | null>(null);
   const seq = SEQUENCES.chair;
 
   /* ---- swap copy states as the scrub crosses the explosion point ---- */
@@ -158,8 +162,16 @@ export default function ChairShowcase() {
     // The wordmark rides the scroll: it glides up and out in step with the
     // scrub (reversible), instead of hanging around while the chair works.
     wordmarkToRef.current?.(-p * 3.2 * 100);
-    const assembled = scope.querySelectorAll("[data-assembled-copy]");
-    const callouts = scope.querySelectorAll("[data-callout]");
+    let assembled = assembledRef.current;
+    let callouts = calloutsRef.current;
+    if (!assembled || !callouts) {
+      assembled = assembledRef.current = Array.from(
+        scope.querySelectorAll<HTMLElement>("[data-assembled-copy]"),
+      );
+      callouts = calloutsRef.current = Array.from(
+        scope.querySelectorAll<HTMLElement>("[data-callout]"),
+      );
+    }
 
     if (p >= EXPLODE_AT && !explodedRef.current) {
       explodedRef.current = true;
@@ -481,7 +493,11 @@ export default function ChairShowcase() {
             <p
               data-assembled-copy
               data-craft-eyebrow
-              className="absolute left-[17.7%] top-[17.5%] font-ui text-[22px] font-medium uppercase tracking-[0.2em] text-timber-900"
+              /* top-[12%] (was 17.5%): the wordmark now runs at its spec'd
+                 300px, whose ink is ~425px tall against 306px at the old
+                 216px cap. Lifting the eyebrow is what buys that height
+                 without dropping the wordmark onto the copy below. */
+              className="absolute left-[17.7%] top-[12%] font-ui text-[22px] font-medium uppercase tracking-[0.2em] text-timber-900"
             >
               — Craftmanship
             </p>
@@ -490,11 +506,12 @@ export default function ChairShowcase() {
                 One element for both would break: gsap's x/y/yPercent writes
                 replace the Tailwind -translate-x-1/2 transform, which is
                 exactly what shoved the wordmark half a screen to the right. */}
-            {/* top-[41%] (was 37%): clears the "— CRAFTMANSHIP" eyebrow —
-                Pearl's tall stroked caps at 260px reached it at 37%. */}
+            {/* top-[44%] (was 41%): at the spec'd 300px the ink is 425px
+                tall, so the block sits lower to keep its cap clear of the
+                eyebrow while its baseline stays above the copy below. */}
             <span
               aria-hidden
-              className="absolute left-1/2 top-[41%] -translate-x-1/2 -translate-y-1/2"
+              className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2"
             >
               <span
                 data-wordmark
@@ -506,18 +523,14 @@ export default function ChairShowcase() {
                   color: "#741A14",
                   fontFamily: "var(--font-hero)",
                   fontWeight: 400,
-                  // 240px cap (down from the spec's 300): Pearl's tall
-                  // stroked glyphs collided with the "— CRAFTMANSHIP"
-                  // eyebrow — 240px at the 41% centre clears it by ~30px
-                  // (glyph top ≈ 41% − 0.475em vs eyebrow bottom ≈ 20.5%).
-                  // Same units mismatch as the hero title: 16.6vw is
-                  // WIDTH-driven while this sits at top-[41%] and the
-                  // "— CRAFTMANSHIP" eyebrow at top-[17.5%] — both HEIGHT.
-                  // Measured clearance on the deployed build: +56px at
-                  // 1920×1080, +14px at 1440×900, −26px at 1536×730 (the
-                  // collision). min(…,24dvh) restores +18px at 730 while
-                  // leaving 1920×1080 on the 240px ceiling exactly as before.
-                  fontSize: "clamp(5.5rem, min(16.6vw, 24dvh), 15rem)",
+                  // The spec's 300px, reached at the 1440-wide design frame
+                  // and held as the ceiling above it. Both terms are needed:
+                  // 20.8vw hits 300 at 1440 wide, 33.3dvh hits it at 900
+                  // tall, and min() means whichever axis is tighter wins —
+                  // a short viewport shrinks the glyphs rather than driving
+                  // them into the eyebrow, which is how the old 16.6vw
+                  // (width-only) rule collided at 1536×730.
+                  fontSize: "clamp(5.5rem, min(20.8vw, 33.3dvh), 300px)",
                   fontStyle: "normal",
                   lineHeight: "normal",
                   letterSpacing: "0.05em",

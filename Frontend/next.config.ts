@@ -12,6 +12,10 @@ const CATALOGUE_ORIGIN = "https://catalogue-eta-three.vercel.app";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Lets a build run against its own output dir while `next dev` still owns
+  // .next. Without it a build mid-session overwrites what the dev server is
+  // serving and every route loses its stylesheet.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   async rewrites() {
     return [
       { source: "/catalogue", destination: `${CATALOGUE_ORIGIN}/` },

@@ -50,7 +50,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className="flex h-24 items-center justify-between px-5 border-b border-white/10">
         {!collapsed ? (
           <Link href={ROUTES.DASHBOARD} className="group block py-2">
-            <MapleLogoSvg width={140} height={45} light />
+            {/* 160x58, not 140x45: the lockup scales as one unit, and below
+                ~55px of height the FURNISHERS wordmark stops resolving. */}
+            <MapleLogoSvg width={160} height={58} light />
             <span
               className="block text-[9px] tracking-[0.25em] font-semibold mt-1"
               style={{ color: "#FFF3D3", opacity: 0.8 }}
