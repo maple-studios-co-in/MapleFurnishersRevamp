@@ -175,24 +175,38 @@ body {
   }
 }
 
+/* fill-mode is `forwards`, deliberately NOT `both`.
+ *
+ * `both` adds `backwards` fill, which paints the 0% keyframe — opacity 0 —
+ * before the animation starts. If the animation then never advances (a
+ * throttled or backgrounded tab, a compositor stall, a reduced-motion
+ * setting the browser applies before our override), the element stays
+ * invisible forever. For the product modal that was fatal: an invisible
+ * panel under a fixed inset-0 overlay with body scroll locked reads as a
+ * frozen page, and the only way out was the Escape key.
+ *
+ * `backwards` fill only ever matters with an animation-delay, and nothing
+ * here has one, so dropping it costs nothing and removes the trap: an
+ * animation that fails to run now simply leaves the element at its normal
+ * visible style. */
 .animate-fade-in {
-  animation: fadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .animate-slide-in-right {
-  animation: slideInRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: slideInRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .animate-slide-in-left {
-  animation: slideInLeft 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: slideInLeft 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .animate-scale-in {
-  animation: scaleIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: scaleIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .animate-shake {
@@ -200,11 +214,11 @@ body {
 }
 
 .animate-toast-in {
-  animation: toast-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: toast-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .animate-toast-out {
-  animation: toast-out 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: toast-out 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* ── Skeleton loader ── */

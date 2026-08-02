@@ -8,7 +8,18 @@
 
 import { TOKEN_KEY } from "./constants";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+/**
+ * In production the admin talks to ITS OWN origin ("" = relative /api/...)
+ * and next.config.ts rewrites proxy those calls to the backend server-side.
+ * Same-origin requests cannot be killed by ad-block filter lists, tracking
+ * prevention, per-subdomain DNS failures or CORS — a user hit exactly that
+ * class of failure calling the backend's domain directly from the browser.
+ * Local dev keeps hitting the backend dev server directly.
+ */
+const API_URL =
+  process.env.NODE_ENV === "production"
+    ? ""
+    : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000");
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;

@@ -32,13 +32,19 @@ function LoginForm() {
       const unreachable =
         err instanceof TypeError ||
         (err instanceof Error && /fetch|network|failed to fetch/i.test(err.message));
-      // Name the endpoint actually being called. The previous wording said
-      // "port 4000" unconditionally, which is wrong — and confusing — on a
-      // deployed build that talks to the hosted API.
-      const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+      // In production the API is proxied through this site's own origin, so
+      // an unreachable fetch means the user's own connection dropped — name
+      // that, not a backend host the browser never talks to. Local dev still
+      // calls the backend directly, where naming the endpoint helps.
+      const message =
+        process.env.NODE_ENV === "production"
+          ? "Network error — check your internet connection and try again."
+          : `Cannot reach the API server at ${
+              process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
+            }. Check that it is running and reachable.`;
       setError(
         unreachable
-          ? `Cannot reach the API server at ${api}. Check that it is running and reachable.`
+          ? message
           : err instanceof Error
             ? err.message
             : "Invalid email or password",
