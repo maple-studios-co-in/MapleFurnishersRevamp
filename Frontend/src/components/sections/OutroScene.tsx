@@ -581,16 +581,19 @@ export default function OutroScene({
       gsap.killTweensOf(nodes);
 
       if (show) {
-        // Hotspots snap in fast; copy keeps the softer editorial reveal.
+        // Hotspots snap in fast; copy keeps a softer editorial reveal —
+        // but not the old 1.1s/0.16 one: stacked on the scrub lerp it read
+        // as the text chasing the film, and the dining scene's whole
+        // window can be crossed before a reveal that slow even lands.
         gsap.fromTo(
           nodes,
-          { autoAlpha: 0, y: group === "spots" ? 10 : 28 },
+          { autoAlpha: 0, y: group === "spots" ? 10 : 24 },
           {
             autoAlpha: 1,
             y: 0,
-            duration: group === "spots" ? 0.3 : 1.1,
+            duration: group === "spots" ? 0.3 : 0.8,
             ease: "power3.out",
-            stagger: group === "spots" ? 0.04 : 0.16,
+            stagger: group === "spots" ? 0.04 : 0.12,
             overwrite: "auto",
           },
         );
@@ -605,11 +608,13 @@ export default function OutroScene({
         }
       } else {
         // Copy eases out gently — abrupt cuts read as glitches between
-        // scenes; the frame windows leave enough room for the longer tail.
+        // scenes — but briskly: a 0.6s tail rode into the NEXT scene's
+        // frames on a fast scroll (the "text follows me between sections"
+        // report), and 0.35s still reads as a fade, not a cut.
         gsap.to(nodes, {
           autoAlpha: 0,
-          y: -20,
-          duration: 0.6,
+          y: -16,
+          duration: 0.35,
           ease: "power2.inOut",
           overwrite: "auto",
         });

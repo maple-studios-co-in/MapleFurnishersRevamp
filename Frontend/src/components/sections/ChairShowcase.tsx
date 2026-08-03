@@ -173,12 +173,25 @@ export default function ChairShowcase() {
       );
     }
 
+    /* killTweensOf before every swap is load-bearing (same bug OutroScene
+       fixed): the callout reveal STAGGERS its child tweens, and
+       `overwrite: "auto"` only cancels tweens that are already ACTIVE. A
+       fast reverse across EXPLODE_AT started the hide while a queued
+       callout reveal hadn't begun — that reveal then fired AFTER the hide
+       and stranded its callout on screen, floating over the bridge and
+       the hero film ("section 03 text continuing into 02"). Killed by
+       PROPERTY (opacity/visibility, i.e. autoAlpha) on purpose: these
+       same nodes are driven by quickTo tweens — the wordmark's scroll
+       glide (yPercent) and the cursor-parallax movers (x/y) — which a
+       wholesale kill would sever for the rest of the page's life. */
     if (p >= EXPLODE_AT && !explodedRef.current) {
       explodedRef.current = true;
+      gsap.killTweensOf(assembled, "autoAlpha,opacity,visibility");
+      gsap.killTweensOf(callouts, "autoAlpha,opacity,visibility");
       gsap.to(assembled, {
         autoAlpha: 0,
         y: -36,
-        duration: 0.55,
+        duration: 0.45,
         ease: "power2.in",
         overwrite: "auto",
       });
@@ -188,25 +201,29 @@ export default function ChairShowcase() {
         {
           autoAlpha: 1,
           y: 0,
-          duration: 0.7,
+          duration: 0.55,
           ease: "power3.out",
-          stagger: 0.14,
+          stagger: 0.1,
           overwrite: "auto",
         },
       );
     } else if (p < EXPLODE_AT && explodedRef.current) {
       explodedRef.current = false;
+      gsap.killTweensOf(callouts, "autoAlpha,opacity,visibility");
+      gsap.killTweensOf(assembled, "autoAlpha,opacity,visibility");
+      // Retire fast — this direction is what trails the scroll when the
+      // user flicks back up; the reveal above keeps the softer entrance.
       gsap.to(callouts, {
         autoAlpha: 0,
         y: 30,
-        duration: 0.4,
+        duration: 0.3,
         ease: "power2.in",
         overwrite: "auto",
       });
       gsap.to(assembled, {
         autoAlpha: 1,
         y: 0,
-        duration: 0.6,
+        duration: 0.5,
         ease: "power3.out",
         overwrite: "auto",
       });
