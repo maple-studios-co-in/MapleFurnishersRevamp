@@ -25,7 +25,12 @@ export const SEQUENCES = {
    * title moment.
    */
   heroTitle: {
-    path: "/media/sequences/hero-title",
+    // -v2: rebuilt 2026-08-03 from the ORIGINAL Downloads/Cine_frames with
+    // a surgical sparkle removal (row-structural fill + mirrored texture)
+    // replacing the old blur-wash inpaint that smudged the corner. New
+    // folder name on purpose: /media is served immutable, so changed
+    // footage must never overwrite an old path.
+    path: "/media/sequences/hero-title-v2",
     frames: 240,
     // 23 (not the pace-matched 17): the film still plays at roughly the
     // same scroll pace because HeroFilm's tailHold grew in step — the

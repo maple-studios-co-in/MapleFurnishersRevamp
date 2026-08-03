@@ -147,24 +147,50 @@ const CALLOUTS = [
 export default function ChairShowcase() {
   const scopeRef = useRef<HTMLDivElement>(null);
   const explodedRef = useRef(false);
+  /**
+   * Raw progress of the hand-off bridge (1 when there is no bridge —
+   * <lg / reduced motion — or once it has completed). Written by the
+   * bridge's onUpdate, read by reconcileCopy.
+   */
+  const bridgeProgressRef = useRef(1);
   const wordmarkToRef = useRef<((v: number) => void) | null>(null);
-  /** Cached copy-state nodes — handleProgress runs on every painted frame
+  /** Cached copy-state nodes — the reconciler runs on every painted frame
    *  of the scrub, and the section's DOM is static for its whole life. */
   const assembledRef = useRef<HTMLElement[] | null>(null);
   const calloutsRef = useRef<HTMLElement[] | null>(null);
+  /** Last APPLIED visibility per copy node (null = not yet initialised). */
+  const copyShownRef = useRef<(boolean | null)[]>([null, null, null]);
+  const calloutsShownRef = useRef<boolean | null>(null);
   const seq = SEQUENCES.chair;
 
-  /* ---- swap copy states as the scrub crosses the explosion point ---- */
-  const handleProgress = useCallback((p: number) => {
+  /**
+   * THE single writer for every piece of craft copy.
+   *
+   * History: the copy used to have two writing systems — the scrubbed
+   * bridge timeline (staged arrival) and dynamic explode/restore tweens —
+   * racing over the same nodes' autoAlpha. A fast exit re-rendered the
+   * timeline's children with a ~1s lag while the state tweens ran, and
+   * whichever wrote last won: the Maple wordmark kept getting stranded,
+   * fully visible, over the hero film. Kill-based arbitration between the
+   * two systems just moved the race around (killTweensOf also strips
+   * props from timeline children, freezing them mid-value).
+   *
+   * So: ONE reducer, called from BOTH event sources (bridge onUpdate and
+   * the frame scrub's onProgress). It derives each node's desired state
+   * from (bridgeProgress, exploded) and, only on a state CHANGE, kills
+   * that node's dynamic tweens and starts a fresh absolute tween to 0 or
+   * 1. Interleaving of calls is harmless — the reduction is idempotent
+   * and every transition self-corrects from any mid-value. The property
+   * filter on the kills spares the wordmark's yPercent glide and the
+   * cursor-parallax x/y quickTo drivers.
+   */
+  const reconcileCopy = useCallback(() => {
     const scope = scopeRef.current;
     if (!scope) return;
-
-    // The wordmark rides the scroll: it glides up and out in step with the
-    // scrub (reversible), instead of hanging around while the chair works.
-    wordmarkToRef.current?.(-p * 3.2 * 100);
     let assembled = assembledRef.current;
     let callouts = calloutsRef.current;
     if (!assembled || !callouts) {
+      // Match [data-assembled-copy] order below: eyebrow, wordmark, beauty.
       assembled = assembledRef.current = Array.from(
         scope.querySelectorAll<HTMLElement>("[data-assembled-copy]"),
       );
@@ -173,62 +199,69 @@ export default function ChairShowcase() {
       );
     }
 
-    /* killTweensOf before every swap is load-bearing (same bug OutroScene
-       fixed): the callout reveal STAGGERS its child tweens, and
-       `overwrite: "auto"` only cancels tweens that are already ACTIVE. A
-       fast reverse across EXPLODE_AT started the hide while a queued
-       callout reveal hadn't begun — that reveal then fired AFTER the hide
-       and stranded its callout on screen, floating over the bridge and
-       the hero film ("section 03 text continuing into 02"). Killed by
-       PROPERTY (opacity/visibility, i.e. autoAlpha) on purpose: these
-       same nodes are driven by quickTo tweens — the wordmark's scroll
-       glide (yPercent) and the cursor-parallax movers (x/y) — which a
-       wholesale kill would sever for the rest of the page's life. */
-    if (p >= EXPLODE_AT && !explodedRef.current) {
-      explodedRef.current = true;
-      gsap.killTweensOf(assembled, "autoAlpha,opacity,visibility");
-      gsap.killTweensOf(callouts, "autoAlpha,opacity,visibility");
-      gsap.to(assembled, {
-        autoAlpha: 0,
-        y: -36,
-        duration: 0.45,
-        ease: "power2.in",
-        overwrite: "auto",
-      });
-      gsap.fromTo(
-        callouts,
-        { autoAlpha: 0, y: 30 },
-        {
-          autoAlpha: 1,
-          y: 0,
-          duration: 0.55,
-          ease: "power3.out",
-          stagger: 0.1,
+    const bp = bridgeProgressRef.current;
+    const exploded = explodedRef.current;
+    // Staged arrival beats along the bridge (wordmark leads, per design);
+    // everything retires while exploded, whatever the bridge says.
+    const beats = [0.72, 0.6, 0.84]; // eyebrow, wordmark, beauty
+    const shown = copyShownRef.current;
+    assembled.forEach((el, i) => {
+      const want = !exploded && bp > (beats[i] ?? 0.84);
+      if (want === shown[i]) return;
+      const first = shown[i] === null;
+      shown[i] = want;
+      gsap.killTweensOf(el, "autoAlpha,opacity,visibility");
+      if (first) {
+        // First pass settles the markup into the derived state without
+        // animating — e.g. mobile has no bridge and starts presented.
+        gsap.set(el, { autoAlpha: want ? 1 : 0, y: want ? 0 : 26 });
+      } else if (want) {
+        gsap.to(el, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power2.out", overwrite: "auto" });
+      } else {
+        // Exploding lifts the copy away; a reversing bridge sinks it back
+        // to its pre-arrival offset.
+        gsap.to(el, {
+          autoAlpha: 0,
+          y: exploded ? -36 : 26,
+          duration: 0.3,
+          ease: "power2.in",
           overwrite: "auto",
-        },
-      );
-    } else if (p < EXPLODE_AT && explodedRef.current) {
-      explodedRef.current = false;
+        });
+      }
+    });
+
+    if (exploded !== calloutsShownRef.current) {
+      const first = calloutsShownRef.current === null;
+      calloutsShownRef.current = exploded;
       gsap.killTweensOf(callouts, "autoAlpha,opacity,visibility");
-      gsap.killTweensOf(assembled, "autoAlpha,opacity,visibility");
-      // Retire fast — this direction is what trails the scroll when the
-      // user flicks back up; the reveal above keeps the softer entrance.
-      gsap.to(callouts, {
-        autoAlpha: 0,
-        y: 30,
-        duration: 0.3,
-        ease: "power2.in",
-        overwrite: "auto",
-      });
-      gsap.to(assembled, {
-        autoAlpha: 1,
-        y: 0,
-        duration: 0.5,
-        ease: "power3.out",
-        overwrite: "auto",
-      });
+      if (first) {
+        gsap.set(callouts, { autoAlpha: exploded ? 1 : 0 });
+      } else if (exploded) {
+        gsap.fromTo(
+          callouts,
+          { autoAlpha: 0, y: 30 },
+          { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out", stagger: 0.1, overwrite: "auto" },
+        );
+      } else {
+        // Retire fast — this direction is what trails the scroll when the
+        // user flicks back up; the reveal keeps the softer entrance.
+        gsap.to(callouts, { autoAlpha: 0, y: 30, duration: 0.3, ease: "power2.in", overwrite: "auto" });
+      }
     }
   }, []);
+
+  /* ---- frame scrub: explosion state + wordmark glide ---- */
+  const handleProgress = useCallback(
+    (p: number) => {
+      // The wordmark rides the scroll: it glides up and out in step with
+      // the scrub (reversible), instead of hanging around while the chair
+      // works.
+      wordmarkToRef.current?.(-p * 3.2 * 100);
+      explodedRef.current = p >= EXPLODE_AT;
+      reconcileCopy();
+    },
+    [reconcileCopy],
+  );
 
   /* ---- hero hand-off bridge + cursor parallax ---- */
   useGSAP(
@@ -290,8 +323,12 @@ export default function ChairShowcase() {
             // screen while the hero is still playing.
             gsap.set(chairWrap, { autoAlpha: 0 });
             gsap.set(pod, { y: 0 });
+            // The bridge is mid-flight until proven otherwise; the copy's
+            // staged arrival derives from this in reconcileCopy.
+            bridgeProgressRef.current = 0;
             const tl = gsap.timeline({
               scrollTrigger: {
+                id: "craft-bridge",
                 trigger: section,
                 start: "top top",
                 end: `+=${BRIDGE_SCROLL_PX}`,
@@ -299,6 +336,42 @@ export default function ChairShowcase() {
                 // after the wheel instead of snapping with it.
                 scrub: 1,
                 invalidateOnRefresh: true,
+                // The copy nodes are deliberately NOT tweened by this
+                // scrubbed timeline (see reconcileCopy): its lagging
+                // playhead keeps re-rendering children's inline styles
+                // for ~1s after a fast exit, racing any state tween on
+                // the same nodes — the race that stranded the wordmark
+                // over the hero. The timeline only publishes its raw
+                // progress; the reducer owns the copy.
+                onUpdate: (self) => {
+                  bridgeProgressRef.current = self.progress;
+                  reconcileCopy();
+                },
+                // Scrub-watchdogs: the scrub's catch-up tween occasionally
+                // never receives its final target when a fast flick
+                // deactivates the trigger mid-lerp (observed ~1 in 3 fast
+                // exits: the cream plate froze at ~0.26 over the hero
+                // film). Give the lerp its natural second to finish, then
+                // drive the playhead home only if it is genuinely
+                // stranded — a no-op on every healthy exit.
+                onLeaveBack: (self) => {
+                  gsap.delayedCall(1.2, () => {
+                    if (self.progress === 0 && tl.progress() > 0.001) {
+                      tl.totalProgress(0);
+                    }
+                  });
+                  bridgeProgressRef.current = 0;
+                  reconcileCopy();
+                },
+                onLeave: (self) => {
+                  gsap.delayedCall(1.2, () => {
+                    if (self.progress === 1 && tl.progress() < 0.999) {
+                      tl.totalProgress(1);
+                    }
+                  });
+                  bridgeProgressRef.current = 1;
+                  reconcileCopy();
+                },
               },
             });
             tl
@@ -331,32 +404,13 @@ export default function ChairShowcase() {
               // 3 — the pod drifts a little lower as section 03 settles,
               //     the one movement in the whole hand-off. The contact
               //     shadow rides the same offset or it would detach.
-              .to(pod, { y: settle, duration: 0.16, ease: "power2.out" }, 0.46)
-              // 4 — the three copy blocks arrive ONE AT A TIME, each on its
-              //     own stretch of scroll, only after the chair is settled
-              //     on the bare cream plate. Order per the user: the Maple
-              //     wordmark, then the "— Craftmanship" eyebrow, then the
-              //     "Beauty You Can See" block. Separate tweens rather than
-              //     a stagger, so each has a real gap of scroll before the
-              //     next begins instead of overlapping.
-              .to(
-                stage.querySelector("[data-wordmark]"),
-                { autoAlpha: 1, y: 0, duration: 0.10, ease: "power2.out" },
-                0.66,
-              )
-              .to(
-                stage.querySelector("[data-craft-eyebrow]"),
-                { autoAlpha: 1, y: 0, duration: 0.10, ease: "power2.out" },
-                0.77,
-              )
-              .to(
-                stage.querySelector("[data-craft-beauty]"),
-                { autoAlpha: 1, y: 0, duration: 0.10, ease: "power2.out" },
-                0.88,
-              )
-              ;
+              .to(pod, { y: settle, duration: 0.16, ease: "power2.out" }, 0.46);
+            // 4 — the copy blocks are NOT in this timeline: their staged
+            //     arrival is threshold-driven from onUpdate above, so the
+            //     scrub's lagging playhead can never re-write their
+            //     opacity and race the explode/restore state tweens.
             if (heroStage) {
-              // 4 — only once the plate is fully opaque does the hero stop
+              // 5 — only once the plate is fully opaque does the hero stop
               //     compositing. Purely a cleanup: it is already hidden
               //     behind the plate, so this is visually a no-op.
               tl.set(heroStage, { autoAlpha: 0 }, 0.72);
@@ -380,6 +434,15 @@ export default function ChairShowcase() {
               },
             );
           }
+          // On revert (breakpoint flip) there is no bridge any more —
+          // "presented" becomes the baseline and the reducer re-derives
+          // every node from scratch (matchMedia restored the markup's
+          // inline styles, so the applied-state cache is stale).
+          return () => {
+            bridgeProgressRef.current = 1;
+            copyShownRef.current = [null, null, null];
+            calloutsShownRef.current = null;
+          };
         },
       );
 
