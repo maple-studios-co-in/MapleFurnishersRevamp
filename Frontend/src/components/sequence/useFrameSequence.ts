@@ -215,7 +215,16 @@ export function useFrameSequence(
     const jump =
       pendingRef.current >= 0 ? Math.abs(idx - pendingRef.current) : 0;
     pendingRef.current = idx;
-    if (idx === drawnRef.current) return;
+    if (idx === drawnRef.current) {
+      // Nothing to repaint — but the emission must not be swallowed with
+      // it. In the lead/tail holds the frame never changes, so a scene
+      // reducer that missed an edge (paints skipped while frames were
+      // still streaming in) would otherwise never see another progress
+      // value and never re-converge. idx IS the painted frame here, so
+      // the painted-frame contract above still holds exactly.
+      progressRef.current?.(idx / Math.max(1, totalFrames - 1));
+      return;
+    }
 
     // Warm the decoder for the frames the scrub is about to hit (both
     // directions — the playhead reverses). Each frame is requested once.
@@ -365,6 +374,30 @@ export function useFrameSequence(
 
     const hold = Math.min(0.5, Math.max(0, tailHold));
     const lead = Math.min(0.5, Math.max(0, leadHold));
+
+    /* Scrub-strand watchdog — the same failure the craft bridge documents
+       on its own trigger: the scrub's catch-up tween occasionally never
+       receives its final target when a fast flick exits the range
+       mid-lerp, freezing the playhead — and, because onProgress rides the
+       painted frame, freezing every scene reducer on a stale value (the
+       hero's end copy stranded over the resting title card). Whenever the
+       SCROLL rests at a boundary, verify the playhead landed with it once
+       the lerp has had its natural time to finish, then drive it home if
+       it is genuinely stranded — a no-op on every healthy exit. */
+    let strandCheck: gsap.core.Tween | null = null;
+    const scheduleStrandCheck = () => {
+      strandCheck?.kill();
+      strandCheck = gsap.delayedCall(scrubSmooth + 0.6, () => {
+        const st = tl.scrollTrigger;
+        if (!st) return;
+        if (st.progress <= 0.001 && tl.progress() > 0.001) {
+          tl.totalProgress(0);
+        } else if (st.progress >= 0.999 && tl.progress() < 0.999) {
+          tl.totalProgress(1);
+        }
+      });
+    };
+
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: section,
@@ -376,6 +409,13 @@ export function useFrameSequence(
         pinSpacing: false,
         scrub: scrubSmooth, // lerped playhead — removes frame-to-frame snapping
         invalidateOnRefresh: true,
+        onUpdate: (self) => {
+          if (self.progress <= 0.001 || self.progress >= 0.999) {
+            scheduleStrandCheck();
+          }
+        },
+        onLeave: scheduleStrandCheck,
+        onLeaveBack: scheduleStrandCheck,
       },
     });
     // Dead time at the head — frame 1 rests on screen while an entrance
@@ -394,6 +434,7 @@ export function useFrameSequence(
     if (hold > 0) tl.to({}, { duration: hold });
 
     return () => {
+      strandCheck?.kill();
       tl.scrollTrigger?.kill();
       tl.kill();
     };

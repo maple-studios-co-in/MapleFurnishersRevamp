@@ -73,6 +73,11 @@ export default function HeroFilm() {
   const subRef = useRef<HTMLDivElement>(null);
   const subOnRef = useRef(false);
   const handleProgress = useCallback((p: number) => {
+    const els = [titleBRef.current, subRef.current].filter(
+      Boolean,
+    ) as HTMLElement[];
+    const atRest = p <= 0.001;
+
     if (p > 0.004 && !scrubbingRef.current) {
       scrubbingRef.current = true;
       setScrubbing(true);
@@ -81,7 +86,7 @@ export default function HeroFilm() {
         gsap.killTweensOf(a);
         gsap.to(a, { autoAlpha: 0, y: -46, duration: 0.55, ease: "power2.in" });
       }
-    } else if (p <= 0.001 && scrubbingRef.current) {
+    } else if (atRest && scrubbingRef.current) {
       scrubbingRef.current = false;
       setScrubbing(false);
       const a = titleARef.current;
@@ -89,17 +94,36 @@ export default function HeroFilm() {
         gsap.killTweensOf(a);
         gsap.to(a, { autoAlpha: 1, y: 0, duration: 0.7, ease: "power3.out" });
       }
+      // Emissions arrive compressed after a fast flick — paints skipped
+      // while frames stream, or a healed scrub-strand jumping straight
+      // home — so the end copy can still be at (or gliding from) full
+      // alpha in the very call that raises the resting title into the
+      // same lines. The rest state owns the stage: retire the end copy
+      // instantly so the two headlines can never overlap. On a normal
+      // exit these elements already sit at 0 and this is a no-op.
+      if (els.length) {
+        subOnRef.current = false;
+        gsap.killTweensOf(els);
+        gsap.set(els, { autoAlpha: 0, y: 16 });
+      }
     }
 
-    const els = [titleBRef.current, subRef.current].filter(
-      Boolean,
-    ) as HTMLElement[];
     if (!els.length) return;
     const show = p >= SUB_AT;
     if (show === subOnRef.current) return;
     subOnRef.current = show;
     gsap.killTweensOf(els);
     if (show) {
+      // Mirror of the atRest cut above: on a violent flick the playhead
+      // can cross the whole film faster than the intro title's 0.55s
+      // fade-out, so the end copy would rise into a still-dissolving
+      // "Every home has a story." — retire it outright first. A normal
+      // descent finished that fade seconds ago, so this is a no-op.
+      const a = titleARef.current;
+      if (a && scrubbingRef.current) {
+        gsap.killTweensOf(a);
+        gsap.set(a, { autoAlpha: 0, y: -46 });
+      }
       // Slow, soft entrance — the sequence has finished and is resting on
       // its settled frame, so the copy can take its time drifting in.
       gsap.fromTo(
@@ -113,6 +137,12 @@ export default function HeroFilm() {
           stagger: 0.22,
         },
       );
+    } else if (atRest) {
+      // The hide edge and the rest edge landed in the same emission
+      // (compressed as above, with the A-branch already settled): cut,
+      // don't glide — a 0.4s tail here is the title collision. The
+      // mid-scroll glide below is untouched.
+      gsap.set(els, { autoAlpha: 0, y: 16 });
     } else {
       gsap.to(els, { autoAlpha: 0, y: 16, duration: 0.4, ease: "power2.in" });
     }
