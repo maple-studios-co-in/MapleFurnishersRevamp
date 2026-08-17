@@ -161,6 +161,10 @@ export default function ChairShowcase() {
   /** Last APPLIED visibility per copy node (null = not yet initialised). */
   const copyShownRef = useRef<(boolean | null)[]>([null, null, null]);
   const calloutsShownRef = useRef<boolean | null>(null);
+  /** The staggered callout reveal's INSTANCE — killTweensOf(targets) does
+   *  not reliably kill a staggered fromTo in this gsap build (see the
+   *  hero's subShowTweenRef), so the reducer kills the instance too. */
+  const calloutsTweenRef = useRef<gsap.core.Tween | null>(null);
   const seq = SEQUENCES.chair;
 
   /**
@@ -233,11 +237,13 @@ export default function ChairShowcase() {
     if (exploded !== calloutsShownRef.current) {
       const first = calloutsShownRef.current === null;
       calloutsShownRef.current = exploded;
+      calloutsTweenRef.current?.kill();
+      calloutsTweenRef.current = null;
       gsap.killTweensOf(callouts, "autoAlpha,opacity,visibility");
       if (first) {
         gsap.set(callouts, { autoAlpha: exploded ? 1 : 0 });
       } else if (exploded) {
-        gsap.fromTo(
+        calloutsTweenRef.current = gsap.fromTo(
           callouts,
           { autoAlpha: 0, y: 30 },
           { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out", stagger: 0.1, overwrite: "auto" },

@@ -72,6 +72,16 @@ export default function HeroFilm() {
   const titleBRef = useRef<HTMLParagraphElement>(null);
   const subRef = useRef<HTMLDivElement>(null);
   const subOnRef = useRef(false);
+  /**
+   * The staggered reveal's INSTANCE. gsap.killTweensOf(targets) does not
+   * reliably kill a staggered fromTo in this gsap build (verified live:
+   * after killTweensOf both targets still report an alive tween, which
+   * keeps rendering and overwrites a later set-to-0 — the kicker
+   * resurrecting over the resting title on rapid direction reversals).
+   * Killing the returned instance takes every staggered child with it,
+   * no target lookup involved.
+   */
+  const subShowTweenRef = useRef<gsap.core.Tween | null>(null);
   const handleProgress = useCallback((p: number) => {
     const els = [titleBRef.current, subRef.current].filter(
       Boolean,
@@ -103,6 +113,8 @@ export default function HeroFilm() {
       // exit these elements already sit at 0 and this is a no-op.
       if (els.length) {
         subOnRef.current = false;
+        subShowTweenRef.current?.kill();
+        subShowTweenRef.current = null;
         gsap.killTweensOf(els);
         gsap.set(els, { autoAlpha: 0, y: 16 });
       }
@@ -112,6 +124,8 @@ export default function HeroFilm() {
     const show = p >= SUB_AT;
     if (show === subOnRef.current) return;
     subOnRef.current = show;
+    subShowTweenRef.current?.kill();
+    subShowTweenRef.current = null;
     gsap.killTweensOf(els);
     if (show) {
       // Mirror of the atRest cut above: on a violent flick the playhead
@@ -126,7 +140,7 @@ export default function HeroFilm() {
       }
       // Slow, soft entrance — the sequence has finished and is resting on
       // its settled frame, so the copy can take its time drifting in.
-      gsap.fromTo(
+      subShowTweenRef.current = gsap.fromTo(
         els,
         { autoAlpha: 0, y: 36 },
         {

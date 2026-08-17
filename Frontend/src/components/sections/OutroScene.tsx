@@ -566,6 +566,13 @@ export default function OutroScene({
    * scene quickly let a queued reveal fire AFTER the hide, leaving a stray
    * hotspot floating over later scenes (the rug over the brand card).
    */
+  /** Per-group staggered-reveal INSTANCES — killTweensOf(targets) does not
+   *  reliably kill a staggered fromTo in this gsap build (see the hero's
+   *  subShowTweenRef), which is exactly the "queued reveal fires after the
+   *  hide" ghost the self-heal sweep keeps catching. Killing the instance
+   *  removes every staggered child outright. */
+  const groupTweenRef = useRef<Record<string, gsap.core.Tween | null>>({});
+
   const setGroup = useCallback(
     (sceneKey: string, group: "copy" | "spots", show: boolean) => {
       const stage = stageRef.current;
@@ -578,6 +585,8 @@ export default function OutroScene({
         `[data-scene="${sceneKey}"] [data-group="${group}"] > *`,
       );
       if (!nodes.length) return;
+      groupTweenRef.current[stateKey]?.kill();
+      groupTweenRef.current[stateKey] = null;
       gsap.killTweensOf(nodes);
 
       if (show) {
@@ -585,7 +594,7 @@ export default function OutroScene({
         // but not the old 1.1s/0.16 one: stacked on the scrub lerp it read
         // as the text chasing the film, and the dining scene's whole
         // window can be crossed before a reveal that slow even lands.
-        gsap.fromTo(
+        groupTweenRef.current[stateKey] = gsap.fromTo(
           nodes,
           { autoAlpha: 0, y: group === "spots" ? 10 : 24 },
           {
