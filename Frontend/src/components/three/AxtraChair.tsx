@@ -276,24 +276,31 @@ export function AxtraChairProcedural({
  * baked shading, grain and velvet nap survive the recolour.
  */
 
-/** Hue band, in degrees, that separates the two materials. */
-const SPLIT_LO = 42;
-const SPLIT_HI = 56;
+/** Hue band, in degrees, that separates the two materials.
+ * Measured 2026-08-03 from the current model's 1024px atlas (sample.glb,
+ * trimesh image-to-3D export): walnut piles up at 5–30°, the olive velvet
+ * at 42–55°, and the 33–42° valley holds ~7% of texels. Narrower than the
+ * previous model's 0–30 vs 60–80 split — re-measure with the atlas
+ * histogram script whenever the model is replaced. */
+const SPLIT_LO = 33;
+const SPLIT_HI = 42;
 /** Above this the texel is neither walnut nor olive — leave it alone. */
 const SPLIT_MAX_LO = 140;
 const SPLIT_MAX_HI = 170;
 /** Mean linear luminance of each class in the baked atlas. Re-measure
- * whenever the model is replaced — these move with the bake. */
-const WOOD_REF_LUM = 0.0458;
-const FABRIC_REF_LUM = 0.0696;
+ * whenever the model is replaced — these move with the bake.
+ * Measured 2026-08-26 via scripts/measure-atlas-classes.mjs on the split
+ * Meshy multi-view export (axtra-chair-split.glb). */
+const WOOD_REF_LUM = 0.045;
+const FABRIC_REF_LUM = 0.0503;
 
 /**
  * Mean colour of each class in the atlas, measured. These are what the
  * piece shows before any swatch is picked, so the untouched state keeps
  * the real chair's walnut and olive rather than inventing a look.
  */
-const BAKE_WOOD = "#593323";
-const BAKE_FABRIC = "#4B4D2F";
+const BAKE_WOOD = "#572E1C";
+const BAKE_FABRIC = "#413C25";
 
 /** Object-space frequency of the procedural grain. Higher = finer. */
 const GRAIN_SCALE = 1.0;
@@ -379,7 +386,7 @@ float hf_grain(vec3 p) {
 }
 `;
 
-const SURFACE_BODY = /* glsl */ `
+const surfaceBody = (forced: 0 | 1 | null) => /* glsl */ `
 {
   vec3  bake = diffuseColor.rgb;
   float mx   = max(bake.r, max(bake.g, bake.b));
@@ -387,6 +394,9 @@ const SURFACE_BODY = /* glsl */ `
   float d    = mx - mn;
   float lum  = dot(bake, vec3(0.2126, 0.7152, 0.0722));
 
+  ${
+    forced === null
+      ? /* glsl */ `
   float hue = 0.0;
   if (d > 1e-5) {
     if      (mx == bake.r) hue = mod((bake.g - bake.b) / d, 6.0);
@@ -394,12 +404,28 @@ const SURFACE_BODY = /* glsl */ `
     else                   hue = (bake.r - bake.g) / d + 4.0;
     hue *= 60.0;
   }
-
-  // Near-greys carry no material identity: metal glides, shadow, seam AO.
-  // Leaving them on the bake is what keeps the piece believable.
-  float chroma = smoothstep(0.010, 0.030, d);
   float isFab  = smoothstep(${SPLIT_LO}.0, ${SPLIT_HI}.0, hue)
-               * (1.0 - smoothstep(${SPLIT_MAX_LO}.0, ${SPLIT_MAX_HI}.0, hue));
+               * (1.0 - smoothstep(${SPLIT_MAX_LO}.0, ${SPLIT_MAX_HI}.0, hue));`
+      : /* glsl */ `
+  // Class is decided by GEOMETRY (this primitive's material name), not by
+  // guessing per texel — the split-mesh pipeline already separated wood
+  // from fabric faces.
+  float isFab = float(${forced});`
+  }
+
+  ${
+    forced === null
+      ? /* glsl */ `
+  // Near-greys carry no material identity: metal glides, shadow, seam AO.
+  // Leaving them on the bake is what keeps the piece believable when the
+  // class itself is guessed from hue.
+  float chroma = smoothstep(0.010, 0.030, d);`
+      : /* glsl */ `
+  // Class is certain here, so synthesise everywhere: the bake's noisy
+  // near-grey patches (the backrest blotch) must not leak through raw.
+  // Crevice depth still arrives via the luminance 'shade' term below.
+  float chroma = 1.0;`
+  }
   gFabricMask = isFab;
 
   // Keep a trace of the bake's crevice shading — that part is real, it
@@ -407,7 +433,12 @@ const SURFACE_BODY = /* glsl */ `
   // ceiling the bake's own dirt specks came through as marks on the velvet,
   // and its bright texels multiplied the walnut up into orange. Half the
   // weight and a 1.5 ceiling keeps the depth without the artefacts.
-  float shade = clamp(lum / mix(${WOOD_REF_LUM}, ${FABRIC_REF_LUM}, isFab), 0.0, 1.5);
+  // The FLOOR is per-class: ribbons keep their deep crevices, but the
+  // velvet gets a 0.55 floor — the bake carries a dark blotch on the
+  // backrest that is noise, not geometry, and an unfloored shade term
+  // rendered it as a permanent stain on every fabric colour.
+  float shade = clamp(lum / mix(${WOOD_REF_LUM}, ${FABRIC_REF_LUM}, isFab),
+                      0.55 * isFab, 1.5);
   shade = mix(1.0, shade, 0.5);
 
   vec3 p = vObjPos * uGrain;
@@ -461,10 +492,22 @@ vSurfNrm = normalize(normalMatrix * normal);
 vSurfView = -(modelViewMatrix * vec4(position, 1.0)).xyz;
 `;
 
-/** Give a material the procedural surface. Returns its live uniforms. */
-function attachSurface(mat: THREE.MeshStandardMaterial): TintUniforms {
+/**
+ * Give a material the procedural surface. Returns its live uniforms.
+ * `forced` pins the wood/fabric class for the whole material (used when
+ * the model's primitives are already split by name); null keeps the
+ * per-texel hue split for single-atlas models.
+ */
+function attachSurface(
+  mat: THREE.MeshStandardMaterial,
+  forced: 0 | 1 | null = null,
+): TintUniforms {
+  // LIVE uniforms only: Material.clone()/copy() JSON-round-trips userData,
+  // which turns these THREE.Color values into dead {r,g,b} literals while
+  // silently dropping onBeforeCompile — a corpse here must not pass as
+  // "already attached" or the surface shader never compiles.
   const existing = mat.userData.tintUniforms as TintUniforms | undefined;
-  if (existing) return existing;
+  if (existing?.uWood?.value?.isColor) return existing;
 
   const uniforms: TintUniforms = {
     uWood: { value: new THREE.Color(BAKE_WOOD) },
@@ -472,6 +515,7 @@ function attachSurface(mat: THREE.MeshStandardMaterial): TintUniforms {
     uGrain: { value: GRAIN_SCALE },
   };
   mat.userData.tintUniforms = uniforms;
+  const body = surfaceBody(forced);
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -479,7 +523,7 @@ function attachSurface(mat: THREE.MeshStandardMaterial): TintUniforms {
       .replace("#include <begin_vertex>", `#include <begin_vertex>\n${SURFACE_VERTEX_BODY}`);
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>\n${SURFACE_DECLS}`)
-      .replace("#include <map_fragment>", `#include <map_fragment>\n${SURFACE_BODY}`)
+      .replace("#include <map_fragment>", `#include <map_fragment>\n${body}`)
       .replace(
         "#include <roughnessmap_fragment>",
         `#include <roughnessmap_fragment>\n${SURFACE_ROUGHNESS}`,
@@ -489,8 +533,68 @@ function attachSurface(mat: THREE.MeshStandardMaterial): TintUniforms {
         `#include <metalnessmap_fragment>\n${SURFACE_METALNESS}`,
       );
   };
+  // The forced variants emit DIFFERENT GLSL from the same onBeforeCompile
+  // source text, and three's program cache keys on that text — without a
+  // per-class key the wood and fabric materials would share one program.
+  mat.customProgramCacheKey = () => `mf-surface-${forced ?? "hue"}`;
   mat.needsUpdate = true;
   return uniforms;
+}
+
+/* ---- colorize mode: tint a GOOD baked map without losing it ---------
+   For stock assets with real PBR texture detail (mfTint: "multiply"
+   extras). Multiplying a light swatch over a dark albedo barely reads;
+   instead the map is reduced to its luminance (keeping tufting, creases,
+   grain) and re-dressed in the swatch colour. uMix 0 = the asset's own
+   untouched look; 1 = fully recoloured. */
+
+type ColorizeUniforms = {
+  uTint: { value: THREE.Color };
+  uMix: { value: number };
+  uRefLum: { value: number };
+};
+
+function attachColorize(mat: THREE.MeshStandardMaterial): ColorizeUniforms {
+  const existing = mat.userData.colorizeUniforms as ColorizeUniforms | undefined;
+  if (existing?.uTint?.value?.isColor) return existing;
+  const uniforms: ColorizeUniforms = {
+    uTint: { value: new THREE.Color("#ffffff") },
+    uMix: { value: 0 },
+    uRefLum: { value: Number(mat.userData.mfRefLum) || 0.05 },
+  };
+  mat.userData.colorizeUniforms = uniforms;
+  mat.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>\nuniform vec3 uTint;\nuniform float uMix;\nuniform float uRefLum;`,
+      )
+      .replace(
+        "#include <map_fragment>",
+        `#include <map_fragment>
+{
+  float mfLum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  vec3 mfColorized = uTint * clamp(mfLum / uRefLum, 0.0, 1.8);
+  diffuseColor.rgb = mix(diffuseColor.rgb, mfColorized, uMix);
+}`,
+      );
+  };
+  mat.customProgramCacheKey = () => "mf-colorize";
+  mat.needsUpdate = true;
+  return uniforms;
+}
+
+/** Tween one colorize class toward a swatch, or back to the baked look. */
+function colorizeTo(list: ColorizeUniforms[], color: string | null) {
+  return list.flatMap((u) => {
+    if (!color) return [gsap.to(u.uMix, { value: 0, duration: 0.55, ease: "power2.out" })];
+    const t = new THREE.Color(color);
+    return [
+      gsap.to(u.uTint.value, { r: t.r, g: t.g, b: t.b, duration: 0.55, ease: "power2.out" }),
+      gsap.to(u.uMix, { value: 1, duration: 0.55, ease: "power2.out" }),
+    ];
+  });
 }
 
 /** Tween the surface colour for one material class. */
@@ -528,6 +632,8 @@ export function AxtraChairGltf({
   const woodRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const fabricRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const tintRef = useRef<TintUniforms[]>([]);
+  const colorizeWoodRef = useRef<ColorizeUniforms[]>([]);
+  const colorizeFabricRef = useRef<ColorizeUniforms[]>([]);
 
   // Clone so two mounts never fight over one cached scene graph.
   const model = useMemo(() => scene.clone(true), [scene]);
@@ -536,40 +642,104 @@ export function AxtraChairGltf({
     const wood: THREE.MeshStandardMaterial[] = [];
     const fabric: THREE.MeshStandardMaterial[] = [];
     const all: THREE.MeshStandardMaterial[] = [];
+    const tinted: TintUniforms[] = [];
+    const colorizeWd: ColorizeUniforms[] = [];
+    const colorizeFab: ColorizeUniforms[] = [];
 
     model.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
+      if (!(child as THREE.Mesh).isMesh) return;
       child.castShadow = true;
       child.receiveShadow = true;
 
-      const wasArray = Array.isArray(child.material);
-      const mats = (wasArray ? child.material : [child.material]) as THREE.Material[];
+      const mesh = child as THREE.Mesh;
+      const wasArray = Array.isArray(mesh.material);
+      const mats = (wasArray ? mesh.material : [mesh.material]) as THREE.Material[];
       const cloned = mats.map((mat) => {
-        if (!(mat instanceof THREE.MeshStandardMaterial)) return mat;
+        // Flag check, not instanceof: the loader's material can come from a
+        // different three module instance than the app's (bundler dedupe is
+        // not guaranteed), and instanceof then fails for a perfectly good
+        // MeshStandardMaterial — silently skipping the clone, the swatch
+        // binding AND the tint shader in one stroke.
+        const sm = mat as THREE.MeshStandardMaterial;
+        if (!sm.isMeshStandardMaterial) return mat;
         // Clone: useGLTF caches materials across mounts, and both the
-        // name binding and the shader hook mutate them.
-        const m = mat.clone();
+        // name binding and the shader hook mutate them. REUSE a clone we
+        // already own, though — StrictMode double-invokes this memo, and
+        // the second pass reads the FIRST pass's clones back off the
+        // meshes. Re-cloning those kills them: clone() JSON-copies
+        // userData (dead tint uniforms that fooled attachSurface's guard)
+        // and does not carry onBeforeCompile at all, which is how the
+        // model rendered unhooked and every swatch went dead in dev.
+        const m = sm.userData.mfCustomizerClone ? sm : sm.clone();
+        m.userData.mfCustomizerClone = true;
         const tag = `${child.name} ${m.name}`.toLowerCase();
-        if (FABRIC_KEYS.some((k) => tag.includes(k))) fabric.push(m);
-        else if (WOOD_KEYS.some((k) => tag.includes(k))) wood.push(m);
+        const isFabric = FABRIC_KEYS.some((k) => tag.includes(k));
+        const isWood = !isFabric && WOOD_KEYS.some((k) => tag.includes(k));
+        // Assets can pin their treatment via glTF material extras
+        // (mfTint: "multiply" | "surface") — GLTFLoader lands extras in
+        // userData. "multiply" keeps the asset's own baked look as the
+        // untouched state and tints m.color over it (right for stock
+        // pieces with good PBR maps); "surface"/default synthesises.
+        const mode =
+          m.userData.mfTint === "multiply" ||
+          ((isFabric || isWood) && !m.map && m.userData.mfTint !== "surface")
+            ? "multiply"
+            : "surface";
+        if ((isFabric || isWood) && mode === "multiply" && m.map) {
+          // Good baked maps: luminance-preserving colorize. Untouched
+          // state shows the asset's own textures.
+          (isFabric ? colorizeFab : colorizeWd).push(attachColorize(m));
+        } else if ((isFabric || isWood) && mode === "multiply") {
+          // Swatch drives m.color directly; remember the original factor
+          // so "no swatch picked" can restore the asset's own look.
+          m.userData.mfBaseColor = m.color.clone();
+          (isFabric ? fabric : wood).push(m);
+        } else {
+          // Recolouring by multiplying m.color over a fully-baked DARK
+          // map goes muddy, so synthesise the surface instead. A name
+          // pins the class for the whole primitive (the split model); no
+          // name falls back to the per-texel hue mask.
+          tinted.push(attachSurface(m, isFabric ? 1 : isWood ? 0 : null));
+        }
         all.push(m);
         return m;
       });
-      child.material = wasArray ? cloned : cloned[0];
+      mesh.material = wasArray ? cloned : cloned[0];
     });
 
     woodRef.current = wood;
     fabricRef.current = fabric;
-    // Nothing bound by name → single baked atlas, so demote it to a mask
-    // and synthesise the surface instead.
-    tintRef.current = wood.length || fabric.length ? [] : all.map(attachSurface);
+    tintRef.current = tinted;
+    colorizeWoodRef.current = colorizeWd;
+    colorizeFabricRef.current = colorizeFab;
+
+    if (process.env.NODE_ENV !== "production") {
+      // Probe hook: which binding path did this model take?
+      (window as unknown as { __mfChairBind?: object }).__mfChairBind = {
+        wood: wood.length,
+        fabric: fabric.length,
+        tinted: tinted.length,
+        colorized: colorizeWd.length + colorizeFab.length,
+        total: all.length,
+      };
+      (window as unknown as { __mfChair?: object }).__mfChair = { model, all };
+    }
   }, [model]);
 
   useEffect(() => {
     const tweens = [
       ...tintTo(tintRef.current, "wood", finishColor),
+      ...colorizeTo(colorizeWoodRef.current, finishColor),
       ...woodRef.current.map((m) => {
-        const t = new THREE.Color(finishColor ?? DEFAULT_WOOD);
+        // null = untouched. A multiply-mode asset restores its OWN base
+        // colour (its baked look); factor-driven brief assets take the
+        // house default.
+        const original = m.userData.mfBaseColor as THREE.Color | undefined;
+        const t = finishColor
+          ? new THREE.Color(finishColor)
+          : original?.isColor
+            ? original
+            : new THREE.Color(DEFAULT_WOOD);
         return gsap.to(m.color, { r: t.r, g: t.g, b: t.b, duration: 0.55, ease: "power2.out" });
       }),
     ];
@@ -579,8 +749,14 @@ export function AxtraChairGltf({
   useEffect(() => {
     const tweens = [
       ...tintTo(tintRef.current, "fabric", fabricColor),
+      ...colorizeTo(colorizeFabricRef.current, fabricColor),
       ...fabricRef.current.map((m) => {
-        const t = new THREE.Color(fabricColor ?? DEFAULT_FABRIC);
+        const original = m.userData.mfBaseColor as THREE.Color | undefined;
+        const t = fabricColor
+          ? new THREE.Color(fabricColor)
+          : original?.isColor
+            ? original
+            : new THREE.Color(DEFAULT_FABRIC);
         return gsap.to(m.color, { r: t.r, g: t.g, b: t.b, duration: 0.55, ease: "power2.out" });
       }),
     ];

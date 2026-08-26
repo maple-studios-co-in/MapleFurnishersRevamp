@@ -8,19 +8,37 @@ geometry, so /customize never renders empty.
 
 ## What is in here now
 
-Generated from the four product renders already in the repo
+Generated 2026-08-26 from the four product renders already in the repo
 (`axtra-chair.png` plus `angles/side|front|back.png`) with Meshy
-multi-image-to-3D. Multi-view was used deliberately: single-image
-reconstruction blobs thin swooping forms like this chair's walnut ribbons,
-and four views constrain the geometry.
+multi-image-to-3D, then post-processed by the repo's scripts into the
+brief's two-material contract. Multi-view was used deliberately:
+single-image reconstruction blobs thin swooping forms like this chair's
+walnut ribbons, and four views constrain the geometry.
 
-- 119,389 triangles, 83,966 vertices
-- one mesh, one material (`Material_0`), PBR: baseColor + metallicRoughness
-  + normal
-- faces **azimuth 0.5°**, i.e. effectively +Z, which is what the four
-  "Preview your piece" camera stations assume
-- 4.6 MB — the raw export was 15 MB, almost all of it a 2048px PNG normal
-  map; textures were resized to 1024 and recompressed
+- 122,955 triangles, 97,506 vertices
+- one mesh, **two primitives/materials named `Wood_Walnut` (72,288 faces)
+  and `Fabric_Olive` (50,667 faces)** — so the swatches bind by NAME
+  (path 1 below) and the hue-split fallback stays dormant
+- faces +Z (the prep script measured the raw export at −4.5° and baked
+  the correction)
+- 4.58 MB — the raw export was 15.4 MB; the normal/metallicRoughness/
+  emissive maps were dropped (the site's procedural surface shader
+  replaces them) and the base-colour atlas resized to 1024
+- the previous model is kept alongside as `axtra-chair.v1-meshy.glb.bak`
+
+Rebuilt from a fresh AI export with (run from anywhere, paths absolute
+or cwd-relative):
+
+1. `node scripts/prep-chair-glb.mjs <raw.glb> <prepped.glb>` — bakes +Z
+   facing and smooth normals, zeroes metallic
+2. `node scripts/split-chair-materials.mjs` — classifies every face from
+   the base-colour atlas into the two named materials (reads
+   `axtra-chair-prepped.glb`, writes `axtra-chair-split.glb` in cwd;
+   re-tune its colour thresholds for a non-walnut/olive piece)
+3. `node scripts/measure-atlas-classes.mjs <split.glb>` — prints the
+   `BAKE_WOOD/BAKE_FABRIC` and `WOOD_REF_LUM/FABRIC_REF_LUM` values that
+   must be updated in `AxtraChair.tsx` whenever the model changes
+4. `node scripts/resize-atlas.mjs <in.glb> <out.glb> 1024` — web weight
 
 ## How the swatches recolour it
 
