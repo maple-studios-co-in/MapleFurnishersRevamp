@@ -24,7 +24,12 @@ MapleFurnishersNew/
 │       ├── app/          #   App Router pages, layout, global styles
 │       ├── components/hero/  #   HeroIntro — cinematic scroll-locked intro
 │       └── fonts/        #   Catilde (hero title font)
-└── Backend/              # (to come) API / server — a sibling workspace
+├── Backend/              # API / server workspace
+├── AdminDashboard/       # Next.js admin app (port 3001)
+└── Catalogue/            # Vite + React catalogue viewer (see "Catalogue" below)
+    ├── package.json      #   workspace manifest — React Router + Vite
+    ├── src/App.tsx       #   routes: / (collections), /catalogue-1, /catalogue-2
+    └── public/catalogues/ #  the collection PDFs served by the viewer
 ```
 
 ### Why some config lives at the root and some in `Frontend/`
@@ -73,8 +78,32 @@ Open http://localhost:3000 (or the port your launch config uses).
 | `npm run build` | Frontend production build |
 | `npm run start` | Frontend production server |
 | `npm run lint` | Frontend lint (ESLint, next/core-web-vitals) |
+| `npm run dev:catalogue` | Catalogue dev server (Vite, http://localhost:5173) |
+| `npm run build:catalogue` | Catalogue production build (`tsc -b && vite build`) |
+| `npm run preview:catalogue` | Serve the Catalogue production build locally |
+| `npm run lint:catalogue` | Catalogue lint |
 
-These will be extended to cover the Backend workspace once it exists.
+`dev:api` / `build:api` / `start:api` and `dev:admin` / `build:admin` /
+`start:admin` do the same for the Backend and AdminDashboard workspaces.
+
+## Catalogue
+
+`Catalogue/` is the collection-catalogue viewer served at
+[maple-furnishers.vercel.app/catalogue](https://maple-furnishers.vercel.app/catalogue)
+— a small Vite + React Router SPA: a landing page listing the collections,
+plus `/catalogue-1` (Chair Collection) and `/catalogue-2` (Nimbus Collection)
+PDF viewers. The PDFs themselves live in `Catalogue/public/catalogues/`.
+
+Deployment is **separate from the Frontend**: the catalogue deploys as its own
+Vercel project (`catalogue-eta-three.vercel.app`, also pushed to
+`maple-studios-co-in/catalogue`), and the Frontend proxies it under
+`/catalogue` via the rewrites in `Frontend/next.config.ts`, so visitors never
+leave maple-furnishers.vercel.app. The SPA picks its router basename at
+runtime (`/catalogue` when proxied, `/` on its own domain), so both entries
+work.
+
+To add a new collection: drop the PDF into `Catalogue/public/catalogues/` and
+add an entry to `CATALOGUES` in `Catalogue/src/App.tsx`.
 
 ## Frontend — hero intro behaviour
 
