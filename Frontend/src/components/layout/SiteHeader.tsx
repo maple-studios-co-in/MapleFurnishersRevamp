@@ -57,15 +57,14 @@ export default function SiteHeader() {
           ))}
         </nav>
 
-        <button
-          type="button"
-          onClick={() => scrollTo("#contact")}
+        <a
+          href="https://shop.maplefurnishers.com/"
           className="flex items-center gap-2.5 rounded-full border border-[rgb(var(--chrome-border))]/50 bg-[rgb(var(--chrome-fg))]/10 px-5 py-2 backdrop-blur-sm transition-colors duration-300 hover:border-[rgb(var(--chrome-accent))]/60 hover:text-[rgb(var(--chrome-accent))] sm:px-6"
           style={chromeType(500)}
         >
           Shop Now
           <ShoppingBag className="h-3.5 w-3.5" strokeWidth={1.5} />
-        </button>
+        </a>
       </div>
     </header>
   );

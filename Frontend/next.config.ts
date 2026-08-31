@@ -1,14 +1,21 @@
 import type { NextConfig } from "next";
 
 /**
- * The catalogue lives in its own repo/deployment (Vite SPA). The main site
- * proxies it under /catalogue via rewrites, so visitors stay on
+ * The catalogue's source lives in this repo (Catalogue/ workspace) but
+ * deploys as its own Vercel project (Vite SPA). The main site proxies it
+ * under /catalogue via rewrites, so visitors stay on
  * maple-furnishers.vercel.app. Its bundles load from absolute /assets/*
  * (plus /favicon.svg) — paths this app doesn't use — so those proxy too.
  * Rewrites run after the filesystem check, so the main site's own static
  * files always win.
  */
-const CATALOGUE_ORIGIN = "https://catalogue-eta-three.vercel.app";
+// In dev the proxy targets a locally served catalogue build (`npm run
+// preview --workspace Catalogue`, port 4173) so localhost:3005/catalogue
+// exercises work-in-progress; production keeps the deployed origin.
+const CATALOGUE_ORIGIN =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:4173"
+    : "https://catalogue-eta-three.vercel.app";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
