@@ -1,0 +1,451 @@
+/*
+ * Maple Furnishers catalogue — Figma scenes 2511:113 (landing) and
+ * 2511:420 (chairs collection), transcribed value-for-value.
+ *
+ * Desktop reproduces the 1440×1087 canvas: column anchors keep Figma's
+ * %-based x constraints (so the layout breathes with the viewport exactly
+ * like the design file) and rows/typography are the node's own pixel
+ * values. Below 1024px the same DOM reflows: the six cards stack, each as
+ * its own full-viewport section (per the client's mobile brief), with the
+ * furniture geometry re-expressed as percentages of the plate so the
+ * overflow composition survives the scale change.
+ */
+
+/* ---------- scene ---------- */
+
+.scene {
+  position: relative;
+  min-height: 1087px;
+}
+
+.backdrop {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1712px;
+  min-width: 100%;
+  height: 1087px;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ---------- header (78px chrome bar) ---------- */
+
+.siteHeader {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 0.2px solid rgba(255, 255, 255, 0.33);
+}
+
+.siteHeader-inner {
+  position: relative;
+  height: 78px;
+}
+
+.siteHeader-logo {
+  position: absolute;
+  left: 100px;
+  top: 0;
+  width: 130px;
+  height: 78px;
+  color: #eeeae2; /* MapleLogo paints with currentColor */
+}
+
+.siteHeader-link {
+  position: absolute;
+  top: 31px;
+  transform: translateX(-50%);
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 2.8px;
+  white-space: nowrap;
+  color: #eeeae2;
+  opacity: 0.5;
+  transition: opacity 0.3s;
+}
+
+.siteHeader-link:hover {
+  opacity: 1;
+}
+
+.siteHeader-link.is-active {
+  color: #fff;
+  opacity: 1;
+}
+
+.siteHeader-link:nth-of-type(1) { left: calc(16.67% + 131.5px); }
+.siteHeader-link:nth-of-type(2) { left: calc(33.33% + 115px); }
+.siteHeader-link:nth-of-type(3) { left: calc(50% + 112.5px); }
+.siteHeader-link:nth-of-type(4) { left: calc(75% - 19px); }
+
+/* Active-tab rule under Home (85px hairline near the bar's bottom edge). */
+.siteHeader-underline {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 34.8px; /* canvas y 65.84 − link top 31 */
+  width: 85px;
+  height: 1px;
+  background: #fff;
+}
+
+.shopNow {
+  position: absolute;
+  left: calc(83.33% - 10px);
+  top: 20px;
+  width: 139px;
+  height: 38px;
+  border-radius: 18.696px;
+  background: rgba(238, 234, 226, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: background 0.3s;
+}
+
+.shopNow:hover {
+  background: rgba(238, 234, 226, 0.22);
+}
+
+.shopNow-label {
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 2.8px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.shopNow-burger {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3.6px;
+}
+
+.shopNow-burger span {
+  display: block;
+  height: 1.4px;
+  background: #fff;
+}
+
+/* ---------- watermark & page title ---------- */
+
+.watermark {
+  position: absolute;
+  left: calc(83.33% + 10.5px);
+  transform: translateX(-50%);
+  margin: 0;
+  font-family: "TAN Pearl", serif;
+  font-size: 145.744px;
+  letter-spacing: 7.2872px;
+  line-height: normal;
+  white-space: nowrap;
+  color: #2f0907;
+  opacity: 0.23;
+  z-index: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pageTitle {
+  position: absolute;
+  left: calc(50% - 239px);
+  top: 170px;
+  margin: 0;
+  font-family: "TAN Pearl", serif;
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  line-height: normal;
+  white-space: nowrap;
+  color: #fff3d3;
+  z-index: 2;
+}
+
+/* ---------- collection cards ---------- */
+
+.cards {
+  display: contents;
+}
+
+.card {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 201.083px;
+  height: 229.712px;
+  z-index: 2;
+  display: block;
+}
+
+.card-plate {
+  position: absolute;
+  inset: 0;
+  background: rgba(53, 11, 8, 0.8); /* #350B08 @ 80% */
+  display: block;
+}
+
+.card-img {
+  position: absolute;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* Furniture geometry — verbatim node offsets relative to the plate. */
+.card--chair .card-img  { left: 1.61px;   top: 26.95px;  width: 216.031px; height: 324.047px; }
+.card--dining .card-img { left: 15.67px;  top: 64.93px;  width: 168.455px; height: 252.377px; object-fit: contain; }
+.card--sofa .card-img   { left: -62.47px; top: 132px;    width: 343.064px; height: 132px; }
+.card--bed .card-img    { left: -37.59px; top: 132.31px; width: 311.695px; height: 117px; }
+.card--accent .card-img { left: 5.9px;    top: 115.16px; width: 188.835px; height: 159.88px; }
+
+.card-title {
+  position: absolute;
+  left: 152.95px;
+  top: 47.78px;
+  font-family: "TAN Pearl", serif;
+  font-size: 19.602px;
+  letter-spacing: 0.9801px;
+  line-height: normal;
+  white-space: nowrap;
+  color: #fff3d3;
+}
+
+.card-sub {
+  position: absolute;
+  left: 152.9px;
+  top: 84.53px;
+  width: 207.315px;
+  font-family: "Red Hat Display", sans-serif;
+  font-size: 11.36px;
+  font-weight: 300;
+  letter-spacing: 1.136px;
+  line-height: normal;
+  color: #fff;
+}
+
+.card-cta {
+  position: absolute;
+  left: 64.04px;
+  top: 290.36px;
+  width: 102.298px;
+  height: 23.277px;
+  border: 0.613px solid #fff3d3;
+  border-radius: 3.675px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Red Hat Display", sans-serif;
+  font-size: 9.188px;
+  font-weight: 700;
+  letter-spacing: 0.4594px;
+  text-transform: uppercase;
+  color: #fff3d3;
+  transition: background 0.3s;
+}
+
+.card:hover .card-cta {
+  background: rgba(255, 243, 211, 0.14);
+}
+
+/* ---------- PDF viewer fallback (touch devices, deep links) ---------- */
+
+.pdfFallback {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+  padding: 24px;
+}
+
+.pdfFallback-eyebrow {
+  font-family: "Manrope", sans-serif;
+  font-size: 12px;
+  letter-spacing: 2.8px;
+  text-transform: uppercase;
+  color: #eeeae2;
+  opacity: 0.6;
+}
+
+.pdfFallback-title {
+  margin: 0;
+  font-family: "TAN Pearl", serif;
+  font-size: clamp(26px, 7vw, 40px);
+  font-weight: 400;
+  letter-spacing: 1.5px;
+  color: #fff3d3;
+}
+
+.pdfFallback-open {
+  border: 1px solid #fff3d3;
+  border-radius: 6px;
+  padding: 12px 26px;
+  font-family: "Red Hat Display", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #fff3d3;
+}
+
+.pdfFallback-back {
+  font-family: "Red Hat Display", sans-serif;
+  font-size: 13px;
+  color: #fff;
+  opacity: 0.6;
+}
+
+/* ---------- mobile: one full-screen card at a time ---------- */
+
+@media (max-width: 1023px) {
+  /* One collection per screen: mandatory snap settles every flick on a
+     card boundary. The chairs page title is its own snap stop so scrolling
+     back up can rest on it instead of trapping the viewport at card 1. */
+  html {
+    scroll-snap-type: y mandatory;
+  }
+
+  .pageTitle {
+    scroll-snap-align: start;
+    scroll-margin-top: 64px;
+  }
+
+  .scene {
+    min-height: 100svh;
+    padding-bottom: 24px;
+  }
+
+  .backdrop {
+    height: 100%;
+  }
+
+  .siteHeader-inner {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+  }
+
+  .siteHeader-logo {
+    position: static;
+    width: 94px;
+    height: 56px;
+  }
+
+  .siteHeader-logo svg {
+    width: 94px;
+    height: 56px;
+  }
+
+  .siteHeader-nav {
+    display: none;
+  }
+
+  .shopNow {
+    position: static;
+    width: auto;
+    height: 34px;
+    padding: 0 14px;
+  }
+
+  .shopNow-label {
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+
+  .watermark {
+    display: none;
+  }
+
+  .pageTitle {
+    position: static;
+    margin: 36px 20px 0;
+    text-align: center;
+    white-space: normal;
+    font-size: clamp(28px, 8vw, 40px);
+  }
+
+  .cards {
+    display: block;
+  }
+
+  /* Each card owns the viewport: full-height section, plate + furniture
+     centred, copy beneath — scroll settles one collection per screen. */
+  .card {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: auto;
+    height: auto;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 84px 24px 48px;
+    scroll-snap-align: start;
+    scroll-margin-top: 0;
+  }
+
+  .card-plate {
+    position: relative;
+    inset: auto;
+    width: min(60vw, 252px);
+    aspect-ratio: 201.083 / 229.712;
+  }
+
+  /* Same composition, re-based as percentages of the plate. Heights are
+     left auto — every export matches its node box aspect exactly. */
+  .card-img {
+    height: auto;
+  }
+  .card--chair .card-img  { left: 0.8%;    top: 11.73%; width: 107.43%; }
+  .card--dining .card-img { left: 7.79%;   top: 28.26%; width: 83.77%; }
+  .card--sofa .card-img   { left: -31.07%; top: 57.46%; width: 170.6%; }
+  .card--bed .card-img    { left: -18.7%;  top: 57.6%;  width: 155%; }
+  .card--accent .card-img { left: 2.93%;   top: 50.13%; width: 93.91%; }
+
+  /* Room for the furniture's overhang below the plate (factor × plate
+     width, straight from the node geometry). */
+  .card--chair .card-plate  { margin-bottom: calc(min(60vw, 252px) * 0.603); }
+  .card--dining .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.436); }
+  .card--sofa .card-plate   { margin-bottom: calc(min(60vw, 252px) * 0.171); }
+  .card--bed .card-plate    { margin-bottom: calc(min(60vw, 252px) * 0.098); }
+  .card--accent .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.226); }
+
+  .card-title {
+    position: static;
+    margin-top: 8px;
+    text-align: center;
+    white-space: normal;
+    font-size: clamp(24px, 6.6vw, 30px);
+  }
+
+  .card-sub {
+    position: static;
+    margin-top: 12px;
+    width: min(300px, 82vw);
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .card-cta {
+    position: static;
+    margin-top: 26px;
+    width: 158px;
+    height: 37px;
+    border-width: 1px;
+    border-radius: 6px;
+    font-size: 12px;
+    letter-spacing: 0.8px;
+  }
+}

@@ -40,6 +40,9 @@ next-env.d.ts
 Backend/dist/
 Backend/build/
 
+# --- Catalogue (Vite) ---
+Catalogue/dist/
+
 # vercel
 .vercel
 

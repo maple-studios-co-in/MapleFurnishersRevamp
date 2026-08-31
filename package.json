@@ -6,7 +6,8 @@
   "workspaces": [
     "Frontend",
     "Backend",
-    "AdminDashboard"
+    "AdminDashboard",
+    "Catalogue"
   ],
   "scripts": {
     "dev": "npm run dev --workspace Frontend",
@@ -22,7 +23,11 @@
     "start:api": "npm run start --workspace Backend",
     "dev:admin": "npm run dev --workspace AdminDashboard",
     "build:admin": "npm run build --workspace AdminDashboard",
-    "start:admin": "npm run start --workspace AdminDashboard"
+    "start:admin": "npm run start --workspace AdminDashboard",
+    "dev:catalogue": "npm run dev --workspace Catalogue",
+    "build:catalogue": "npm run build --workspace Catalogue",
+    "preview:catalogue": "npm run preview --workspace Catalogue",
+    "lint:catalogue": "npm run lint --workspace Catalogue"
   },
   "engines": {
     "node": ">=18.18.0"
