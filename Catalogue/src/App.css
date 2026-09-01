@@ -18,6 +18,15 @@
   min-height: 1087px;
 }
 
+/* Single-row pages (Scene 30, Beds) use a shorter 824px canvas. */
+.scene--short {
+  min-height: 824px;
+}
+
+.scene--short .backdrop {
+  height: 824px;
+}
+
 .backdrop {
   position: absolute;
   top: 0;
@@ -197,12 +206,28 @@
   pointer-events: none;
 }
 
-/* Furniture geometry — verbatim node offsets relative to the plate. */
+/* Furniture geometry — verbatim node offsets relative to the plate.
+   (rocking/bar/bedroom have no Figma nodes; their boxes follow their
+   siblings' composition at the supplied renders' aspect ratios.) */
 .card--chair .card-img  { left: 1.61px;   top: 26.95px;  width: 216.031px; height: 324.047px; }
 .card--dining .card-img { left: 15.67px;  top: 64.93px;  width: 168.455px; height: 252.377px; object-fit: contain; }
 .card--sofa .card-img   { left: -62.47px; top: 132px;    width: 343.064px; height: 132px; }
 .card--bed .card-img    { left: -37.59px; top: 132.31px; width: 311.695px; height: 117px; }
 .card--accent .card-img { left: 5.9px;    top: 115.16px; width: 188.835px; height: 159.88px; }
+.card--rocking .card-img { left: -29.5px; top: 88px;     width: 260px;     height: 173.33px; }
+.card--bar .card-img     { left: 1.61px;  top: 26.95px;  width: 216.031px; height: 324.047px; }
+.card--bedroom .card-img { left: 0.54px;  top: 72px;     width: 200px;     height: 196.44px; }
+.card--sofa2 .card-img   { left: -28.75px; top: 85px;     width: 259.5px;   height: 173px; }
+.card--sofa3 .card-img   { left: -50.45px; top: 96px;     width: 301.5px;   height: 201px; }
+.card--sofa5 .card-img   { left: -78.57px; top: 74px;     width: 410.448px; height: 231px; }
+.card--sofa7 .card-img   { left: -48px;    top: 111.5px;  width: 325px;     height: 162.5px; }
+.card--sofaAll .card-img { left: -61.07px; top: 132px;    width: 322.272px; height: 124px; }
+.card--cafe .card-img    { left: -14.41px; top: 92px;     width: 214.815px; height: 196px; }
+.card--restaurant .card-img { left: -10.35px; top: 104px; width: 223.583px; height: 204px; }
+.card--nimbus .card-img  { left: -37.52px; top: 104.33px; width: 258px;     height: 172px; }
+.card--fabric .card-img  { left: -44px;    top: 100px;    width: 290.25px;  height: 193.5px; }
+.card--solidwood .card-img { left: -24.18px; top: 97px;   width: 249.224px; height: 206.5px; }
+.card--kids .card-img    { left: -17.47px; top: 75px;     width: 247px;     height: 205px; }
 
 .card-title {
   position: absolute;
@@ -413,6 +438,20 @@
   .card--sofa .card-img   { left: -31.07%; top: 57.46%; width: 170.6%; }
   .card--bed .card-img    { left: -18.7%;  top: 57.6%;  width: 155%; }
   .card--accent .card-img { left: 2.93%;   top: 50.13%; width: 93.91%; }
+  .card--rocking .card-img { left: -14.67%; top: 38.31%; width: 129.3%; }
+  .card--bar .card-img     { left: 0.8%;    top: 11.73%; width: 107.43%; }
+  .card--bedroom .card-img { left: 0.27%;   top: 31.34%; width: 99.46%; }
+  .card--sofa2 .card-img   { left: -14.3%;  top: 37%;    width: 129.05%; }
+  .card--sofa3 .card-img   { left: -25.09%; top: 41.79%; width: 149.94%; }
+  .card--sofa5 .card-img   { left: -39.07%; top: 32.21%; width: 204.12%; }
+  .card--sofa7 .card-img   { left: -23.87%; top: 48.54%; width: 161.63%; }
+  .card--sofaAll .card-img { left: -30.37%; top: 57.46%; width: 160.27%; }
+  .card--cafe .card-img    { left: -7.17%;  top: 40.05%; width: 106.83%; }
+  .card--restaurant .card-img { left: -5.15%; top: 45.27%; width: 111.19%; }
+  .card--nimbus .card-img  { left: -18.66%; top: 45.42%; width: 128.3%; }
+  .card--fabric .card-img  { left: -21.88%; top: 43.54%; width: 144.34%; }
+  .card--solidwood .card-img { left: -12.02%; top: 42.23%; width: 123.94%; }
+  .card--kids .card-img    { left: -8.69%;  top: 32.65%; width: 122.83%; }
 
   /* Room for the furniture's overhang below the plate (factor × plate
      width, straight from the node geometry). */
@@ -421,6 +460,24 @@
   .card--sofa .card-plate   { margin-bottom: calc(min(60vw, 252px) * 0.171); }
   .card--bed .card-plate    { margin-bottom: calc(min(60vw, 252px) * 0.098); }
   .card--accent .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.226); }
+  .card--rocking .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.157); }
+  .card--bar .card-plate     { margin-bottom: calc(min(60vw, 252px) * 0.603); }
+  .card--bedroom .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.193); }
+  .card--sofa2 .card-plate   { margin-bottom: calc(min(60vw, 252px) * 0.141); }
+  .card--sofa3 .card-plate   { margin-bottom: calc(min(60vw, 252px) * 0.335); }
+  .card--sofa5 .card-plate   { margin-bottom: calc(min(60vw, 252px) * 0.374); }
+  .card--sofa7 .card-plate   { margin-bottom: calc(min(60vw, 252px) * 0.22); }
+  .card--sofaAll .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.131); }
+  .card--cafe .card-plate    { margin-bottom: calc(min(60vw, 252px) * 0.29); }
+  .card--restaurant .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.389); }
+  .card--nimbus .card-plate  { margin-bottom: calc(min(60vw, 252px) * 0.232); }
+  .card--fabric .card-plate  { margin-bottom: calc(min(60vw, 252px) * 0.317); }
+  .card--solidwood .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.367); }
+  .card--kids .card-plate    { margin-bottom: calc(min(60vw, 252px) * 0.251); }
+
+  .scene--short .backdrop {
+    height: 100%;
+  }
 
   .card-title {
     position: static;
