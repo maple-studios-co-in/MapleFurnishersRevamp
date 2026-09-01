@@ -14,10 +14,31 @@ import { Link } from "react-router-dom";
  * and reflow each card into its own full-screen section.
  */
 
-export type Furniture = "chair" | "sofa" | "bed" | "dining" | "accent";
+export type Furniture =
+  | "chair"
+  | "sofa"
+  | "bed"
+  | "dining"
+  | "accent"
+  | "rocking"
+  | "bar"
+  | "bedroom"
+  | "sofa2"
+  | "sofa3"
+  | "sofa5"
+  | "sofa7"
+  | "sofaAll"
+  | "cafe"
+  | "restaurant"
+  | "nimbus"
+  | "fabric"
+  | "solidwood"
+  | "kids";
 
 interface CardProps {
   title: string;
+  /** One-line supporting copy under the title. */
+  sub: string;
   img: string;
   furniture: Furniture;
   /** Plate anchor within the 1440 canvas, e.g. { x: "86px", y: "256px" }. */
@@ -29,9 +50,7 @@ interface CardProps {
   href?: string;
 }
 
-const SUB = "Where everyday moments become lasting memories.";
-
-export default function CollectionCard({ title, img, furniture, x, y, to, href }: CardProps) {
+export default function CollectionCard({ title, sub, img, furniture, x, y, to, href }: CardProps) {
   const cls = `card card--${furniture}`;
   const style = { "--x": x, "--y": y } as CSSProperties;
   const body = (
@@ -40,7 +59,7 @@ export default function CollectionCard({ title, img, furniture, x, y, to, href }
         <img className="card-img" src={img} alt="" />
       </span>
       <span className="card-title">{title}</span>
-      <span className="card-sub">{SUB}</span>
+      <span className="card-sub">{sub}</span>
       <span className="card-cta">View Catalogue</span>
     </>
   );
