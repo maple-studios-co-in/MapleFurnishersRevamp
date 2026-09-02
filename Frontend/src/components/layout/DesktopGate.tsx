@@ -38,36 +38,42 @@ export default function DesktopGate({ children }: { children: ReactNode }) {
         <span className="desktop-gate__glow desktop-gate__glow--a" aria-hidden />
         <span className="desktop-gate__glow desktop-gate__glow--b" aria-hidden />
 
-        <div className="desktop-gate__logo" aria-hidden>
-          <MapleLogo />
+        {/* Auto-margin wrapper: centered on tall screens, scrolls without
+            clipping on very short ones. */}
+        <div className="desktop-gate__inner">
+          <div className="desktop-gate__logo" aria-hidden>
+            <MapleLogo />
+          </div>
+
+          <p className="desktop-gate__eyebrow">A Maple Furnishers experience</p>
+
+          <h1 className="desktop-gate__title">
+            Made for the
+            <br />
+            Big Screen.
+          </h1>
+
+          <p className="desktop-gate__sub">
+            {/* The break hides on short-landscape screens — the explicit
+                space keeps "experiment, browse" intact there. */}
+            To fully enjoy the experiment,{" "}
+            <br />
+            browse it on desktop.
+          </p>
+
+          <span className="desktop-gate__rule" aria-hidden />
+
+          <div className="desktop-gate__actions">
+            <a className="desktop-gate__cta" href="/catalogue">
+              Browse the Catalogue
+            </a>
+            <a className="desktop-gate__shop" href="https://shop.maplefurnishers.com/">
+              Shop Now
+            </a>
+          </div>
+
+          <p className="desktop-gate__foot">Best experienced at 1024px and wider</p>
         </div>
-
-        <p className="desktop-gate__eyebrow">A Maple Furnishers experience</p>
-
-        <h1 className="desktop-gate__title">
-          Made for the
-          <br />
-          Big Screen.
-        </h1>
-
-        <p className="desktop-gate__sub">
-          To fully enjoy the experiment,
-          <br />
-          browse it on desktop.
-        </p>
-
-        <span className="desktop-gate__rule" aria-hidden />
-
-        <div className="desktop-gate__actions">
-          <a className="desktop-gate__cta" href="/catalogue">
-            Browse the Catalogue
-          </a>
-          <a className="desktop-gate__shop" href="https://shop.maplefurnishers.com/">
-            Shop Now
-          </a>
-        </div>
-
-        <p className="desktop-gate__foot">Best experienced at 1024px and wider</p>
       </section>
 
       {mobile !== true && <div className="max-lg:hidden">{children}</div>}

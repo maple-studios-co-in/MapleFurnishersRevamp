@@ -201,7 +201,10 @@ next-route-announcer {
   pointer-events: none !important;
 }
 
-/* ── Desktop gate — the mobile takeover plate (see layout/DesktopGate) ── */
+/* ── Desktop gate — the mobile takeover plate (see layout/DesktopGate) ──
+   Fully fluid: type, spacing and controls scale with viewport width AND
+   height (clamp + svh), a compact row layout kicks in for short landscape
+   phones, and the auto-margin inner never lets tiny screens clip the top. */
 
 /* Unlayered rules outrank Tailwind's layered utilities, so the lg:hidden
    on the element can't win — hide it here for desktop instead. */
@@ -217,12 +220,19 @@ next-route-announcer {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   text-align: center;
-  padding: 48px 28px 36px;
+  padding: clamp(16px, 4svh, 44px) clamp(18px, 6vw, 32px) clamp(14px, 3.5svh, 32px);
   background: #140101;
   color: #eeeae2;
+}
+
+.desktop-gate__inner {
+  position: relative; /* above the glows */
+  margin-block: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
 .desktop-gate__glow {
@@ -233,19 +243,19 @@ next-route-announcer {
 }
 
 .desktop-gate__glow--a {
-  width: 340px;
-  height: 340px;
-  left: -90px;
-  top: -60px;
+  width: clamp(220px, 85vw, 340px);
+  aspect-ratio: 1;
+  left: -18vw;
+  top: -10vh;
   background: rgba(138, 47, 29, 0.4); /* clay-700 */
   animation: gate-drift-a 16s ease-in-out infinite alternate;
 }
 
 .desktop-gate__glow--b {
-  width: 430px;
-  height: 430px;
-  right: -140px;
-  bottom: -120px;
+  width: clamp(280px, 105vw, 430px);
+  aspect-ratio: 1;
+  right: -28vw;
+  bottom: -18vh;
   background: rgba(192, 133, 82, 0.24); /* maple-accent */
   animation: gate-drift-b 21s ease-in-out infinite alternate;
 }
@@ -258,10 +268,6 @@ next-route-announcer {
 @keyframes gate-drift-b {
   from { transform: translate(8%, 8%) scale(1.12); }
   to   { transform: translate(-10%, -8%) scale(0.98); }
-}
-
-.desktop-gate > :not(.desktop-gate__glow) {
-  position: relative; /* lift copy above the glows */
 }
 
 .desktop-gate__logo,
@@ -283,49 +289,53 @@ next-route-announcer {
 .desktop-gate__actions { animation-delay: 0.78s; }
 .desktop-gate__foot { animation-delay: 0.95s; }
 
+.desktop-gate__logo svg {
+  width: clamp(92px, 28vw, 130px);
+  height: auto;
+}
+
 .desktop-gate__eyebrow {
-  margin-top: 26px;
+  margin-top: clamp(12px, 2.6svh, 26px);
   font-family: var(--font-manrope), sans-serif;
-  font-size: 11px;
-  letter-spacing: 0.32em;
+  font-size: clamp(9px, 2.7vw, 11px);
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  opacity: 0;
   color: rgba(238, 234, 226, 0.55);
 }
 
 .desktop-gate__title {
-  margin-top: 14px;
+  margin-top: clamp(8px, 1.6svh, 14px);
   font-family: var(--font-pearl), serif;
-  font-size: clamp(32px, 9vw, 44px);
+  font-size: clamp(26px, 8.6vw, 44px);
   font-weight: 400;
   line-height: 1.22;
   letter-spacing: 0.04em;
 }
 
 .desktop-gate__sub {
-  margin-top: 18px;
-  max-width: 34ch;
+  margin-top: clamp(10px, 2svh, 18px);
+  max-width: 36ch;
   font-family: var(--font-redhat), sans-serif;
   font-weight: 300;
-  font-size: 14.5px;
-  line-height: 1.7;
+  font-size: clamp(12.5px, 3.7vw, 14.5px);
+  line-height: 1.65;
   letter-spacing: 0.02em;
   color: rgba(238, 234, 226, 0.78);
 }
 
 .desktop-gate__rule {
   display: block;
-  width: 64px;
+  width: clamp(48px, 16vw, 64px);
   height: 1px;
-  margin-top: 26px;
+  margin-top: clamp(14px, 2.8svh, 26px);
   background: rgba(238, 234, 226, 0.35);
 }
 
 .desktop-gate__actions {
   display: flex;
   flex-direction: column;
-  gap: 13px;
-  margin-top: 28px;
+  gap: clamp(10px, 1.6svh, 13px);
+  margin-top: clamp(16px, 3svh, 28px);
   width: min(320px, 100%);
 }
 
@@ -336,16 +346,17 @@ next-route-announcer {
   justify-content: center;
   font-family: var(--font-manrope), sans-serif;
   text-transform: uppercase;
+  white-space: nowrap;
   transition: background 0.3s, border-color 0.3s;
 }
 
 .desktop-gate__cta {
-  height: 52px;
+  height: clamp(46px, 6.4svh, 52px);
   border-radius: 999px;
   background: rgba(238, 234, 226, 0.1);
   border: 1px solid rgba(238, 234, 226, 0.3);
-  font-size: 13px;
-  letter-spacing: 0.18em;
+  font-size: clamp(11px, 3.3vw, 13px);
+  letter-spacing: 0.16em;
   color: #eeeae2;
 }
 
@@ -355,10 +366,10 @@ next-route-announcer {
 }
 
 .desktop-gate__shop {
-  height: 46px;
+  height: clamp(40px, 5.6svh, 46px);
   border-radius: 8px;
   border: 1px solid rgba(238, 234, 226, 0.4);
-  font-size: 12px;
+  font-size: clamp(10.5px, 3vw, 12px);
   letter-spacing: 0.16em;
   color: rgba(238, 234, 226, 0.85);
 }
@@ -369,12 +380,36 @@ next-route-announcer {
 }
 
 .desktop-gate__foot {
-  margin-top: 30px;
+  margin-top: clamp(16px, 3.2svh, 30px);
   font-family: var(--font-manrope), sans-serif;
-  font-size: 10.5px;
-  letter-spacing: 0.24em;
+  font-size: clamp(8.5px, 2.5vw, 10.5px);
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: rgba(238, 234, 226, 0.35);
+}
+
+/* Short landscape phones: tighten the stack and put the actions side by
+   side so everything still fits one screen. */
+@media (max-width: 1023px) and (max-height: 540px) {
+  .desktop-gate__logo svg { width: 80px; }
+  .desktop-gate__eyebrow { margin-top: 8px; }
+  .desktop-gate__title { font-size: clamp(20px, 7.2svh, 28px); }
+  .desktop-gate__sub { margin-top: 6px; }
+  .desktop-gate__sub br { display: none; }
+  .desktop-gate__rule { margin-top: 10px; }
+  .desktop-gate__actions {
+    flex-direction: row;
+    width: min(460px, 100%);
+    margin-top: 14px;
+    gap: 10px;
+  }
+  .desktop-gate__cta,
+  .desktop-gate__shop {
+    flex: 1 1 0;
+    height: 42px;
+    font-size: 10.5px;
+  }
+  .desktop-gate__foot { margin-top: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
