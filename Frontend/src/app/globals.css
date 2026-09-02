@@ -200,3 +200,187 @@ next-route-announcer {
   visibility: hidden !important;
   pointer-events: none !important;
 }
+
+/* ── Desktop gate — the mobile takeover plate (see layout/DesktopGate) ── */
+
+/* Unlayered rules outrank Tailwind's layered utilities, so the lg:hidden
+   on the element can't win — hide it here for desktop instead. */
+@media (min-width: 1024px) {
+  .desktop-gate {
+    display: none !important;
+  }
+}
+
+.desktop-gate {
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 28px 36px;
+  background: #140101;
+  color: #eeeae2;
+}
+
+.desktop-gate__glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  pointer-events: none;
+}
+
+.desktop-gate__glow--a {
+  width: 340px;
+  height: 340px;
+  left: -90px;
+  top: -60px;
+  background: rgba(138, 47, 29, 0.4); /* clay-700 */
+  animation: gate-drift-a 16s ease-in-out infinite alternate;
+}
+
+.desktop-gate__glow--b {
+  width: 430px;
+  height: 430px;
+  right: -140px;
+  bottom: -120px;
+  background: rgba(192, 133, 82, 0.24); /* maple-accent */
+  animation: gate-drift-b 21s ease-in-out infinite alternate;
+}
+
+@keyframes gate-drift-a {
+  from { transform: translate(-8%, -6%) scale(1); }
+  to   { transform: translate(12%, 10%) scale(1.18); }
+}
+
+@keyframes gate-drift-b {
+  from { transform: translate(8%, 8%) scale(1.12); }
+  to   { transform: translate(-10%, -8%) scale(0.98); }
+}
+
+.desktop-gate > :not(.desktop-gate__glow) {
+  position: relative; /* lift copy above the glows */
+}
+
+.desktop-gate__logo,
+.desktop-gate__eyebrow,
+.desktop-gate__title,
+.desktop-gate__sub,
+.desktop-gate__rule,
+.desktop-gate__actions,
+.desktop-gate__foot {
+  opacity: 0;
+  animation: hero-fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.desktop-gate__logo { animation-delay: 0.1s; }
+.desktop-gate__eyebrow { animation-delay: 0.24s; }
+.desktop-gate__title { animation-delay: 0.38s; }
+.desktop-gate__sub { animation-delay: 0.52s; }
+.desktop-gate__rule { animation-delay: 0.66s; }
+.desktop-gate__actions { animation-delay: 0.78s; }
+.desktop-gate__foot { animation-delay: 0.95s; }
+
+.desktop-gate__eyebrow {
+  margin-top: 26px;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  opacity: 0;
+  color: rgba(238, 234, 226, 0.55);
+}
+
+.desktop-gate__title {
+  margin-top: 14px;
+  font-family: var(--font-pearl), serif;
+  font-size: clamp(32px, 9vw, 44px);
+  font-weight: 400;
+  line-height: 1.22;
+  letter-spacing: 0.04em;
+}
+
+.desktop-gate__sub {
+  margin-top: 18px;
+  max-width: 34ch;
+  font-family: var(--font-redhat), sans-serif;
+  font-weight: 300;
+  font-size: 14.5px;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+  color: rgba(238, 234, 226, 0.78);
+}
+
+.desktop-gate__rule {
+  display: block;
+  width: 64px;
+  height: 1px;
+  margin-top: 26px;
+  background: rgba(238, 234, 226, 0.35);
+}
+
+.desktop-gate__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin-top: 28px;
+  width: min(320px, 100%);
+}
+
+.desktop-gate__cta,
+.desktop-gate__shop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-manrope), sans-serif;
+  text-transform: uppercase;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.desktop-gate__cta {
+  height: 52px;
+  border-radius: 999px;
+  background: rgba(238, 234, 226, 0.1);
+  border: 1px solid rgba(238, 234, 226, 0.3);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: #eeeae2;
+}
+
+.desktop-gate__cta:active,
+.desktop-gate__cta:hover {
+  background: rgba(238, 234, 226, 0.18);
+}
+
+.desktop-gate__shop {
+  height: 46px;
+  border-radius: 8px;
+  border: 1px solid rgba(238, 234, 226, 0.4);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: rgba(238, 234, 226, 0.85);
+}
+
+.desktop-gate__shop:active,
+.desktop-gate__shop:hover {
+  border-color: rgba(238, 234, 226, 0.75);
+}
+
+.desktop-gate__foot {
+  margin-top: 30px;
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(238, 234, 226, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-gate *,
+  .desktop-gate__glow {
+    animation: none !important;
+    opacity: 1;
+  }
+}

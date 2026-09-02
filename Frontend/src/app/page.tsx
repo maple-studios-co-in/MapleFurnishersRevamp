@@ -1,3 +1,4 @@
+import DesktopGate from "@/components/layout/DesktopGate";
 import ChairShowcase from "@/components/sections/ChairShowcase";
 import HeroFilm from "@/components/sections/HeroFilm";
 import OutroScene from "@/components/sections/OutroScene";
@@ -20,11 +21,13 @@ export default async function Home() {
   const sceneProducts = await fetchSceneProducts();
 
   return (
-    <main>
-      <HeroFilm />      {/* 01 intro + 02 furnish (in-scrub marker) */}
-      <ChairShowcase /> {/* 03 craft   */}
-      {/* 04 spaces + 05 promise + 06 contact (in-scrub) */}
-      <OutroScene sceneProducts={sceneProducts} />
-    </main>
+    <DesktopGate>
+      <main>
+        <HeroFilm />      {/* 01 intro + 02 furnish (in-scrub marker) */}
+        <ChairShowcase /> {/* 03 craft   */}
+        {/* 04 spaces + 05 promise + 06 contact (in-scrub) */}
+        <OutroScene sceneProducts={sceneProducts} />
+      </main>
+    </DesktopGate>
   );
 }

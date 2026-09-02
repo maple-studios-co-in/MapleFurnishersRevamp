@@ -215,7 +215,9 @@
 .card--bed .card-img    { left: -37.59px; top: 132.31px; width: 311.695px; height: 117px; }
 .card--accent .card-img { left: 5.9px;    top: 115.16px; width: 188.835px; height: 159.88px; }
 .card--rocking .card-img { left: -29.5px; top: 88px;     width: 260px;     height: 173.33px; }
-.card--bar .card-img     { left: 1.61px;  top: 26.95px;  width: 216.031px; height: 324.047px; }
+/* The stool cutout has no baked-in margins like its siblings, so it runs
+   ~85% of the chair box to read the same visual size (baseline kept). */
+.card--bar .card-img     { left: 8.5px;   top: 75px;     width: 184px;     height: 276px; }
 .card--bedroom .card-img { left: 0.54px;  top: 72px;     width: 200px;     height: 196.44px; }
 .card--sofa2 .card-img   { left: -28.75px; top: 85px;     width: 259.5px;   height: 173px; }
 .card--sofa3 .card-img   { left: -50.45px; top: 96px;     width: 301.5px;   height: 201px; }
@@ -439,7 +441,7 @@
   .card--bed .card-img    { left: -18.7%;  top: 57.6%;  width: 155%; }
   .card--accent .card-img { left: 2.93%;   top: 50.13%; width: 93.91%; }
   .card--rocking .card-img { left: -14.67%; top: 38.31%; width: 129.3%; }
-  .card--bar .card-img     { left: 0.8%;    top: 11.73%; width: 107.43%; }
+  .card--bar .card-img     { left: 4.23%;   top: 32.65%; width: 91.5%; }
   .card--bedroom .card-img { left: 0.27%;   top: 31.34%; width: 99.46%; }
   .card--sofa2 .card-img   { left: -14.3%;  top: 37%;    width: 129.05%; }
   .card--sofa3 .card-img   { left: -25.09%; top: 41.79%; width: 149.94%; }

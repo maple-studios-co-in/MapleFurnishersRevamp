@@ -114,9 +114,13 @@ export default function RootLayout({
             ancestor rather than the viewport. */}
         <SmoothScroll>
           <SectionTheme />
-          <SiteHeader />
-          <SectionRail />
-          <SocialRail />
+          {/* Below lg the page shows the DesktopGate takeover, which brings
+              its own logo — hide the site chrome so the plate stands alone. */}
+          <div className="max-lg:hidden">
+            <SiteHeader />
+            <SectionRail />
+            <SocialRail />
+          </div>
           {children}
         </SmoothScroll>
       </body>
