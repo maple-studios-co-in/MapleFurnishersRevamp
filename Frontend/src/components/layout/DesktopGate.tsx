@@ -51,9 +51,9 @@ export default function DesktopGate({ children }: { children: ReactNode }) {
         </h1>
 
         <p className="desktop-gate__sub">
-          Every home has a story — ours is told through full-scale films of
-          craft and space. To enjoy the experience completely, open this site
-          on a desktop.
+          To fully enjoy the experiment,
+          <br />
+          browse it on desktop.
         </p>
 
         <span className="desktop-gate__rule" aria-hidden />
