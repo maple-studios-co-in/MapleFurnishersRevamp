@@ -32,14 +32,14 @@ const IMGS: Record<string, string> = {
   bedroom: bedroomChair,
 };
 
-/* Subtexts verbatim from the design (Scene 29). */
+/* Subtexts verbatim from the design (Scene 29); slugs are the URL segments. */
 const SLOTS: { slug: ChairSlug; sub: string; furniture: Furniture }[] = [
-  { slug: "arm", furniture: "chair", sub: "Comfort shaped with a confident silhouette." },
-  { slug: "dining", furniture: "dining", sub: "Crafted to complement every table beautifully." },
-  { slug: "accent", furniture: "accent", sub: "A bold finishing touch for refined spaces." },
-  { slug: "rocking", furniture: "rocking", sub: "Gentle motion, timeless comfort, quiet luxury." },
-  { slug: "bar", furniture: "bar", sub: "Made for counters, conversations, and stylish gatherings." },
-  { slug: "bedroom", furniture: "bedroom", sub: "Perfect for reading, dressing, or simply unwinding." },
+  { slug: "arm-collections", furniture: "chair", sub: "Comfort shaped with a confident silhouette." },
+  { slug: "dining-collections", furniture: "dining", sub: "Crafted to complement every table beautifully." },
+  { slug: "accent-collections", furniture: "accent", sub: "A bold finishing touch for refined spaces." },
+  { slug: "rocking-collections", furniture: "rocking", sub: "Gentle motion, timeless comfort, quiet luxury." },
+  { slug: "bar-collections", furniture: "bar", sub: "Made for counters, conversations, and stylish gatherings." },
+  { slug: "bedroom-chairs", furniture: "bedroom", sub: "Perfect for reading, dressing, or simply unwinding." },
 ];
 
 export default function ChairsCollections() {
@@ -61,7 +61,7 @@ export default function ChairsCollections() {
               img={IMGS[s.furniture]}
               x={COLS[i % 3]}
               y={ROWS[Math.floor(i / 3)]}
-              {...(MOBILE_PDF ? { href: cat.pdf } : { to: `/catalogue-1/${s.slug}` })}
+              {...(MOBILE_PDF ? { href: cat.pdf } : { to: `/chairs-collections/${s.slug}` })}
             />
           );
         })}

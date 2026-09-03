@@ -25,7 +25,7 @@ const SLOTS: { slug: SofaSlug; sub: string; furniture: Furniture; img: string; c
   { slug: "3-seater", furniture: "sofa3", img: sofa3, col: 1, row: 0, sub: "Generous seating shaped for everyday comfort." },
   { slug: "5-seater", furniture: "sofa5", img: sofa5, col: 2, row: 0, sub: "Made for bigger moments and longer conversations." },
   { slug: "7-seater", furniture: "sofa7", img: sofa7, col: 0, row: 1, sub: "Designed to bring everyone together beautifully." },
-  { slug: "all", furniture: "sofaAll", img: sofaAll, col: 1, row: 1, sub: "Explore every silhouette, size, and expression." },
+  { slug: "all-sofas", furniture: "sofaAll", img: sofaAll, col: 1, row: 1, sub: "Explore every silhouette, size, and expression." },
 ];
 
 export default function SofasCollections() {
@@ -47,7 +47,7 @@ export default function SofasCollections() {
               img={s.img}
               x={COLS[s.col]}
               y={ROWS[s.row]}
-              {...(MOBILE_PDF ? { href: cat.pdf } : { to: `/catalogue-2/${s.slug}` })}
+              {...(MOBILE_PDF ? { href: cat.pdf } : { to: `/sofa-collections/${s.slug}` })}
             />
           );
         })}

@@ -17,9 +17,9 @@ import kidsBed from "../assets/figma/kids-bed.png";
 const COLS = ["75px", "calc(33.33% + 54.42px)", "calc(66.67% + 15.47px)"];
 
 const SLOTS: { slug: BedSlug; sub: string; furniture: Furniture; img: string }[] = [
-  { slug: "fabric", furniture: "fabric", img: fabricBed, sub: "Softly upholstered for comfort you can sink into." },
-  { slug: "solidwood", furniture: "solidwood", img: solidwoodBed, sub: "Crafted from enduring wood with timeless character." },
-  { slug: "kids", furniture: "kids", img: kidsBed, sub: "Playful designs made for growing imaginations." },
+  { slug: "fabric-beds", furniture: "fabric", img: fabricBed, sub: "Softly upholstered for comfort you can sink into." },
+  { slug: "solidwood-beds", furniture: "solidwood", img: solidwoodBed, sub: "Crafted from enduring wood with timeless character." },
+  { slug: "kids-bed", furniture: "kids", img: kidsBed, sub: "Playful designs made for growing imaginations." },
 ];
 
 export default function BedsCollections() {
@@ -41,7 +41,7 @@ export default function BedsCollections() {
               img={s.img}
               x={COLS[i]}
               y="307px"
-              {...(MOBILE_PDF ? { href: cat.pdf } : { to: `/catalogue-3/${s.slug}` })}
+              {...(MOBILE_PDF ? { href: cat.pdf } : { to: `/beds-collections/${s.slug}` })}
             />
           );
         })}
