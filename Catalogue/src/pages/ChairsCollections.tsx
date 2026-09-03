@@ -7,6 +7,7 @@ import chairAccent from "../assets/figma/chair-accent.png";
 import rocking from "../assets/figma/rocking.png";
 import barStool from "../assets/figma/bar-stool.png";
 import bedroomChair from "../assets/figma/bedroom-chair.png";
+import allChairs from "../assets/figma/all-chairs.png";
 
 /**
  * Chairs collection page — Figma "Scene 29" (2511:420), opened from any
@@ -21,7 +22,7 @@ import bedroomChair from "../assets/figma/bedroom-chair.png";
  */
 
 const COLS = ["75px", "calc(33.33% + 54.42px)", "calc(66.67% + 15.47px)"];
-const ROWS = ["307px", "709px"];
+const ROWS = ["307px", "709px", "1111px"];
 
 const IMGS: Record<string, string> = {
   chair: chairGreen,
@@ -30,10 +31,12 @@ const IMGS: Record<string, string> = {
   rocking,
   bar: barStool,
   bedroom: bedroomChair,
+  allChairs,
 };
 
 /* Subtexts verbatim from the design (Scene 29); slugs are the URL segments. */
 const SLOTS: { slug: ChairSlug; sub: string; furniture: Furniture }[] = [
+  { slug: "all-chairs", furniture: "allChairs", sub: "Explore every silhouette, size, and expression." },
   { slug: "arm-collections", furniture: "chair", sub: "Comfort shaped with a confident silhouette." },
   { slug: "dining-collections", furniture: "dining", sub: "Crafted to complement every table beautifully." },
   { slug: "accent-collections", furniture: "accent", sub: "A bold finishing touch for refined spaces." },
@@ -44,7 +47,7 @@ const SLOTS: { slug: ChairSlug; sub: string; furniture: Furniture }[] = [
 
 export default function ChairsCollections() {
   return (
-    <div className="scene">
+    <div className="scene scene--tall">
       <Backdrop />
       <Header />
       <Watermark top={441} />

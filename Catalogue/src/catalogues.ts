@@ -17,8 +17,11 @@ export const MOBILE_PDF =
  * object keys below ARE the URL segments.
  */
 
-/** The six chair collections — /chairs-collections/:slug. */
+/** The chair collections — /chairs-collections/:slug. "All Chairs" opens
+ *  the merged master (shared front matter kept once; the accent chapter is
+ *  excluded from the merge because its PDF is the dining file). */
 export const CHAIR_COLLECTIONS = {
+  "all-chairs": { title: "All Chairs", pdf: "/catalogues/all-chairs.pdf" },
   "arm-collections": { title: "Arm Collections", pdf: "/catalogues/arm-chairs.pdf" },
   "dining-collections": { title: "Dining Collections", pdf: "/catalogues/dining.pdf" },
   // No dedicated Accent PDF supplied yet — the client sent Dining.pdf
@@ -45,8 +48,10 @@ export const SOFA_COLLECTIONS = {
 
 export type SofaSlug = keyof typeof SOFA_COLLECTIONS;
 
-/** The three bed collections — /beds-collections/:slug. */
+/** The bed collections — /beds-collections/:slug. "All Beds" opens the
+ *  merged master (front matter and back cover kept once). */
 export const BED_COLLECTIONS = {
+  "all-beds": { title: "All Beds", pdf: "/catalogues/all-beds.pdf" },
   "fabric-beds": { title: "Fabric Beds", pdf: "/catalogues/fabric-beds.pdf" },
   "solidwood-beds": { title: "Solidwood Beds", pdf: "/catalogues/solidwood-beds.pdf" },
   "kids-bed": { title: "Kids Bed", pdf: "/catalogues/kids-beds.pdf" },

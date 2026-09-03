@@ -18,13 +18,23 @@
   min-height: 1087px;
 }
 
-/* Single-row pages (Scene 30, Beds) use a shorter 824px canvas. */
+/* Single-row pages use a shorter 824px canvas. */
 .scene--short {
   min-height: 824px;
 }
 
 .scene--short .backdrop {
   height: 824px;
+}
+
+/* Three-row pages (Chairs, with its All Chairs lead card) extend the
+   canvas by one 402px row pitch; the backdrop stretches to cover. */
+.scene--tall {
+  min-height: 1489px;
+}
+
+.scene--tall .backdrop {
+  height: 100%;
 }
 
 .backdrop {
@@ -230,6 +240,8 @@
 .card--fabric .card-img  { left: -44px;    top: 100px;    width: 290.25px;  height: 193.5px; }
 .card--solidwood .card-img { left: -24.18px; top: 97px;   width: 249.224px; height: 206.5px; }
 .card--kids .card-img    { left: -17.47px; top: 75px;     width: 247px;     height: 205px; }
+.card--allChairs .card-img { left: 5.54px; top: 66px;     width: 190px;     height: 285px; }
+.card--allBeds .card-img { left: -44.5px;  top: 100px;    width: 290px;     height: 193.33px; }
 
 .card-title {
   position: absolute;
@@ -454,6 +466,8 @@
   .card--fabric .card-img  { left: -21.88%; top: 43.54%; width: 144.34%; }
   .card--solidwood .card-img { left: -12.02%; top: 42.23%; width: 123.94%; }
   .card--kids .card-img    { left: -8.69%;  top: 32.65%; width: 122.83%; }
+  .card--allChairs .card-img { left: 2.76%; top: 28.73%; width: 94.49%; }
+  .card--allBeds .card-img { left: -22.13%; top: 43.54%; width: 144.22%; }
 
   /* Room for the furniture's overhang below the plate (factor × plate
      width, straight from the node geometry). */
@@ -476,6 +490,8 @@
   .card--fabric .card-plate  { margin-bottom: calc(min(60vw, 252px) * 0.317); }
   .card--solidwood .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.367); }
   .card--kids .card-plate    { margin-bottom: calc(min(60vw, 252px) * 0.251); }
+  .card--allChairs .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.603); }
+  .card--allBeds .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.317); }
 
   .scene--short .backdrop {
     height: 100%;
