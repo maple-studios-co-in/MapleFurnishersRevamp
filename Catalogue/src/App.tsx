@@ -8,6 +8,9 @@ import {
   SOFA_COLLECTIONS,
   BED_COLLECTIONS,
   DIRECT,
+  LEGACY_CHAIR_SLUGS,
+  LEGACY_SOFA_SLUGS,
+  LEGACY_BED_SLUGS,
   MOBILE_PDF,
   type ChairSlug,
   type SofaSlug,
@@ -31,7 +34,7 @@ function PdfViewer({ cat }: { cat: Pdf }) {
         <a href={cat.pdf} className="pdfFallback-open">
           Open the catalogue →
         </a>
-        <Link to="/catalogue-1" className="pdfFallback-back">
+        <Link to="/" className="pdfFallback-back">
           ← All collections
         </Link>
       </div>
@@ -48,49 +51,77 @@ function PdfViewer({ cat }: { cat: Pdf }) {
   );
 }
 
-/** /catalogue-1/:slug — one chair sub-collection's PDF catalogue. */
+/** /chairs-collections/:slug — one chair sub-collection's PDF catalogue. */
 function ChairPdf() {
   const { slug } = useParams();
   if (!slug || !(slug in CHAIR_COLLECTIONS)) {
-    return <Navigate to="/catalogue-1" replace />;
+    return <Navigate to="/chairs-collections" replace />;
   }
   return <PdfViewer cat={CHAIR_COLLECTIONS[slug as ChairSlug]} />;
 }
 
-/** /catalogue-2/:slug — one sofa collection's PDF catalogue. */
+/** /sofa-collections/:slug — one sofa collection's PDF catalogue. */
 function SofaPdf() {
   const { slug } = useParams();
   if (!slug || !(slug in SOFA_COLLECTIONS)) {
-    return <Navigate to="/catalogue-2" replace />;
+    return <Navigate to="/sofa-collections" replace />;
   }
   return <PdfViewer cat={SOFA_COLLECTIONS[slug as SofaSlug]} />;
 }
 
-/** /catalogue-3/:slug — one bed collection's PDF catalogue. */
+/** /beds-collections/:slug — one bed collection's PDF catalogue. */
 function BedPdf() {
   const { slug } = useParams();
   if (!slug || !(slug in BED_COLLECTIONS)) {
-    return <Navigate to="/catalogue-3" replace />;
+    return <Navigate to="/beds-collections" replace />;
   }
   return <PdfViewer cat={BED_COLLECTIONS[slug as BedSlug]} />;
+}
+
+/** Redirect an old /catalogue-N/:slug child onto its named route. */
+function LegacyChild({ map, base }: { map: Record<string, string>; base: string }) {
+  const { slug } = useParams();
+  const next = slug ? map[slug] : undefined;
+  return <Navigate to={next ? `${base}/${next}` : base} replace />;
 }
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<CatalogueLanding />} />
-      {/* Chairs, Sofas and Beds open their designed collection pages, whose
-          cards open per-collection PDFs (natively on touch devices).
-          Cafe/Restaurants/Nimbus open their catalogues directly. */}
-      <Route path="/catalogue-1" element={<ChairsCollections />} />
-      <Route path="/catalogue-1/:slug" element={<ChairPdf />} />
-      <Route path="/catalogue-2" element={<SofasCollections />} />
-      <Route path="/catalogue-2/:slug" element={<SofaPdf />} />
-      <Route path="/catalogue-3" element={<BedsCollections />} />
-      <Route path="/catalogue-3/:slug" element={<BedPdf />} />
-      <Route path="/cafe" element={<PdfViewer cat={DIRECT.cafe} />} />
+
+      {/* Named routes: the URL is the collection. Family pages list their
+          sub-collections; each child opens that catalogue's PDF (natively
+          on touch devices). */}
+      <Route path="/chairs-collections" element={<ChairsCollections />} />
+      <Route path="/chairs-collections/:slug" element={<ChairPdf />} />
+      <Route path="/sofa-collections" element={<SofasCollections />} />
+      <Route path="/sofa-collections/:slug" element={<SofaPdf />} />
+      <Route path="/beds-collections" element={<BedsCollections />} />
+      <Route path="/beds-collections/:slug" element={<BedPdf />} />
+      <Route path="/cafe-collections" element={<PdfViewer cat={DIRECT.cafe} />} />
       <Route path="/restaurants" element={<PdfViewer cat={DIRECT.restaurant} />} />
-      <Route path="/nimbus" element={<PdfViewer cat={DIRECT.nimbus} />} />
+      <Route path="/nimbus-collection" element={<PdfViewer cat={DIRECT.nimbus} />} />
+
+      {/* Legacy /catalogue-N routes shipped for a while — keep every old
+          bookmark and shared link working via client-side redirects. */}
+      <Route path="/catalogue-1" element={<Navigate to="/chairs-collections" replace />} />
+      <Route
+        path="/catalogue-1/:slug"
+        element={<LegacyChild map={LEGACY_CHAIR_SLUGS} base="/chairs-collections" />}
+      />
+      <Route path="/catalogue-2" element={<Navigate to="/sofa-collections" replace />} />
+      <Route
+        path="/catalogue-2/:slug"
+        element={<LegacyChild map={LEGACY_SOFA_SLUGS} base="/sofa-collections" />}
+      />
+      <Route path="/catalogue-3" element={<Navigate to="/beds-collections" replace />} />
+      <Route
+        path="/catalogue-3/:slug"
+        element={<LegacyChild map={LEGACY_BED_SLUGS} base="/beds-collections" />}
+      />
+      <Route path="/cafe" element={<Navigate to="/cafe-collections" replace />} />
+      <Route path="/nimbus" element={<Navigate to="/nimbus-collection" replace />} />
     </Routes>
   );
 }

@@ -41,21 +41,21 @@ const SLOTS: Slot[][] = [
       sub: "Statement seating for every corner.",
       furniture: "chair",
       img: chairGreen,
-      to: "/catalogue-1",
+      to: "/chairs-collections",
     },
     {
       title: "Sofas Collections",
       sub: "Made for conversations that linger.",
       furniture: "sofa",
       img: sofa,
-      to: "/catalogue-2",
+      to: "/sofa-collections",
     },
     {
       title: "Beds Collections",
       sub: "Because every day deserves a beautiful ending.",
       furniture: "bed",
       img: bed,
-      to: "/catalogue-3",
+      to: "/beds-collections",
     },
   ],
   [
@@ -64,7 +64,7 @@ const SLOTS: Slot[][] = [
       sub: "Designed for spaces people love to return to.",
       furniture: "cafe",
       img: cafe,
-      ...direct(DIRECT.cafe.pdf, "/cafe"),
+      ...direct(DIRECT.cafe.pdf, "/cafe-collections"),
     },
     {
       title: "Restaurants",
@@ -78,7 +78,7 @@ const SLOTS: Slot[][] = [
       sub: "Soft forms, elevated comfort, unmistakable presence.",
       furniture: "nimbus",
       img: nimbusBed,
-      ...direct(DIRECT.nimbus.pdf, "/nimbus"),
+      ...direct(DIRECT.nimbus.pdf, "/nimbus-collection"),
     },
   ],
 ];
