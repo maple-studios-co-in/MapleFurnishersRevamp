@@ -33,7 +33,9 @@ export type Furniture =
   | "nimbus"
   | "fabric"
   | "solidwood"
-  | "kids";
+  | "kids"
+  | "allChairs"
+  | "allBeds";
 
 interface CardProps {
   title: string;
