@@ -7,11 +7,11 @@ import type { NextConfig } from "next";
  * failures and CORS are all out of the picture — a login from a real user's
  * browser was being killed client-side calling the backend domain directly.
  *
- * Note: proxied requests reach the backend from Vercel's egress, so its
- * per-IP login rate limit effectively becomes shared for admin users. With
- * a single admin account that trade is fine.
+ * BACKEND_ORIGIN is set at build time so each deployment can use its nearest
+ * private backend while retaining the hosted API as a fallback.
  */
-const BACKEND_ORIGIN = "https://maple-furnishers-backend.vercel.app";
+const BACKEND_ORIGIN =
+  process.env.BACKEND_ORIGIN ?? "https://maple-furnishers-backend.vercel.app";
 /** The marketing site, which owns the product image files. */
 const SITE_ORIGIN = "https://maple-furnishers-revamp-frontend.vercel.app";
 

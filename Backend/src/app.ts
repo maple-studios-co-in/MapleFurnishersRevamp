@@ -21,7 +21,16 @@ export function createApp() {
   app.use(helmet());
   app.use(cors({ origin: corsOrigins }));
   app.use(express.json({ limit: "100kb" }));
-  app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === "/health" } }));
+  app.use(
+    pinoHttp({
+      logger,
+      redact: {
+        paths: ["req.headers.authorization", "req.headers.cookie"],
+        censor: "[Redacted]",
+      },
+      autoLogging: { ignore: (req) => req.url === "/health" },
+    }),
+  );
 
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", uptime: Math.round(process.uptime()) });
