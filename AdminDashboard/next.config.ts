@@ -16,6 +16,12 @@ const SITE_ORIGIN = "https://maple-furnishers-revamp-frontend.vercel.app";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Match the API's 50 MiB artifact limit; Next otherwise truncates proxy
+  // uploads at 10 MiB. Allow time for larger files to reach the backend.
+  experimental: {
+    middlewareClientMaxBodySize: "50mb",
+    proxyTimeout: 120000,
+  },
   // Lets a build run against its own output dir while `next dev` still owns
   // .next — on OneDrive the two colliding surface as EINVAL/readlink.
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
