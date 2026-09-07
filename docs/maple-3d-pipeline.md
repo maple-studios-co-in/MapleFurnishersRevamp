@@ -12,7 +12,8 @@ The initial recipe is **Manual Blender delivery**, ID `manual-blender`, version 
 
 | Boundary | Current implementation | Later extension |
 |---|---|---|
-| Input contract | Keeri export v1, readiness filter, tenant scope, snapshots and checksummed private originals | Signed change feed and pre-generation readiness refresh |
+| Input contract | Approved Keeri export v2, canonical revision checks, capture/variant attribution, verified measurements and private originals | Additional capture profiles and pre-generation readiness refresh |
+| Catalogue imports | Durable PostgreSQL batches with a separate worker, progress, retry, cancellation and lease recovery | Scheduled scans and change feeds |
 | Recipe registry | Immutable recipe ID/version with declared stages | Image reconstruction, geometry cleanup, UV/material baking and optimization recipes |
 | Job persistence | Exact source snapshot, recipe version, idempotent job creation and output lineage | Worker leases, retries, progress, cancellation and provider execution adapters |
 | Artifact storage | `ArtifactStorage` interface, private filesystem implementation | Maple-owned object storage and large-file/multipart uploads |
@@ -34,7 +35,7 @@ The backend still needs its existing PostgreSQL, JWT and admin-login configurati
 | `KEERI_3D_TOKEN` | Read-only server-side integration credential. |
 | `KEERI_3D_TENANT_ID` | Expected Keeri company ID; responses must match it. |
 | `KEERI_3D_REFERENCE_ORIGINS` | Optional comma-separated additional HTTPS origins allowed for signed original-image downloads. No integration credential is forwarded to those other origins. |
-| `MAPLE_BACKEND_ORIGIN` | Frontend and admin server-side API/proxy target. Set consistently for both apps. |
+| `MAPLE_BACKEND_ORIGIN` | Frontend and admin server-side API/proxy target. Existing VPS `BACKEND_ORIGIN` is accepted as a fallback. |
 | `NEXT_PUBLIC_API_URL` | Existing admin direct API target for local development. |
 | `NEXT_PUBLIC_STOREFRONT_URL` | Admin's Maple customizer origin for preview/live links. |
 
@@ -48,7 +49,29 @@ The local adapter requires a persistent VPS volume, filesystem permissions and b
 
 ## Schema and API
 
-New tables are additive: `ThreeDProduct`, `ThreeDImport`, `ThreeDJob`, `ThreeDAsset`, `ThreeDVersion` and `ThreeDPublication`. They store references to Keeri IDs without adding any 3D data to Keeri. Apply all three new migrations when releasing: `20260907093000_three_d_foundation`, `20260907095000_three_d_version_identity`, and `20260907102000_three_d_version_master`. Each version can pin its private Blender master independently from the public GLB and images.
+New tables are additive: `ThreeDProduct`, `ThreeDImport`, `ThreeDJob`, `ThreeDAsset`, `ThreeDVersion`, `ThreeDPublication`, `ThreeDImportBatch` and `ThreeDImportItem`. They store references to Keeri IDs without adding 3D outputs to Keeri. Apply all four new migrations when releasing: `20260907093000_three_d_foundation`, `20260907095000_three_d_version_identity`, `20260907102000_three_d_version_master`, and `20260907160000_three_d_import_batches`. Versions pin their private Blender master, approved source revision and geometry group independently from public files.
+
+### Approved input imports
+
+The authoritative Keeri wire contract is [source v2](contracts/keeri-3d-source-v2.md). It supersedes the original proposal's source v1. The public viewer manifest remains v1. Legacy Keeri input snapshots require reimport before new production; manual Maple products and existing published versions are retained.
+
+The current import profile accepts one geometry group, up to 24 references and 200 MiB of originals per design. Each original has a 50 MiB ceiling. Required front, side, back and angle views must be marked as photographs from the group's capture set. Generated views are supplements. Approval must match the recomputed content hash. Downloaded originals must match both declared size and SHA-256; expiring access URLs are removed before snapshot persistence.
+
+The admin creates one-page import batches (up to 20 designs) using `POST /api/admin/3d/keeri/import-batches` with `{idempotencyKey,cursor?}`. It returns `202 {batch}` without downloading images. `GET` on the same route lists recent batches; `GET /:id` reads one; `POST /:id/retry` and `POST /:id/cancel` act on it. The older `/keeri/sync` endpoint now also enqueues and returns `{batch}`, so external clients using its old synchronous response must migrate.
+
+Start a separately supervised process with the same backend environment and private storage directory:
+
+```sh
+npm run worker:3d-imports --workspace Backend
+```
+
+The worker command uses compiled backend code; build first. `-- --once` processes at most one available batch for an operational check. Queued records remain waiting if no worker is running; the web process does not execute them. Worker process health alone does not establish successful importing: inspect the batch outcome.
+
+Each persisted batch has a cumulative 500 MiB download reservation budget across retries and worker restarts, with a five-minute time limit per attempt. Reservations happen before downloads and remain charged after failure, so retries cannot bypass the limit. A 30-second renewable lease permits recovery after a crash; transaction fencing prevents stale workers from committing. Imported source records and successful item outcomes commit together. Graceful worker stops requeue unfinished work; cancellation preserves already committed products and files.
+
+Retry reattempts eligible failures while retaining successful items. Source revisions are pinned when the page is fetched: changed/invalid sources require a new scan. A fresh scan starts from the first page so newly eligible IDs behind an earlier cursor can be discovered. Polling/scheduled scans are not enabled automatically. Missing entries in a partial or failed page never withdraw Maple products or publication.
+
+Changing the source or import limits for a future capture/generation workflow requires a tested profile/contract change. Additional geometry groups are represented in source v2 but rejected by this pilot before downloading; group-specific model selection must be added before enabling them. AI workers must separately revalidate current Keeri readiness before unattended generation.
 
 Admin APIs start at `/api/admin/3d` and use existing Maple JWT authentication. The full route/payload contract is in [the design](superpowers/specs/2026-09-07-maple-3d-pipeline-design.md). `GET /api/3d/products/:slug` returns only a published manifest; `/api/3d/assets/:id` authorizes only artifacts referenced by published versions. Private 15-minute preview tokens are scoped to one product/version and cannot authenticate as admin.
 

@@ -5,9 +5,25 @@ import { requireRecipe } from './recipes';
 import { type ArtifactStorage, validateArtifact, modelMaterialNames } from './storage';
 import { type AssetKind, type ManifestInput, manifestAssetIds, ManifestSchema, parse, parseSource } from './validation';
 import { KeeriConnector } from './connector';
+import { parseStoredSource, type SourceInput } from './source-contract';
 
 export const assetSelect = { id: true, productId: true, kind: true, filename: true, contentType: true, sizeBytes: true, sha256: true, createdAt: true } as const;
 type Transaction = Prisma.TransactionClient;
+export type ImportContext = {
+  signal?: AbortSignal;
+  beforeReference?: (sizeBytes: number) => Promise<void>;
+  beforeCommit?: (tx: Transaction) => Promise<void>;
+  afterImport?: (tx: Transaction, result: { product: ThreeDProduct; unchanged: boolean }) => Promise<void>;
+};
+export const IMPORT_LIMITS = { referencesPerDesign: 24, bytesPerDesign: 200 * 1024 * 1024 } as const;
+function oneGeometry(source: Pick<SourceInput, 'geometryGroups'>) {
+  if (source.geometryGroups.length !== 1) throw new AppError(400, 'This Maple pilot requires one geometry group per design. Separate different sizes or constructions before importing.');
+  return source.geometryGroups[0];
+}
+function approvedSnapshot(input: unknown, tenantId: string, modelId: string) {
+  if (!input || typeof input !== 'object' || !('schemaVersion' in input) || input.schemaVersion !== 2) throw new AppError(409, 'Legacy Keeri input: reimport approved inputs before starting production or saving another version');
+  return parseStoredSource(input, tenantId, modelId);
+}
 const asJson = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const missing = () => new AppError(404, '3D product or version not found');
 export class ThreeDService {
@@ -40,28 +56,42 @@ export class ThreeDService {
     const updated = await tx.threeDProduct.update({ where: { id: product.id }, data: { name: source.name, sourceRevision: source.sourceRevision } });
     return { product: updated, unchanged: false };
   }
-  async importSource(input: unknown, tenantId: string, modelId?: string) {
+  async importSource(input: unknown, tenantId: string, modelId?: string, context: ImportContext = {}) {
+    context.signal?.throwIfAborted();
     const source = parseSource(input, tenantId, modelId);
+    oneGeometry(source);
+    if (source.references.length > IMPORT_LIMITS.referencesPerDesign) throw new AppError(400, 'The current import profile accepts at most 24 references per design');
+    if (source.references.reduce((sum, ref) => sum + ref.sizeBytes, 0) > IMPORT_LIMITS.bytesPerDesign) throw new AppError(400, 'The current import profile accepts at most 200 MiB of originals per design');
+    const finish = async <T extends { product: ThreeDProduct; unchanged: boolean }>(tx: Transaction, result: T): Promise<T> => {
+      await context.afterImport?.(tx, result);
+      return result;
+    };
     const existing = await this.db.threeDProduct.findUnique({ where: { sourceTenantId_sourceModelId: { sourceTenantId: tenantId, sourceModelId: source.modelId } }, include: { imports: { where: { sourceRevision: source.sourceRevision }, take: 1 } } });
     if (existing?.imports.length) return this.transaction(async tx => {
+      context.signal?.throwIfAborted();
+      await context.beforeCommit?.(tx);
       const current = await tx.threeDProduct.findUniqueOrThrow({ where: { id: existing.id } });
-      return this.activateSource(tx, current, source);
+      return finish(tx, await this.activateSource(tx, current, source));
     });
     const downloads: { referenceId: string; filename: string; storageKey: string; contentType: string; sizeBytes: number; sha256: string }[] = [];
     try {
       for (const reference of source.references) {
+        context.signal?.throwIfAborted();
         if (!this.connector) throw new AppError(503, 'Keeri reference download is not configured');
-        const bytes = await this.connector.reference(reference);
+        await context.beforeReference?.(reference.sizeBytes);
+        const bytes = await this.connector.reference(reference, context.signal);
         const metadata = validateArtifact('reference', bytes);
         if (metadata.sha256 !== reference.checksum.replace(/^sha256:/, '').toLowerCase()) throw new AppError(400, 'Keeri reference checksum does not match its bytes');
         const storageKey = await this.storage.put(bytes);
         downloads.push({ referenceId: reference.id, filename: `keeri-${reference.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180), storageKey, ...metadata });
       }
       const result = await this.transaction(async tx => {
+        context.signal?.throwIfAborted();
+        await context.beforeCommit?.(tx);
         let product = await tx.threeDProduct.findUnique({ where: { sourceTenantId_sourceModelId: { sourceTenantId: tenantId, sourceModelId: source.modelId } } });
         if (product) {
           const found = await tx.threeDImport.findUnique({ where: { productId_sourceRevision: { productId: product.id, sourceRevision: source.sourceRevision } } });
-          if (found) return { ...await this.activateSource(tx, product, source), reused: true };
+          if (found) return finish(tx, { ...await this.activateSource(tx, product, source), reused: true });
         } else {
           const base = (source.code || source.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'design';
           const suffix = createHash('sha256').update(`${tenantId}\0${source.modelId}`).digest('hex').slice(0, 12);
@@ -72,29 +102,14 @@ export class ThreeDService {
           const asset = await tx.threeDAsset.create({ data: { productId: product.id, kind: 'reference', ...data } });
           storedReferences.push({ referenceId, assetId: asset.id, sha256: asset.sha256 });
         }
-        await tx.threeDImport.create({ data: { productId: product.id, sourceRevision: source.sourceRevision, snapshot: asJson({ ...source, storedReferences }) } });
+        const references = source.references.map(({ url: _url, ...evidence }) => evidence);
+        await tx.threeDImport.create({ data: { productId: product.id, sourceRevision: source.sourceRevision, snapshot: asJson({ ...source, references, storedReferences }) } });
         product = await tx.threeDProduct.update({ where: { id: product.id }, data: { name: source.name, sourceRevision: source.sourceRevision } });
-        return { product, unchanged: false, reused: false };
+        return finish(tx, { product, unchanged: false, reused: false });
       });
       if (result.reused) await Promise.all(downloads.map(d => this.storage.remove(d.storageKey)));
       return result;
     } catch (error) { await Promise.all(downloads.map(d => this.storage.remove(d.storageKey))); throw error; }
-  }
-  async sync(cursor?: string) {
-    if (!this.connector) throw new AppError(503, 'Keeri integration is not configured');
-    const page = await this.connector.list(cursor);
-    let imported = 0, unchanged = 0;
-    const failed: { modelId: string; message: string }[] = [];
-    for (const item of page.products) {
-      try {
-        const source = await this.connector.detail(item.modelId);
-        if (source.sourceRevision !== item.sourceRevision) throw new AppError(409, 'Source changed during import; retry this page');
-        const result = await this.importSource(source, this.connector.config.tenantId, item.modelId);
-        result.unchanged ? unchanged++ : imported++;
-      } catch (error) { failed.push({ modelId: item.modelId, message: error instanceof AppError ? error.message : 'Import failed; retry this page' }); }
-    }
-    // Absence from a page never withdraws a previously imported or published design.
-    return { imported, unchanged, failed, nextCursor: page.nextCursor };
   }
   async createJob(productId: string, data: { recipeId: string; idempotencyKey: string }) {
     const recipe = requireRecipe(data.recipeId);
@@ -104,12 +119,14 @@ export class ThreeDService {
       const existing = await tx.threeDJob.findUnique({ where: { productId_idempotencyKey: { productId, idempotencyKey: data.idempotencyKey } } });
       if (existing) {
         if (existing.recipeId !== recipe.id) throw new AppError(409, 'Idempotency key already belongs to a different recipe');
+        if (product.sourceType === 'keeri') oneGeometry(approvedSnapshot(existing.inputSnapshot, product.sourceTenantId!, product.sourceModelId!));
         return existing;
       }
       const sourceImport = product.sourceRevision ? await tx.threeDImport.findUnique({ where: { productId_sourceRevision: { productId, sourceRevision: product.sourceRevision } } }) : null;
       if (product.sourceType === 'keeri' && !sourceImport) throw new AppError(409, 'Import the design inputs before creating a job');
+      const geometryGroupId = product.sourceType === 'keeri' ? oneGeometry(approvedSnapshot(sourceImport?.snapshot, product.sourceTenantId!, product.sourceModelId!)).id : null;
       const references = sourceImport ? [] : await tx.threeDAsset.findMany({ where: { productId, kind: 'reference' }, select: assetSelect });
-      return tx.threeDJob.create({ data: { productId, ...data, recipeVersion: recipe.version, importId: sourceImport?.id, inputSnapshot: sourceImport?.snapshot ?? asJson({ schemaVersion: 1, sourceType: 'manual', productId, name: product.name, slug: product.slug, references }) } });
+      return tx.threeDJob.create({ data: { productId, ...data, recipeVersion: recipe.version, geometryGroupId, importId: sourceImport?.id, inputSnapshot: sourceImport?.snapshot ?? asJson({ schemaVersion: 1, sourceType: 'manual', productId, name: product.name, slug: product.slug, references }) } });
     });
   }
   async uploadAsset(productId: string, kind: AssetKind, filename: string, bytes: Buffer) {
@@ -139,6 +156,7 @@ export class ThreeDService {
       const product = await tx.threeDProduct.findUnique({ where: { id: productId } });
       if (!product) throw missing();
       let source: unknown;
+      let geometryGroupId: string | null = null;
       if (input.jobId) {
         const job = await tx.threeDJob.findUnique({ where: { id: input.jobId } });
         if (!job || job.productId !== productId) throw new AppError(400, 'Job must belong to this product');
@@ -148,7 +166,10 @@ export class ThreeDService {
         source = (await tx.threeDImport.findUnique({ where: { productId_sourceRevision: { productId, sourceRevision: product.sourceRevision } } }))?.snapshot;
       }
       if (product.sourceType === 'keeri') {
-        const snapshot = parseSource(source, product.sourceTenantId!, product.sourceModelId!);
+        const snapshot = approvedSnapshot(source, product.sourceTenantId!, product.sourceModelId!);
+        const geometry = oneGeometry(snapshot);
+        geometryGroupId = geometry.id;
+        if (['width', 'depth', 'height'].some(axis => manifest.dimensionsMm[axis as keyof typeof manifest.dimensionsMm] !== geometry.dimensionsMm[axis as keyof typeof manifest.dimensionsMm])) throw new AppError(400, 'Version dimensions must match the approved geometry measurements');
         const variantIds = new Set(snapshot.variants.map(v => v.variantId));
         if (variantIds.size && !manifest.variantBindings.length) throw new AppError(400, 'Keeri versions must bind at least one source variant');
         if (manifest.variantBindings.some(b => !variantIds.has(b.variantId))) throw new AppError(400, 'Variant binding does not belong to the job source snapshot');
@@ -157,7 +178,7 @@ export class ThreeDService {
       const last = await tx.threeDVersion.aggregate({ where: { productId }, _max: { sequence: true } });
       const sourceRevision = source && typeof source === 'object' && 'sourceRevision' in source && typeof source.sourceRevision === 'string' ? source.sourceRevision : null;
       const productName = source && typeof source === 'object' && 'name' in source && typeof source.name === 'string' ? source.name : product.name;
-      const version = await tx.threeDVersion.create({ data: { productId, productName, sourceRevision, masterAssetId: input.masterAssetId, sequence: (last._max.sequence || 0) + 1, jobId: input.jobId, manifest: asJson(manifest), notes: input.notes || '' } });
+      const version = await tx.threeDVersion.create({ data: { productId, productName, sourceRevision, geometryGroupId, masterAssetId: input.masterAssetId, sequence: (last._max.sequence || 0) + 1, jobId: input.jobId, manifest: asJson(manifest), notes: input.notes || '' } });
       if (input.jobId) await tx.threeDJob.update({ where: { id: input.jobId }, data: { status: 'completed', completedAt: new Date() } });
       return version;
     });

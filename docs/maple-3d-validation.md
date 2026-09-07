@@ -1,4 +1,46 @@
-# Maple 3D foundation — local validation, 7 September 2026
+# Maple 3D — local validation, 7 September 2026
+
+## Approved-input update: current verification
+
+The approved-input update builds on foundation commit `3ca03f4` in `/Users/adityaagrawal/dev/maple-3d-pipeline`, branch `codex/maple-3d-pipeline`. The current results below supersede the earlier test counts. Keeri and production were not modified.
+
+| Check | Result |
+| --- | --- |
+| Backend source/connector/service/API/batch tests | **44 passed; zero failures or skips**, using only disposable PostgreSQL `127.0.0.1:5447/maple3d_test` |
+| Admin evidence tests | **7 passed**, including optional seat/arm measurements and variant attributes |
+| Viewer manifest/selection regression tests | **8 passed** |
+| Backend production build | Passed: Prisma generation and TypeScript |
+| Admin production build | Passed from final source; 3D Assets route included |
+| Frontend production build | Passed; original customize, Taro and dynamic product routes included |
+| Prisma migration status and schema diff | Up to date; no difference detected; new batch/geometry migration applied only locally |
+| Worker entry point | Actual compiled `worker:3d-imports -- --once` imported an approved source and four original files from a disposable authenticated HTTPS server |
+| Independent review | Contract/service/batch/admin interfaces reviewed; identified cancellation and evidence-display gaps corrected and verified |
+
+Total: **59 automated tests passed**. The frontend build retains two pre-existing `OutroScene` hook dependency warnings; no new build failures were observed.
+
+Meaningful regression tests were observed failing before their fixes: download size mismatch, cancellation before fetch, legacy input acceptance, mixed geometry import, aggregate design limits, URL persistence, output dimension mismatch, transactionally acknowledged item outcomes, numeric-key canonicalization and optional admin evidence. Source fixtures and canonical byte vectors are in `docs/contracts/` and are explicitly synthetic.
+
+### Browser and worker checks
+
+- Import from Keeri queued without starting downloads in the HTTP request.
+- Reload recovered the same persisted queued batch; cancellation persisted; a new scan could be queued separately.
+- The actual separate worker imported one test product; admin displayed completion and refreshed the product list automatically.
+- Next-page continuation appeared separately from a new scan.
+- Source history displayed approval revision/person/time, verified dimensions/method/person/time, capture set, original roles, provenance, checksums and variant attribution.
+- Approved variant attributes were visible; private reference download actions used Maple asset IDs.
+- Starting a Blender job retained the approved source snapshot and `geometry-standard` lineage.
+- Legacy source inputs displayed an explicit reimport message and disabled new job/version controls.
+- The mock Keeri connection was removed after QA. Local admin returns to the honest disconnected state; no real Keeri credentials were added.
+
+### Current delivery boundary
+
+Local backend is on 4027, admin on 3028 and the final frontend preview on 3027. Automatic test products were removed from the disposable database after verification; Taro, the existing admin QA chair and the clearly named synthetic approved-input sample remain for local review.
+
+The existing VPS backend/admin deployment is separate. This update was not pushed, merged into main or deployed, and no production migrations, storage changes, photography or model generation were performed. The new migration is `20260907160000_three_d_import_batches`; it follows the three foundation migrations. See [implementation report](maple-3d-approved-inputs-report.md) and [Keeri handoff](keeri-3d-input-implementation-plan.md).
+
+## Earlier foundation checks (historical)
+
+The sections below record the earlier foundation verification and its original scope; use the current results above for this update.
 
 ## Source and scope
 

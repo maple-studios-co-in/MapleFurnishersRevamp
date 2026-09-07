@@ -1,168 +1,150 @@
-# Keeri → Maple: 3D input implementation plan
+# Keeri → Maple: implementation handoff
 
-**Goal:** Let a Keeri employee mark a furniture design **Ready for 3D**. Maple can fetch only those designs, their eligible variants, measurements and selected source photographs. All 3D production and publishing stays in Maple.
+**Outcome:** Keeri supplies approved product evidence. Maple stores and owns imported originals, Blender masters, 3D jobs, versions, review and customer publication. Keeri does not receive or store generated 3D files.
 
-**Status:** Keeri implementation handoff. No Keeri code or database changes were made while preparing this plan. Maple's receiving contract is specified in [the design](superpowers/specs/2026-09-07-maple-3d-pipeline-design.md).
+**Status:** Maple's receiving contract is implemented locally. This document specifies the remaining Keeri work; no Keeri code, database or product data was changed. It replaces the earlier v1 handoff before any real Keeri integration. Use [source contract v2](contracts/keeri-3d-source-v2.md) and its [complete validated example](contracts/keeri-3d-source-v2.example.json), not the old shortened v1 examples. The viewer's public manifest remains v1.
 
-## 1. Add independent readiness and reference selection
+## What Maple now expects
 
-Authoritative schema: `/Users/adityaagrawal/dev/keeri/packages/db/prisma/schema.prisma`.
+- A design-level **Ready for 3D** decision tied to an immutable approved content revision.
+- Explicit geometry groups, selected variants, verified dimensions and attributed original photographs.
+- A read-only, revocable credential scoped to one tenant and `maple:3d-inputs:read`.
+- Authenticated list/detail/original-download APIs. Each original is pinned to its approved SHA-256 and byte count.
+- Version 2 source packs matching the canonical hash specification. Unsupported/unknown fields fail explicitly instead of being discarded.
 
-Add to `ProductModel`:
+The current pilot accepts **one geometry group, at most 24 references and 200 MiB per design**. Each original is at most 50 MiB. A page contains at most 20 designs; Maple's import-worker byte budget is 500 MiB per persisted batch (one page), cumulative across retries and worker restarts. Each worker attempt has a five-minute deadline. JSON responses are limited to 2 MiB and individual requests to 15 seconds. These bounds protect intake; they are not estimates of model-generation cost or quality.
 
-```prisma
-readyFor3D       Boolean   @default(false)
-readyFor3DAt     DateTime?
-readyFor3DBy     String?
+## 1. Relational inputs and ownership
 
-@@index([tenantId, readyFor3D, deletedAt, id])
-```
+Use `packages/db/prisma/schema.prisma` as the authority. The following records are a proposed Keeri implementation, not existing tables:
 
-Do not reuse `status` or `published`. Those already express catalogue/commerce workflow. Preserve them when toggling this flag.
+| Record | Responsibility and constraints |
+| --- | --- |
+| `Product3DInput` | Exactly one record per `(tenantId, modelId)` using a non-null compound unique key. Stores preparation version, current content revision, readiness, active approval reference and withdrawal metadata. Readiness defaults to false. |
+| `Product3DGeometryGroup` | Belongs to that design input. Stable group ID, verified width/depth/height, optional seat/arm dimensions, measurement method/verifier/time, physical capture-set ID. |
+| `Product3DSelectedVariant` | Links an actual design variant to one geometry group. Unique `(tenantId, inputId, variantId)`; no variant may silently belong to two groups in one export. |
+| Optional `Product3DVariantOverride` | Exactly one override per selected-variant relation, enforced by a non-null unique selection ID. Resolve effective materials before export. A dimension/construction change requires a different geometry group, not a mismatched override. |
+| `Product3DReference` | Links a selected original `MediaAsset` to input, group, capture set, role, explicit nullable variant association, provenance, original SHA-256 and byte count. |
+| `Product3DApproval` | Append-only approval evidence: approved revision, approver, time and immutable source snapshot. Withdrawal must preserve this history. |
+| Dedicated integration credential | Hash, nonsecret ID/prefix, tenant, read scope, expiry/revocation and rotation history. Never reuse another integration's credential. |
 
-Add a tenant-scoped `Product3DInput` record, one per design, with an optional variant override relation for size/construction differences. Store structured `widthMm`, `depthMm`, `heightMm`, optional seat/arm dimensions, measurement method, `verifiedAt`, `verifiedBy` and selected source `MediaAsset` IDs. Model dimensions are currently free text; keep that text for display while collecting independently verified numeric measurements. Never silently turn guessed dimensions into verified data.
+Add composite foreign keys wherever possible to enforce tenant, design and group membership. Existing relations may require supporting composite unique keys before adding those foreign keys. A nullable `variantId` with a unique constraint does **not** enforce one design-default row in PostgreSQL; the design default belongs on the single `Product3DInput`/group record instead.
 
-Use a `Product3DReference` relation to attach each selected image to its model, optional variant, view (`front`, `side`, `back`, `angle`, `detail`, `dimension`), physical capture set and provenance. Validate tenant and subject ownership on every association. Preserve the original `MediaAsset.checksum`; calculate it over original bytes if absent. Do not use a thumbnail checksum.
+Cross-row rules that cannot be expressed as foreign keys belong in a shared transaction service used by every mutation path. Do not expose generic mass assignment over readiness, approver IDs or revision fields.
 
-Readiness requirements:
+Do not reuse `ProductModel.status`/`published`: catalogue and commerce approval are independent. Do not use names/SKUs as foreign identity. Do not parse free-text dimensions and silently mark them verified.
 
-- At least one explicitly selected variant where sellable variants exist; include applicable material/finish choices and dimensions.
-- Positive, verified width/depth/height in millimetres.
-- Original front, side, back and three-quarter photographs of the same construction/capture set. Detail/material images supplement these views.
-- A human confirms source attribution and physical-photograph provenance. Keeri's generated back/detail photos are not independent evidence, even when approved for the listing.
+## 2. Preparation, verification and approval
 
-When requirements are missing, the employee sees a concrete list and cannot turn the flag on. Existing marketing-photo completeness remains unchanged.
+Extend the current design detail/editor with **Prepare for 3D**, a checklist, measurement entry, selected variants, capture grouping and original-photo selection. At minimum, the checklist must show:
 
-## 2. Add the employee control
+1. Positive, physically verified width/depth/height in millimetres and the method/verifier/time.
+2. Front, side, back and three-quarter original photographs for each group, from the declared capture set.
+3. Every photo's design, geometry, capture-set and optional variant attribution.
+4. Explicit material-only variants sharing geometry; distinct construction/size placed in separate groups.
+5. SHA-256 and byte count available for every selected original. Compute missing values during preparation, not on list requests.
 
-Extend the existing design detail at `apps/admin/app/products/[id]/page.tsx`. Keep the control near its source photos/details, labelled **Ready for 3D**, with helper text: “Make this design available to Maple's 3D production team.” Show the readiness checklist and link to edit measurements/reference selection.
+Generated or unknown-provenance views may supplement the record but never satisfy the required original views. Human approval establishes the factual attribution; Maple can validate the declarations and bytes, not whether the declared photograph depicts the correct construction.
 
-Relevant existing files:
+Use existing permission helpers and define capabilities explicitly:
 
-- `apps/admin/src/products/model-form.ts`: normal model edits and existing status parsing.
-- `apps/admin/app/products/model-editor.tsx`: existing editing pattern.
-- `apps/admin/app/products/model-table.tsx`: optional compact ready badge/filter.
-- `apps/admin/src/products/detail.ts` and `variant-detail.ts`: current scoped reads and inheritance.
-- `apps/admin/app/api/products/[id]/route.ts`: existing design mutation pattern.
+- **Prepare:** edit reference selection and draft measurements.
+- **Verify:** confirm physical measurements and attribution.
+- **Approve/withdraw:** make a completed input revision available, or stop future export.
+- **Manage integration:** create, rotate and revoke credentials.
 
-Prefer a dedicated readiness mutation `PATCH /api/products/:id/3d-input` over extending a generic mass-assignment update. Authenticate the employee through existing session/access helpers; verify tenant ownership; validate selected references and measurements in one transaction. Record who changed readiness and when using Keeri's audit conventions. Keep a request with `readyFor3D: false` valid even if the reference pack has become incomplete.
+Map these to Keeri's existing roles before implementation; do not assume every catalogue editor may approve exports or rotate keys. Store actor IDs server-side from the authenticated session.
 
-## 3. Expose a narrowly scoped integration credential
+## 3. Readiness lifecycle and concurrent edits
 
-Create a revocable, read-only credential for `maple:3d-inputs:read`, bound to one Keeri tenant. Store only its hash and a nonsecret identifier/prefix. Compare credentials safely, rate-limit failures, and avoid printing tokens or signed image URLs in logs. Employee sessions are used to administer the connection, never copied into Maple's worker.
+A flag is only the visible state. Eligibility means all of the following are true: design not deleted; readiness enabled; required evidence complete; current canonical revision equals the unwithdrawn approved revision.
 
-New helper: `apps/admin/src/integrations/maple/auth.ts`. New route handlers live under `apps/admin/app/api/integrations/maple/3d/`.
+Suggested dedicated employee mutation: `PATCH /api/products/:modelId/3d-input`, with a preparation version or expected source revision. Use a shared service; preserve ordinary catalogue saves.
 
-Every list, detail and download request derives tenant identity from that credential. Client-supplied tenant IDs cannot broaden access. Existing media routes at `apps/admin/app/api/media/[...key]/route.ts` require a user session; do not make them public to enable this integration.
+When approving, in **one database transaction**:
 
-## 4. Build the eligible list API
+1. Lock the input and relevant ownership/original metadata, or use equivalent optimistic concurrency conditions.
+2. Reject a stale editor version with `409`; never silently approve newer content the employee did not inspect.
+3. Assemble/validate a consistent source snapshot and calculate its revision.
+4. Write the immutable approval record and update readiness/current approval together.
 
-`GET /api/integrations/maple/3d/products?limit=20&cursor=<opaque>`
+Selected original bytes/checksum, attribution, selected variants, relevant material attributes, grouping, dimensions, verification metadata and exported name/code changes require reapproval. Price/stock or unrelated catalogue changes do not, because they are not inputs to this contract. Child records must invalidate approval even if `ProductModel.updatedAt` does not change.
 
-Return only `readyFor3D=true` and `deletedAt=null` designs belonging to the authenticated tenant. Order by immutable design ID; use a validated cursor and a maximum page size of 20. Readiness filtering must happen on the server, even if the client omits a filter.
+Withdrawal is always allowed for an authorized user, including when inputs are incomplete. It disables future list/detail/download access and records the event without deleting approvals or Maple assets. Deleting a design withdraws export in the same transaction; restoring it does not restore readiness automatically. Media reassignment/variant changes must run through the same invalidation and ownership checks.
 
-```json
-{
-  "schemaVersion": 1,
-  "tenantId": "company-maple",
-  "products": [
-    { "modelId": "design-taro", "name": "Taro Armchair", "code": "TARO", "sourceRevision": "sha256-of-canonical-inputs" }
-  ],
-  "nextCursor": null
-}
-```
+The current general activity audit helper is best-effort. It can accompany these actions, but the durable approval/withdrawal evidence must be committed with the state transition itself.
 
-The IDs above are illustrative, not current Keeri IDs. Maple stores stable design/variant IDs; names, SKU strings and slugs are display fields.
+## 4. Original protection and exact bytes
 
-## 5. Build the detail/reference API
+Extend the existing guarded deletion service in `apps/admin/src/products/media-delete.ts`, including design, variant and media deletion paths. Refuse deletion/reassignment of an actively approved original until readiness is withdrawn. Acquire the same relevant locks as approval so the two actions cannot race.
 
-`GET /api/integrations/maple/3d/products/:modelId`
+Do not cascade away approval evidence. Retain the immutable approved snapshot with IDs/checksums/attribution even after later permitted deletion. If the history needs a relation to a deleted row, use retained evidence rather than deleting the history through a cascading foreign key.
 
-Return the exact source pack for one eligible design. Wrong-tenant, deleted or unknown IDs return 404. A previously accessible design whose flag is now off returns 409 with `code: "NOT_READY_FOR_3D"`. The route always rechecks readiness; knowing an old model ID is insufficient.
+An original download is identified by design, selected reference, approved revision and checksum. Keep original object keys immutable or bind an object-store version. If the exact bytes have disappeared or changed, fail explicitly; never return a newly uploaded file under the old checksum. A revision-pinned source snapshot and its downloads must agree even during concurrent editing.
 
-```json
-{
-  "schemaVersion": 1,
-  "tenantId": "company-maple",
-  "modelId": "design-taro",
-  "name": "Taro Armchair",
-  "code": "TARO",
-  "readyFor3D": true,
-  "sourceRevision": "sha256-of-canonical-inputs",
-  "dimensionsMm": { "width": 660, "depth": 766, "height": 763 },
-  "variants": [
-    { "variantId": "variant-taro-walnut-ivory", "sku": "example-sku", "attributes": { "finish": "Walnut Brown", "fabric": "Ivory" } }
-  ],
-  "references": [
-    { "id": "media-front", "role": "front", "url": "https://keeri.example/api/integrations/maple/3d/media/media-front?token=short-lived-signature", "checksum": "64-character-sha256-of-original-bytes", "provenance": "photograph" }
-  ]
-}
-```
+## 5. Integration authentication and cookie proxy
 
-The example is shortened to one reference; production readiness requires the full set described above. Example dimensions are illustrative and do not certify the real Taro. Resolve variant overrides before returning measurements/materials; a variant with a different size must retain its own dimensions.
+Create a separate read-only credential bound to one tenant and scope `maple:3d-inputs:read`. Store its hash, support expiry/revocation/rotation, compare safely, rate-limit requests and redact authorization headers and signed URLs from logs. Derive tenant identity from this credential on every handler.
 
-Implement source assembly in `apps/admin/src/integrations/maple/three-d-input.ts`. Use current `ProductModel`, `ProductVariant`, `VariantAttribute`, `AttributeValue`, `MediaAsset` relations. Read the design and its selected variants, references and attributes from a consistent database snapshot.
+`apps/admin/proxy.ts` currently gates API access using cookie/session authentication. Add a narrow exception **only for the GET route shapes implemented below**. Do not exempt all `/api`, all integrations, ordinary media or a broad path prefix. This bypasses the cookie requirement, not authentication: each exempt handler must require the integration credential before reading data or bytes. Keep existing cookie/session behavior everywhere else.
 
-For download URLs, create a purpose-specific signed route scoped to tenant, asset ID/checksum and expiry. Serve original bytes from `@keeri/media`; check asset still belongs to the eligible selected design when serving. Use `private, no-store`. A 15-minute lifetime supports bounded imports and retries; an expired link is renewed by refetching detail. Maple copies those bytes into private Maple storage and verifies SHA-256. Keeri's ordinary gallery/media visibility stays unchanged.
+Prefer authenticated Keeri-origin URLs with no bearer secret in the query string. Maple already forwards its integration bearer only to the configured Keeri origin and rejects redirects. Every download request rechecks credential validity, scope, tenant, readiness and requested revision. Revoking a credential then blocks future requests immediately, including previously returned URL paths.
 
-## 6. Compute source revisions correctly
+External object-store signed URLs are optional future delivery. A bare signature that works until expiry cannot meet immediate revocation. If used, route through a Keeri gate or implement an online revocation check tied to the integration credential before byte access. Merely shortening expiry is not equivalent to revocation. Do not make existing ordinary media routes public.
 
-Compute SHA-256 over a canonical, sorted payload containing:
+Revocation cannot recall copies already imported into Maple; Maple owns those files. Withdrawing export does not silently unpublish a customer model.
 
-- Stable design ID, name/code and relevant model specifications.
-- Included variant IDs, effective dimensions and canonical material/finish attributes.
-- Selected media IDs, role, subject/capture attribution, provenance and original-byte checksums.
-- Verified measurements and confirmation metadata.
+## 6. Implement three export endpoints
 
-Exclude signed URLs, link expiry and request time: renewing access must not create a new model job. A child-media or variant-attribute edit must change the revision even if `ProductModel.updatedAt` does not. JSON object keys and unordered lists must be sorted deterministically. Add the source pack schema version to the hash input.
+| Endpoint | Behavior |
+| --- | --- |
+| `GET /api/integrations/maple/3d/products?limit=20&cursor=<opaque>` | Approved, current, nondeleted designs for the authenticated tenant only. Return strict v2 list shape, at most 20 unique design IDs, ordered by immutable ID. No client filter can broaden eligibility. |
+| `GET /api/integrations/maple/3d/products/:modelId` | Return the complete strict v2 source pack for the currently approved revision. Recheck eligibility even when the caller knows the ID. |
+| `GET /api/integrations/maple/3d/products/:modelId/references/:referenceId?revision=<sha256>` | Serve exact selected original bytes for that currently approved revision, after independent integration authentication. No redirect to a generally accessible media route. |
 
-Maple compares revisions to avoid duplicate imports. A source update creates a new private input snapshot and prompts review; it does not automatically regenerate or replace an approved live model.
+Return `404` for wrong-tenant/deleted/unknown identities without revealing their existence. For a same-tenant known design that is no longer approved/current, use `409` with a stable code such as `NOT_READY_FOR_3D` or `SOURCE_REVISION_CHANGED`. Credential failures use `401`/`403`; malformed payloads/cursors use `400`; missing/corrupt approved original bytes fail clearly. Use `Cache-Control: private, no-store` on detail/download responses.
 
-## 7. Withdrawal, polling and future generation
+Build the payload from the immutable approved snapshot after verifying it remains the active revision. Renewable URL delivery details are attached after hashing. Return byte count/content type and serve only the checksum-pinned original. Parent or child edits must not produce a hybrid of old approval and new media.
 
-The initial integration uses Maple admin's **Fetch from Keeri**, one bounded page at a time. Turning readiness off prevents future input fetches. It never deletes a Maple asset or unpublishes a model. Absence from a partial list page is not a withdrawal signal.
+The list source revision and fetched detail must agree. If a design changes between them, Maple should fail/retry that item against a newly fetched page rather than mislabel its imported snapshot.
 
-Before a future unattended worker starts a new generation job, Maple must revalidate the source detail/revision and readiness. Add a separate change feed or signed notification for flag-off/deletion if immediate synchronization becomes necessary. Do not pretend the initial paginated eligible list supplies that guarantee.
+Follow the exact [v2 canonical algorithm and test vectors](contracts/keeri-3d-source-v2.md). It includes all geometry, variants and reference metadata; excludes all download URLs, approval fields, readiness and the revision field itself. Approval times are excluded; measurement verification times are included. Do not hash the whole response or only `ProductModel.updatedAt`.
 
-Keeri does not need GLB support, generation-provider fields, 3D job records or output webhooks. Future worker callbacks target Maple. An optional Keeri link can open the Maple workspace.
+## 7. Pagination, retries and ownership after import
 
-## 8. Acceptance tests
+Use stable, validated, tenant-bound opaque cursors. Within one traversal, pages must not overlap or loop. Restart pagination from the beginning after reaching the end, or on an explicit refresh, so newly approved IDs behind an earlier cursor are found. Maple deduplicates by design identity plus source revision.
 
-Create tests beside the new service/routes, following existing Keeri test conventions. Important examples:
+Maple performs the downloads in a durable background import flow with bounded work and visible per-design progress/failures. A retry re-fetches eligibility and verifies the intended revision before downloading; partial failure does not publish a partial source snapshot. The Keeri endpoints must tolerate repeat reads of the same approved revision without mutation.
 
-```ts
-it('does not expose an unflagged design through list OR known-ID detail', async () => {
-  const design = await fixture.design({ readyFor3D: false });
-  expect(await api.list(mapleCredential)).not.toContainEqual(expect.objectContaining({ modelId: design.id }));
-  expect((await api.detail(mapleCredential, design.id)).status).toBe(409);
-});
+An absent item on a page is not a deletion/withdrawal signal. Turning readiness off blocks future fetches, but never deletes Maple models or replaces its live version. A later explicit change feed may report withdrawals; it does not transfer asset ownership back to Keeri.
 
-it('changes the source revision after a child reference replacement', async () => {
-  const before = await exportInput(tenantId, designId);
-  await replaceReferenceOriginal(referenceId, differentImageBytes);
-  const after = await exportInput(tenantId, designId);
-  expect(after.sourceRevision).not.toBe(before.sourceRevision);
-});
-```
+Keeri needs no 3D generation provider configuration, GLB upload feature, 3D output API or generation callback endpoint. Future Blender/Trellis/Meshy workers remain behind Maple's recipe and artifact contracts. Any future unattended generation must refresh source readiness before starting; the current manual-delivery workflow does not imply that this automation exists.
 
-These fixture/helper names describe the intended new test support; implement them using the repo's disposable DB harness, not a live catalogue. Also cover:
+## 8. Required Keeri acceptance tests
 
-- Tenant A cannot list, fetch or download tenant B's references, including modified cursor/asset IDs.
-- False is the migration default for every existing design; a normal product save cannot toggle readiness accidentally.
-- Missing side view, unknown provenance or unverified measurements prevent enabling readiness.
-- Approved AI-generated images do not satisfy original-photo requirements.
-- Reordering unchanged attributes or renewing signed URLs leaves the revision identical.
-- Empty/final pages and non-overlapping cursor pages work; a malformed cursor fails clearly.
-- Referenced bytes match their exported checksum; expired/revoked signatures fail.
-- A valid variant override wins over parent dimensions; unrelated variant images are excluded.
+Use the repository's disposable-database harness and real services/handlers. Read `apps/admin/AGENTS.md` and local framework guidance before implementing routes.
 
-## 9. Delivery sequence
+- Fresh migration leaves every design unready; ordinary catalogue updates cannot accidentally approve it.
+- Missing original views, unverifiable dimensions, wrong capture set, generated substitutes and foreign variant/media associations block approval.
+- Tenant A cannot list, fetch or download tenant B's evidence, including crafted cursor/reference IDs.
+- An unflagged or stale-approved design is absent from list and rejected by known-ID detail/download.
+- Concurrent edits invalidate a stale approval submission; approval evidence and readiness cannot commit separately.
+- A child image replacement, attribution/material/dimension change alters the revision and requires reapproval; price/stock edits do not.
+- The approved canonical example and numeric-key vector hash exactly as Maple expects; reordering collections or renewing URLs leaves the revision unchanged.
+- Approved original deletion/reassignment races are guarded. Withdrawal allows the intended subsequent operation, preserves evidence, and restore does not reactivate approval.
+- Missing/replaced original bytes fail instead of returning replacement content; downloads match exported checksum and size.
+- Revocation/expiry immediately blocks new API and original download requests, including a URL obtained before revocation.
+- Proxy exceptions are exact: new authenticated routes are reachable without cookies, unauthorized requests fail, and existing private routes stay private.
+- Partial/final/empty pages, malformed cursors, traversal restart and payload/file budgets behave predictably.
+- One material-only variant group succeeds; a different-size variant is assigned another group and rejected by Maple's current single-group pilot until that viewer milestone is implemented.
 
-1. Add schema and readiness service/tests. Keep every existing flag off.
-2. Add employee readiness/reference UI and scoped integration authentication.
-3. Implement list/detail/download endpoints and contract tests against Maple's receiver.
-4. Verify Taro's actual Keeri identity, originals and physical measurements, then flag only that pilot design.
-5. Configure Maple's backend with the Keeri origin, company ID and integration token. Import, inspect the private snapshot, attach a model and review in Maple.
-6. Expand to a small mixed batch: upholstered chair, solid-wood table and a design with size variants. Confirm material-only variants share geometry while size/construction differences get their own versions/recipes.
+## 9. Delivery order
 
-Before Keeri code changes, read its `apps/admin/AGENTS.md` and installed Next documentation. The current repo's instructions warn that its framework conventions may differ from this Maple app.
+1. Implement the relational model, preparation/readiness service, permissions, concurrent-edit controls and deletion guard invariants.
+2. Add the employee evidence/approval workflow and dedicated credential administration.
+3. Add narrowly exempted authenticated export endpoints; verify them against Maple's v2 parser and hash vectors.
+4. Select one real design with one geometry group. Photograph its actual views, verify measurements/materials, and approve that revision in Keeri.
+5. Configure Maple with the Keeri origin, tenant and credential; import and inspect its private source evidence, then model/review/publish through Maple.
+6. Expand to a small batch after import and generation quality checks. Implement multiple-geometry viewer/recipe support before onboarding mixed-size designs.
+
+Source locations to consult in Keeri: `packages/db/prisma/schema.prisma`, `apps/admin/proxy.ts`, `apps/admin/app/products/[id]/page.tsx`, `apps/admin/src/products/model-form.ts`, `apps/admin/src/products/detail.ts`, `apps/admin/src/products/variant-detail.ts`, `apps/admin/src/products/media-delete.ts`, `apps/admin/src/products/photo-upload.ts`, and `apps/admin/src/audit/log.ts`.

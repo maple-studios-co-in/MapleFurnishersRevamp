@@ -37,6 +37,7 @@ export interface ThreeDJob {
   recipeVersion: string;
   status: "awaiting_delivery" | "completed";
   importId: string | null;
+  geometryGroupId: string | null;
   inputSnapshot: unknown;
   idempotencyKey: string;
   createdAt: string;
@@ -47,6 +48,7 @@ export interface ThreeDVersion {
   productId: string;
   jobId: string | null;
   masterAssetId: string | null;
+  geometryGroupId: string | null;
   sequence: number;
   status: "draft" | "approved" | "rejected";
   manifest: ManifestInput;
@@ -83,11 +85,26 @@ export interface ThreeDConfig {
   keeriConfigured: boolean;
   recipes: { id: string; version: string; name: string }[];
 }
-export interface SyncResult {
-  imported: number;
-  unchanged: number;
-  failed: { modelId: string; message: string }[];
+export interface KeeriImportBatch {
+  id: string;
+  tenantId: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  cursor: string | null;
   nextCursor: string | null;
+  listLoadedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  attempts: number;
+  bytesReserved: number;
+  maxBytes: number;
+  errorCode: string | null;
+  errorMessage: string | null;
+  canRetry: boolean;
+  canCancel: boolean;
+  counts: { total: number; pending: number; running: number; imported: number; unchanged: number; failed: number; cancelled: number };
+  items: { id: string; modelId: string; name: string; code: string; sourceRevision: string; status: "pending" | "running" | "imported" | "unchanged" | "failed" | "cancelled"; attempts: number; productId: string | null; errorCode: string | null; errorMessage: string | null; completedAt: string | null }[];
 }
 export interface VersionInput {
   jobId?: string;
@@ -102,18 +119,24 @@ const post = <T>(path: string, body?: unknown) =>
     method: "POST",
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-export const fetchThreeDProducts = () =>
-  adminRequest<{ products: ThreeDProduct[] }>(`${base}/products`);
-export const fetchThreeDConfig = () =>
-  adminRequest<ThreeDConfig>(`${base}/config`);
+export const fetchThreeDProducts = (signal?: AbortSignal) =>
+  adminRequest<{ products: ThreeDProduct[] }>(`${base}/products`, { signal });
+export const fetchThreeDConfig = (signal?: AbortSignal) =>
+  adminRequest<ThreeDConfig>(`${base}/config`, { signal });
 export const fetchThreeDProduct = (id: string) =>
   adminRequest<{ product: ThreeDProductDetail }>(
     `${base}/products/${encodeURIComponent(id)}`,
   );
 export const createThreeDProduct = (input: { slug: string; name: string }) =>
   post<{ product: ThreeDProduct }>("/products", input);
-export const syncKeeri = (cursor?: string) =>
-  post<SyncResult>("/keeri/sync", cursor ? { cursor } : {});
+export const fetchKeeriImportBatches = (signal?: AbortSignal) =>
+  adminRequest<{ batches: KeeriImportBatch[] }>(`${base}/keeri/import-batches`, { signal });
+export const queueKeeriImportBatch = (idempotencyKey: string, cursor?: string) =>
+  post<{ batch: KeeriImportBatch }>("/keeri/import-batches", { idempotencyKey, ...(cursor ? { cursor } : {}) });
+export const retryKeeriImportBatch = (id: string) =>
+  post<{ batch: KeeriImportBatch }>(`/keeri/import-batches/${encodeURIComponent(id)}/retry`);
+export const cancelKeeriImportBatch = (id: string) =>
+  post<{ batch: KeeriImportBatch }>(`/keeri/import-batches/${encodeURIComponent(id)}/cancel`);
 export const queueThreeDJob = (
   id: string,
   recipeId: string,

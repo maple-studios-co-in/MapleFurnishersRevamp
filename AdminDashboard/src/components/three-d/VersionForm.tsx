@@ -10,6 +10,7 @@ import type {
 } from "@/lib/three-d-api";
 import { ErrorMessage, FieldSelect, dateLabel } from "./Fields";
 import SwatchEditor from "./SwatchEditor";
+import { inputBlockReason, productionInput } from "@/lib/three-d-evidence";
 
 const ANGLES = ["perspective", "side", "front", "back"];
 const splitNames = (value: string) =>
@@ -58,7 +59,7 @@ export default function VersionForm({
     previous?.materialSlots.fabric.join(", ") ?? "",
   );
   const [jobId, setJobId] = useState(
-    product.jobs.find((job) => job.status === "awaiting_delivery")?.id ?? "",
+    product.jobs.find((job) => job.status === "awaiting_delivery" && !inputBlockReason(product, job.id))?.id ?? "",
   );
   const [notes, setNotes] = useState("");
   const [masterAssetId, setMasterAssetId] = useState(
@@ -68,14 +69,20 @@ export default function VersionForm({
   const submitting = useRef(false);
   const models = product.assets.filter((asset) => asset.kind === "web_model");
   const images = product.assets.filter((asset) => asset.kind === "preview");
-  const jobs = product.jobs.filter((job) => job.status === "awaiting_delivery");
+  const jobs = product.jobs.filter((job) => job.status === "awaiting_delivery" && !inputBlockReason(product, job.id));
+  const source = product.sourceType === "keeri" ? productionInput(product, jobId || undefined) : null;
+  const geometry = source?.geometryGroups.length === 1 ? source.geometryGroups[0] : null;
+  const inputError = inputBlockReason(product, jobId || undefined);
+  const variants = source?.variants.filter(variant => variant.geometryGroupId === geometry?.id) ?? [];
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting.current || isSaving) return;
     setError(null);
+    if (inputError) return setError(inputError);
     const next: ManifestInput = {
       ...manifest,
+      dimensionsMm: geometry ? { width: geometry.dimensionsMm.width, depth: geometry.dimensionsMm.depth, height: geometry.dimensionsMm.height } : manifest.dimensionsMm,
       materialSlots: {
         finish: manifest.finishes.length ? splitNames(finishSlots) : [],
         fabric: manifest.fabrics.length ? splitNames(fabricSlots) : [],
@@ -151,6 +158,8 @@ export default function VersionForm({
       next.variantBindings.length
     )
       return setError("Use each catalogue variant only once.");
+    if (source && (next.variantBindings.some(binding => !variants.some(variant => variant.variantId === binding.variantId)) || (variants.length > 0 && next.variantBindings.length === 0)))
+      return setError("Match catalogue variants from this approved geometry group. Different shapes or sizes need separate models.");
     if (
       next.variantBindings.some(
         (binding) =>
@@ -225,7 +234,19 @@ export default function VersionForm({
         this version. It remains private.
       </p>
       <ErrorMessage message={error} />
-      <fieldset disabled={isSaving} className="space-y-6 disabled:opacity-60">
+      <ErrorMessage message={inputError} />
+      {geometry && source && (
+        <div className="space-y-1 rounded-xl border border-admin-border bg-admin-bg/40 p-3 text-xs text-admin-text-muted">
+          <p className="font-semibold text-admin-text">Approved source for this model</p>
+          <p className="break-all">Geometry group: {geometry.id} · Revision: {source.approval.revision}</p>
+          <p>Approved by {source.approval.approvedBy} · {dateLabel(source.approval.approvedAt)}</p>
+          <p>Verified dimensions: {geometry.dimensionsMm.width} × {geometry.dimensionsMm.depth} × {geometry.dimensionsMm.height} mm</p>
+          {geometry.dimensionsMm.seatHeight !== undefined && <p>Seat height: {geometry.dimensionsMm.seatHeight} mm</p>}
+          {geometry.dimensionsMm.armHeight !== undefined && <p>Arm height: {geometry.dimensionsMm.armHeight} mm</p>}
+          <p>Only variants sharing this shape and size can be matched to this model.</p>
+        </div>
+      )}
+      <fieldset disabled={isSaving || !!inputError} className="space-y-6 disabled:opacity-60">
         <div className="grid gap-4 md:grid-cols-2">
           <FieldSelect
             label="Web model"
@@ -250,7 +271,7 @@ export default function VersionForm({
             <option value="">Independent delivery</option>
             {jobs.map((job) => (
               <option key={job.id} value={job.id}>
-                Manual Blender · {dateLabel(job.createdAt)}
+                Manual Blender · {dateLabel(job.createdAt)}{job.geometryGroupId ? ` · ${job.geometryGroupId}` : ""}
               </option>
             ))}
           </FieldSelect>
@@ -311,7 +332,8 @@ export default function VersionForm({
                 max="100000"
                 step="any"
                 required
-                value={manifest.dimensionsMm[dimension] || ""}
+                value={(geometry?.dimensionsMm ?? manifest.dimensionsMm)[dimension] || ""}
+                readOnly={!!geometry}
                 onChange={(e) =>
                   setManifest({
                     ...manifest,
@@ -376,19 +398,24 @@ export default function VersionForm({
         />
         <details className="rounded-xl border border-admin-border p-4">
           <summary className="cursor-pointer text-sm font-semibold">
-            Catalogue variant matching (optional)
+            Catalogue variant matching {source ? "(required)" : "(optional)"}
           </summary>
           <div className="mt-4 space-y-3">
             <p className="text-xs text-admin-text-muted">
-              Link a catalogue variant to its finish and fabric. With no
-              matches, every combination is available. With matches, only listed
-              combinations are offered.
+              {source ? "Match the available variants from this approved geometry group. Only the listed finish and fabric combinations will be offered." : "Link a catalogue variant to its finish and fabric. With no matches, every combination is available. With matches, only listed combinations are offered."}
             </p>
             {manifest.variantBindings.map((binding, index) => (
               <div
                 key={index}
                 className="grid gap-2 rounded-lg bg-admin-surface-hover p-3 sm:grid-cols-2"
               >
+                {source ? (
+                  <FieldSelect label={`Variant ${index + 1} reference`} value={binding.variantId} required onChange={event => setManifest({ ...manifest, variantBindings: manifest.variantBindings.map((item, i) => i === index ? { ...item, variantId: event.target.value } : item) })}>
+                    <option value="">Choose a variant from this geometry group</option>
+                    {binding.variantId && !variants.some(variant => variant.variantId === binding.variantId) && <option value={binding.variantId} disabled>Previous match unavailable — choose again</option>}
+                    {variants.map(variant => <option key={variant.variantId} value={variant.variantId}>{variant.sku || variant.name || variant.variantId}</option>)}
+                  </FieldSelect>
+                ) : (
                 <Input
                   id={`variant-${index}`}
                   label={`Variant ${index + 1} reference`}
@@ -407,6 +434,7 @@ export default function VersionForm({
                     })
                   }
                 />
+                )}
                 {(["finish", "fabric"] as const).map((key) => (
                   <FieldSelect
                     key={key}
@@ -507,7 +535,7 @@ export default function VersionForm({
         >
           Cancel
         </Button>
-        <Button type="submit" isLoading={isSaving}>
+        <Button type="submit" isLoading={isSaving} disabled={!!inputError}>
           Save draft version
         </Button>
       </div>

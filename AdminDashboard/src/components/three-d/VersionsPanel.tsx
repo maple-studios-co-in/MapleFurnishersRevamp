@@ -128,6 +128,12 @@ export default function VersionsPanel({
                 </div>
               </div>
               <dl className="grid gap-3 text-xs sm:grid-cols-2">
+                {version.geometryGroupId && (
+                  <div>
+                    <dt className="text-admin-text-muted">Source geometry group</dt>
+                    <dd className="mt-1 break-all font-medium">{version.geometryGroupId}</dd>
+                  </div>
+                )}
                 {master && (
                   <div>
                     <dt className="text-admin-text-muted">

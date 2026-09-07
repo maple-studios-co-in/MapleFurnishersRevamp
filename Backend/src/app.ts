@@ -22,7 +22,7 @@ export function createApp() {
   app.use(helmet());
   app.use(cors({ origin: corsOrigins }));
   app.use(express.json({ limit: "100kb" }));
-  app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === "/health" }, serializers: {
+  app.use(pinoHttp({ logger, redact: { paths: ['req.headers.authorization', 'req.headers.cookie'], censor: '[Redacted]' }, autoLogging: { ignore: (req) => req.url === "/health" }, serializers: {
     req: (req) => ({ id: req.id, method: req.method, url: req.url?.replace(/([?&]preview=)[^&]*/g, "$1[redacted]") }),
   } }));
 

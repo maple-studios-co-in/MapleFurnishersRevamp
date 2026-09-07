@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parse, parseSource, ManifestSchema } from '../src/modules/three-d/validation';
 import { validateArtifact } from '../src/modules/three-d/storage';
+import { makeSource } from './fixtures/three-d-source';
 
-const source = { schemaVersion: 1, tenantId: 'tenant-a', modelId: 'chair', name: 'Chair', code: 'CHAIR', readyFor3D: true, sourceRevision: 'r1', variants: [], references: [] };
+const source = makeSource();
 test('Keeri import refuses unflagged, wrong-tenant and mismatched design inputs', () => {
   assert.throws(() => parseSource({ ...source, readyFor3D: false }, 'tenant-a'));
   assert.throws(() => parseSource(source, 'tenant-b'));

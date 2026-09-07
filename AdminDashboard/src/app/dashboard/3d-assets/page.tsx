@@ -7,20 +7,19 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { Box, Download, Plus, RefreshCw } from "lucide-react";
+import { Box, Plus, RefreshCw } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import ProductWorkspace from "@/components/three-d/ProductWorkspace";
+import KeeriImports from "@/components/three-d/KeeriImports";
 import { ErrorMessage } from "@/components/three-d/Fields";
 import {
   createThreeDProduct,
   fetchThreeDConfig,
   fetchThreeDProducts,
-  syncKeeri,
-  type SyncResult,
   type ThreeDConfig,
   type ThreeDProduct,
 } from "@/lib/three-d-api";
@@ -37,7 +36,6 @@ export default function ThreeDAssetsPage() {
   const [config, setConfig] = useState<ThreeDConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedRefresh, setSelectedRefresh] = useState(0);
@@ -47,19 +45,23 @@ export default function ThreeDAssetsPage() {
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"create" | "sync" | null>(null);
-  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [busy, setBusy] = useState<"create" | null>(null);
   const lock = useRef(false);
-  const lastSyncCursor = useRef<string | undefined>(undefined);
   const loadRequest = useRef(0);
+  const configRequest = useRef(0);
+  const productAbort = useRef<AbortController | null>(null);
+  const configAbort = useRef<AbortController | null>(null);
   const { toast } = useToast();
 
   const loadProducts = useCallback(async () => {
     const request = ++loadRequest.current;
+    productAbort.current?.abort();
+    const controller = new AbortController();
+    productAbort.current = controller;
     setLoading(true);
     setListError(null);
     try {
-      const result = await fetchThreeDProducts();
+      const result = await fetchThreeDProducts(controller.signal);
       if (request !== loadRequest.current) return;
       setProducts(result.products);
       setSelectedId((current) =>
@@ -79,10 +81,16 @@ export default function ThreeDAssetsPage() {
     }
   }, []);
   const loadConfig = useCallback(async () => {
+    const request = ++configRequest.current;
+    configAbort.current?.abort();
+    const controller = new AbortController();
+    configAbort.current = controller;
     setConfigError(null);
     try {
-      setConfig(await fetchThreeDConfig());
+      const next = await fetchThreeDConfig(controller.signal);
+      if (request === configRequest.current) setConfig(next);
     } catch (error) {
+      if (request !== configRequest.current) return;
       setConfigError(
         error instanceof Error
           ? error.message
@@ -94,6 +102,9 @@ export default function ThreeDAssetsPage() {
     void Promise.all([loadProducts(), loadConfig()]);
     return () => {
       loadRequest.current += 1;
+      configRequest.current += 1;
+      productAbort.current?.abort();
+      configAbort.current?.abort();
     };
   }, [loadProducts, loadConfig]);
 
@@ -128,35 +139,10 @@ export default function ThreeDAssetsPage() {
     }
   }
 
-  async function fetchKeeri(retryPage = false) {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy("sync");
-    setActionError(null);
-    try {
-      const cursor = retryPage
-        ? lastSyncCursor.current
-        : (syncResult?.nextCursor ?? undefined);
-      lastSyncCursor.current = cursor;
-      const result = await syncKeeri(cursor);
-      setSyncResult(result);
-      await loadProducts();
-      setSelectedRefresh((current) => current + 1);
-      toast(
-        result.failed.length ? "warning" : "success",
-        `Keeri page fetched: ${result.imported} imported, ${result.unchanged} unchanged${result.failed.length ? `, ${result.failed.length} failed` : ""}.`,
-      );
-    } catch (error) {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : "Keeri inputs could not be fetched.",
-      );
-    } finally {
-      lock.current = false;
-      setBusy(null);
-    }
-  }
+  const refreshImportedProducts = useCallback(async () => {
+    await loadProducts();
+    setSelectedRefresh(current => current + 1);
+  }, [loadProducts]);
 
   const visibleProducts = products.filter((product) =>
     `${product.name} ${product.slug}`
@@ -175,17 +161,6 @@ export default function ThreeDAssetsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            disabled={!!busy || !config?.keeriConfigured || !!configError}
-            isLoading={busy === "sync"}
-            onClick={() => void fetchKeeri()}
-          >
-            <Download className="h-4 w-4" />
-            {syncResult?.nextCursor
-              ? "Fetch next Keeri page"
-              : "Fetch from Keeri"}
-          </Button>
           <Button
             disabled={!!busy}
             onClick={() => {
@@ -227,60 +202,14 @@ export default function ThreeDAssetsPage() {
         </div>
       ) : config ? (
         <p className="text-xs text-admin-text-muted">
-          Keeri connection configured · Fetch imports one page of eligible
-          catalogue inputs. Maple manages production, files, reviews and
-          publication.
+          Keeri connection configured · Approved catalogue inputs are imported in the background. Maple manages production, files, reviews and publication.
         </p>
       ) : (
         <p role="status" className="text-sm text-admin-text-muted">
           Checking integration setup…
         </p>
       )}
-      <ErrorMessage message={actionError} />
-      {syncResult && (
-        <div className="glass-card space-y-2 p-4 text-sm">
-          <p>
-            This Keeri page: <strong>{syncResult.imported}</strong> imported ·{" "}
-            <strong>{syncResult.unchanged}</strong> unchanged ·{" "}
-            <strong>{syncResult.failed.length}</strong> failed.
-          </p>
-          {syncResult.nextCursor ? (
-            <p className="text-admin-text-muted">
-              More products are available. Fetch the next page to continue.
-            </p>
-          ) : (
-            <p className="text-admin-text-muted">
-              The last page was reached. Fetch again to check for updates.
-            </p>
-          )}
-          {syncResult.failed.length > 0 && (
-            <details>
-              <summary className="cursor-pointer text-admin-danger">
-                View import failures
-              </summary>
-              <ul className="mt-2 space-y-1">
-                {syncResult.failed.map((failure, index) => (
-                  <li
-                    key={`${failure.modelId}-${index}`}
-                    className="break-words text-xs"
-                  >
-                    {failure.modelId}: {failure.message}
-                  </li>
-                ))}
-              </ul>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="mt-3"
-                disabled={!!busy}
-                onClick={() => void fetchKeeri(true)}
-              >
-                Retry this Keeri page
-              </Button>
-            </details>
-          )}
-        </div>
-      )}
+      <KeeriImports enabled={!!config?.keeriConfigured && !configError} onInputsChanged={refreshImportedProducts} onConfigRefresh={loadConfig} />
       <div className="grid items-start gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
         <aside
           className="glass-card min-w-0 space-y-4 p-4"

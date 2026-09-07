@@ -1,5 +1,4 @@
-import { createHmac } from 'node:crypto';
-import { resolve } from 'node:path';
+import { createHmac, randomUUID } from 'node:crypto';
 import express, { Router, type Response } from 'express';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { env } from '../../config/env';
@@ -7,14 +6,11 @@ import { AppError } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
 import { requireAdmin } from '../../middleware/auth';
 import { availableRecipes } from './recipes';
-import { KeeriConnector } from './connector';
-import { ThreeDService } from './service';
-import { LocalArtifactStorage, MAX_ASSET_BYTES } from './storage';
+import { MAX_ASSET_BYTES } from './storage';
+import { keeriConfigured as configured, threeDService, threeDImportBatches } from './runtime';
+export { threeDService } from './runtime';
 import { AssetKind, JobInput, ManifestSchema, ProductInput, ReviewInput, SyncInput, VersionInput, manifestAssetIds, parse } from './validation';
 
-const configured = !!(env.KEERI_3D_API_URL && env.KEERI_3D_TOKEN && env.KEERI_3D_TENANT_ID);
-const connector = configured ? new KeeriConnector({ baseUrl: env.KEERI_3D_API_URL!, token: env.KEERI_3D_TOKEN!, tenantId: env.KEERI_3D_TENANT_ID!, referenceOrigins: env.KEERI_3D_REFERENCE_ORIGINS.split(',').map(s => s.trim()).filter(Boolean) }) : undefined;
-export const threeDService = new ThreeDService(prisma, new LocalArtifactStorage(env.THREE_D_STORAGE_DIR || resolve(process.cwd(), 'var/three-d')), connector);
 // A preview is never a valid Maple admin session, including on older commerce endpoints.
 const previewKey = createHmac('sha256', env.JWT_SECRET).update('maple-three-d-preview-v1').digest('hex');
 const previewOptions = { audience: 'maple-three-d-preview', issuer: 'maple', algorithms: ['HS256'] as jwt.Algorithm[] };
@@ -30,11 +26,17 @@ function previewClaims(token: unknown): (JwtPayload & { productId: string; versi
 export const adminThreeDRouter = Router();
 adminThreeDRouter.use(requireAdmin);
 adminThreeDRouter.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
-adminThreeDRouter.get('/config', (_req, res) => res.json({ keeriConfigured: configured, recipes: availableRecipes() }));
+adminThreeDRouter.get('/config', (_req, res) => res.json({ keeriConfigured: configured, inputSchemaVersion: 2, importLimits: { referencesPerDesign: 24, bytesPerDesign: 209715200, bytesPerBatch: 524288000, designsPerPage: 20, geometryGroupsPerDesign: 1 }, recipes: availableRecipes() }));
 adminThreeDRouter.get('/products', async (_req, res) => res.json({ products: await threeDService.listProducts() }));
 adminThreeDRouter.post('/products', async (req, res) => res.status(201).json({ product: await threeDService.createProduct(parse(ProductInput, req.body)) }));
 adminThreeDRouter.get('/products/:id', async (req, res) => res.json({ product: await threeDService.product(String(req.params.id)) }));
-adminThreeDRouter.post('/keeri/sync', async (req, res) => res.json(await threeDService.sync(parse(SyncInput, req.body).cursor)));
+// Compatibility endpoint also queues; no reference downloads run in an HTTP request.
+adminThreeDRouter.post('/keeri/sync', async (req, res) => res.status(202).json({ batch: await threeDImportBatches.enqueue({ ...parse(SyncInput, req.body), idempotencyKey: randomUUID() }, env.ADMIN_EMAIL) }));
+adminThreeDRouter.post('/keeri/import-batches', async (req, res) => res.status(202).json({ batch: await threeDImportBatches.enqueue(req.body, env.ADMIN_EMAIL) }));
+adminThreeDRouter.get('/keeri/import-batches', async (_req, res) => res.json({ batches: await threeDImportBatches.list() }));
+adminThreeDRouter.get('/keeri/import-batches/:id', async (req, res) => res.json({ batch: await threeDImportBatches.get(String(req.params.id)) }));
+adminThreeDRouter.post('/keeri/import-batches/:id/retry', async (req, res) => res.json({ batch: await threeDImportBatches.retry(String(req.params.id)) }));
+adminThreeDRouter.post('/keeri/import-batches/:id/cancel', async (req, res) => res.json({ batch: await threeDImportBatches.cancel(String(req.params.id)) }));
 adminThreeDRouter.post('/products/:id/jobs', async (req, res) => res.status(201).json({ job: await threeDService.createJob(String(req.params.id), parse(JobInput, req.body)) }));
 adminThreeDRouter.post('/products/:id/assets', express.raw({ type: 'application/octet-stream', limit: MAX_ASSET_BYTES }), async (req, res) => {
   if (!req.is('application/octet-stream')) throw new AppError(415, 'Use application/octet-stream for artifact uploads');

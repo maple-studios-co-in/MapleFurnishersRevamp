@@ -5,7 +5,7 @@ export type ManifestResult = { status: 'ready'; manifest: PublicManifest } | { s
 
 export async function loadManifest(slug: string, preview?: string): Promise<ManifestResult> {
   if (!/^[a-z0-9-]+$/.test(slug) || (preview && preview.length > 4096)) return { status: 'missing' };
-  const origin = process.env.MAPLE_BACKEND_ORIGIN ?? (process.env.NODE_ENV === 'development'
+  const origin = process.env.MAPLE_BACKEND_ORIGIN ?? process.env.BACKEND_ORIGIN ?? (process.env.NODE_ENV === 'development'
     ? 'http://localhost:4000' : 'https://maple-furnishers-backend.vercel.app');
   const url = new URL(`/api/3d/products/${encodeURIComponent(slug)}`, origin);
   if (preview) url.searchParams.set('preview', preview);

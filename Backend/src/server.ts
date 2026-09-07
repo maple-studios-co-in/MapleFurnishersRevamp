@@ -3,8 +3,8 @@ import { env } from "./config/env";
 import { logger } from "./lib/logger";
 import { prisma } from "./lib/prisma";
 
-const server = createApp().listen(env.PORT, () => {
-  logger.info(`Maple Furnishers API listening on http://localhost:${env.PORT}`);
+const server = createApp().listen(env.PORT, env.HOST, () => {
+  logger.info(`Maple Furnishers API listening on http://${env.HOST}:${env.PORT}`);
 });
 
 function shutdown(signal: string) {

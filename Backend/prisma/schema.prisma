@@ -134,6 +134,7 @@ model ThreeDJob {
   importId       String?
   sourceImport   ThreeDImport? @relation(fields: [importId], references: [id], onDelete: Restrict)
   inputSnapshot  Json
+  geometryGroupId String?
   version        ThreeDVersion?
   createdAt      DateTime @default(now())
   completedAt    DateTime?
@@ -178,6 +179,7 @@ model ThreeDVersion {
   sequence    Int
   productName String
   sourceRevision String?
+  geometryGroupId String?
   masterAssetId String?
   masterAsset ThreeDAsset? @relation("VersionMaster", fields: [masterAssetId], references: [id], onDelete: Restrict)
   jobId       String? @unique
@@ -211,4 +213,69 @@ model ThreeDPublication {
   createdAt         DateTime @default(now())
 
   @@index([productId, createdAt])
+}
+
+
+// Durable one-page input scans. A separate worker imports the pinned item revisions.
+model ThreeDImportBatch {
+  id             String @id @default(cuid())
+  tenantId       String
+  idempotencyKey String
+  requestedBy    String
+  status         ThreeDImportBatchStatus @default(queued)
+  cursor         String?
+  nextCursor     String?
+  listLoadedAt   DateTime?
+  bytesReserved  Int @default(0)
+  attempts       Int @default(0)
+  errorCode      String?
+  errorMessage   String?
+  leaseToken     String?
+  leaseExpiresAt DateTime?
+  attemptDeadline DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  items          ThreeDImportItem[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+}
+
+enum ThreeDImportBatchStatus {
+  queued
+  running
+  completed
+  failed
+  cancelled
+}
+
+model ThreeDImportItem {
+  id             String @id @default(cuid())
+  batchId        String
+  batch          ThreeDImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  position       Int
+  modelId        String
+  name           String
+  code           String
+  sourceRevision String
+  status         ThreeDImportItemStatus @default(pending)
+  attempts       Int @default(0)
+  productId      String?
+  errorCode      String?
+  errorMessage   String?
+  completedAt    DateTime?
+
+  @@unique([batchId, modelId])
+  @@unique([batchId, position])
+}
+
+enum ThreeDImportItemStatus {
+  pending
+  running
+  imported
+  unchanged
+  failed
+  cancelled
 }

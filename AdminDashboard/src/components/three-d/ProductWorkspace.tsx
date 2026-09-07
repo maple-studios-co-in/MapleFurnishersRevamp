@@ -26,6 +26,7 @@ import { assetLabels, dateLabel, ErrorMessage, FieldSelect } from "./Fields";
 import VersionForm from "./VersionForm";
 import ImportHistory from "./ImportHistory";
 import VersionsPanel, { type RunAction } from "./VersionsPanel";
+import { inputBlockReason, productionInput } from "@/lib/three-d-evidence";
 
 export default function ProductWorkspace({
   productId,
@@ -150,6 +151,8 @@ export default function ProductWorkspace({
     (recipe) => recipe.id === "manual-blender",
   );
   const disabled = !!busy || loading || !!loadError;
+  const sourceBlock = inputBlockReason(product);
+  const source = productionInput(product);
 
   return (
     <section
@@ -243,7 +246,7 @@ export default function ProductWorkspace({
               <h3 className="font-semibold">Production jobs</h3>
               <Button
                 size="sm"
-                disabled={disabled || !recipe}
+                disabled={disabled || !recipe || !!sourceBlock}
                 isLoading={busy === "job"}
                 onClick={() => {
                   jobKey.current ??= crypto.randomUUID();
@@ -265,6 +268,8 @@ export default function ProductWorkspace({
                 Start Blender job
               </Button>
             </div>
+            {sourceBlock && <p className="text-xs text-admin-warning">{sourceBlock}</p>}
+            {product.sourceType === "keeri" && source && !sourceBlock && <p className="break-all text-xs text-admin-text-muted">Production uses geometry group {source.geometryGroups[0].id}, approved in Keeri by {source.approval.approvedBy} on {dateLabel(source.approval.approvedAt)}.</p>}
             {!recipe && (
               <p className="text-xs text-admin-warning">
                 The manual Blender recipe is unavailable. Refresh the workspace
@@ -294,6 +299,7 @@ export default function ProductWorkspace({
                         {job.importId
                           ? " · Saved Keeri input"
                           : " · Maple input"}
+                        {job.geometryGroupId ? ` · Geometry group ${job.geometryGroupId}` : ""}
                       </p>
                     </div>
                     <Badge
@@ -454,6 +460,7 @@ export default function ProductWorkspace({
             <Button
               disabled={
                 disabled ||
+                !!sourceBlock ||
                 !product.assets.some((asset) => asset.kind === "web_model") ||
                 !product.assets.some((asset) => asset.kind === "preview")
               }

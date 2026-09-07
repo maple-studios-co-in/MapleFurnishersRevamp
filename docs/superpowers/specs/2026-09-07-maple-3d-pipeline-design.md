@@ -1,5 +1,7 @@
 # Maple-owned 3D production foundation
 
+> Historical foundation design. The Keeri **input v1** proposal below was superseded before real integration by [source contract v2](../../contracts/keeri-3d-source-v2.md) and the [current Keeri handoff](../../keeri-3d-input-implementation-plan.md). Use [the current pipeline runbook](../../maple-3d-pipeline.md) for the background import APIs and worker limits. The public viewer manifest remains **v1**.
+
 ## Approved intent
 
 Keeri owns catalogue inputs and a design-level `readyFor3D` flag. Maple owns imported reference snapshots, generation jobs, files, model versions, material assignments, review and publication. The customer experience stays on Maple `/customize`. This implementation is the first working foundation; it must accept improved generation tools without changing catalogue integration or the viewer contract.

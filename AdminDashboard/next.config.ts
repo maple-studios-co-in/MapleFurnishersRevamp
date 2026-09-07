@@ -11,7 +11,7 @@ import type { NextConfig } from "next";
  * per-IP login rate limit effectively becomes shared for admin users. With
  * a single admin account that trade is fine.
  */
-const BACKEND_ORIGIN = process.env.MAPLE_BACKEND_ORIGIN || "https://maple-furnishers-backend.vercel.app";
+const BACKEND_ORIGIN = process.env.MAPLE_BACKEND_ORIGIN ?? process.env.BACKEND_ORIGIN ?? "https://maple-furnishers-backend.vercel.app";
 /** The marketing site, which owns the product image files. */
 const SITE_ORIGIN = "https://maple-furnishers-revamp-frontend.vercel.app";
 

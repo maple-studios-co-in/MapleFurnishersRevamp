@@ -43,27 +43,11 @@ export const SyncInput = z.object({ cursor: z.string().min(1).max(2000).optional
 export const AssetKind = z.enum(['web_model', 'blender_master', 'preview', 'texture', 'reference']);
 export type AssetKind = z.infer<typeof AssetKind>;
 
-export const SourceInput = z.object({
-  schemaVersion: z.literal(1), tenantId: Id, modelId: Id, name: Name, code: z.string().max(120), readyFor3D: z.literal(true), sourceRevision: Id,
-  dimensionsMm: Dimensions.optional(),
-  variants: z.array(z.object({ variantId: Id, sku: z.string().max(200), attributes: z.record(z.string(), z.unknown()), dimensionsMm: Dimensions.optional() })).max(5000),
-  references: z.array(z.object({ id: Id, role: Name, url: z.url().refine(url => new URL(url).protocol === 'https:', 'Reference downloads must use HTTPS'), checksum: z.string().min(1).max(200), provenance: z.enum(['photograph', 'generated', 'unknown']) })).max(100),
-}).superRefine((value, ctx) => {
-  for (const [label, ids] of [['variant', value.variants.map(v => v.variantId)], ['reference', value.references.map(r => r.id)]] as const) {
-    if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', message: `Duplicate ${label} IDs` });
-  }
-});
-export type SourceInput = z.infer<typeof SourceInput>;
-export const SourceList = z.object({ schemaVersion: z.literal(1), tenantId: Id, products: z.array(z.object({ modelId: Id, name: Name, code: z.string().max(120), sourceRevision: Id })).max(20), nextCursor: z.string().max(2000).nullable() });
+export { SourceInput, SourceList, parseSource, computeSourceRevision, StoredSourceInput, parseStoredSource } from './source-contract';
 export function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
   if (!result.success) throw new AppError(400, 'Validation failed', result.error.issues.map(i => ({ field: i.path.join('.'), message: i.message })));
   return result.data;
-}
-export function parseSource(input: unknown, tenantId: string, modelId?: string): SourceInput {
-  const source = parse(SourceInput, input);
-  if (source.tenantId !== tenantId || (modelId !== undefined && source.modelId !== modelId)) throw new AppError(400, 'Keeri source does not match the configured tenant and requested design');
-  return source;
 }
 export function manifestAssetIds(manifest: ManifestInput): string[] {
   return [...new Set([manifest.modelAssetId, ...manifest.angles.map(a => a.assetId)])];
