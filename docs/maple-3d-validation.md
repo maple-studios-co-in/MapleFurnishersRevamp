@@ -31,6 +31,7 @@ Meaningful regression tests were observed failing before their fixes: download s
 - Starting a Blender job retained the approved source snapshot and `geometry-standard` lineage.
 - Legacy source inputs displayed an explicit reimport message and disabled new job/version controls.
 - The mock Keeri connection was removed after QA. Local admin returns to the honest disconnected state; no real Keeri credentials were added.
+- Final disconnected-state browser check passed: imports disabled, no 503 alert or console errors, saved approval/reference evidence still readable. Taro rendered its original chair viewer and material/view controls. The browser disconnected during the final swatch/rotation interaction pass, so that last interaction check was not completed; all eight viewer manifest/selection regression tests passed.
 
 ### Current delivery boundary
 
