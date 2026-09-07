@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Icon360 from "@/components/ui/Icon360";
@@ -139,14 +139,14 @@ const T = {
 } as const;
 
 
-const FINISHES = [
+export const CUSTOMIZER_FINISHES = [
   { name: "Natural Ash", hex: "#d6883b", img: "/media/customizer/swatches/finish-natural-ash.png" },
   { name: "Walnut Brown", hex: "#5e4230", img: "/media/customizer/swatches/finish-walnut-brown.png" },
   { name: "Dark Oak", hex: "#9c8364", img: "/media/customizer/swatches/finish-dark-oak.png" },
   { name: "Ebony", hex: "#63595a", img: "/media/customizer/swatches/finish-ebony.png" },
 ] as const;
 
-const FABRICS = [
+export const CUSTOMIZER_FABRICS = [
   { name: "Ivory", label: "Ivory", hex: "#beb4a5", img: "/media/customizer/swatches/fabric-ivory.png" },
   { name: "Sand", label: "Sand", hex: "#958068", img: "/media/customizer/swatches/fabric-sand.png" },
   { name: "Mauve", label: "Dark Oak", hex: "#6a5759", img: "/media/customizer/swatches/fabric-mauve.png" },
@@ -186,6 +186,24 @@ const ArrowRightIcon = () => (
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#DFA35C] focus-visible:outline-offset-2";
 
+export type CustomizerSelection = { finish: string | null; fabric: string | null; angle: number };
+export type CustomizerStageProps = CustomizerSelection & { finishColor: string | null; fabricColor: string | null };
+export type CustomizerProduct = {
+  name: string;
+  modelUrl: string;
+  angles: readonly { src: string; label: string }[];
+  defaultFinish: string;
+  defaultFabric: string;
+  priceLabel: string;
+  note: string;
+  actionLabel: string;
+  /** Render an authored room behind the existing desktop controls. */
+  fullScene?: boolean;
+  onAction: (selection: CustomizerStageProps) => void;
+  renderStage: (props: CustomizerStageProps & { viewerOpen: boolean }) => ReactNode;
+  renderViewer: (props: CustomizerStageProps & { open: boolean; onClose: () => void }) => ReactNode;
+};
+
 function Swatch({
   name, label, img, selected, onSelect,
 }: {
@@ -198,7 +216,7 @@ function Swatch({
         aria-pressed={selected}
         aria-label={name}
         onClick={onSelect}
-        className={`h-[68px] w-[68px] overflow-hidden rounded-full transition-all duration-200 hover:scale-110 ${focusRing}`}
+        className={`h-[54px] w-[54px] sm:h-[68px] sm:w-[68px] overflow-hidden rounded-full transition-all duration-200 hover:scale-110 ${focusRing}`}
         style={{
           boxShadow: selected
             ? `0 0 0 2.5px ${T.gold}, 0 0 16px rgba(223,163,92,0.35)`
@@ -220,11 +238,24 @@ function Swatch({
 
 /* ================================================================= */
 
-export default function CustomizerHero() {
+export default function CustomizerHero({ product, selection, onSelectionChange }: {
+  product?: CustomizerProduct;
+  selection?: CustomizerSelection;
+  onSelectionChange?: (selection: CustomizerSelection) => void;
+} = {}) {
+  const finishes = CUSTOMIZER_FINISHES;
+  const fabrics = CUSTOMIZER_FABRICS;
+  const angles = product?.angles ?? ANGLES;
+  const productName = product?.name ?? "Axtra Lounge Chair";
+  const modelUrl = product?.modelUrl ?? CHAIR_GLB_URL;
   /** null = untouched: that aspect of the chair keeps its original pixels. */
-  const [finish, setFinish] = useState<(typeof FINISHES)[number]["name"] | null>(null);
-  const [fabric, setFabric] = useState<(typeof FABRICS)[number]["name"] | null>(null);
-  const [angle, setAngle] = useState(0);
+  const [localSelection, setLocalSelection] = useState<CustomizerSelection>({ finish: null, fabric: null, angle: 0 });
+  const { finish, fabric, angle } = selection ?? localSelection;
+  const updateSelection = (patch: Partial<CustomizerSelection>) => {
+    const next = { finish, fabric, angle, ...patch };
+    setLocalSelection(next);
+    onSelectionChange?.(next);
+  };
   const [panelOpen, setPanelOpen] = useState(true);
   const [viewerOpen, setViewerOpen] = useState(false);
 
@@ -252,8 +283,9 @@ export default function CustomizerHero() {
     return () => window.removeEventListener("resize", measure);
   }, [panelOpen]);
 
-  const finishHex = finish ? FINISHES.find((f) => f.name === finish)!.hex : null;
-  const fabricHex = fabric ? FABRICS.find((f) => f.name === fabric)!.hex : null;
+  const finishHex = finishes.find((f) => f.name === (finish ?? product?.defaultFinish))?.hex ?? null;
+  const fabricHex = fabrics.find((f) => f.name === (fabric ?? product?.defaultFabric))?.hex ?? null;
+  const stageProps: CustomizerStageProps = { finish, fabric, angle, finishColor: finishHex, fabricColor: fabricHex };
 
   /* ---- which stage renders the piece ----
    *
@@ -281,7 +313,7 @@ export default function CustomizerHero() {
       return;
     }
     // HEAD, so a missing model costs one 404 rather than a failed download.
-    fetch(CHAIR_GLB_URL, { method: "HEAD" })
+    fetch(modelUrl, { method: "HEAD" })
       .then((r) => {
         if (!cancelled) setStage(r.ok ? "webgl" : "flat");
       })
@@ -291,20 +323,20 @@ export default function CustomizerHero() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [modelUrl]);
 
   return (
     <section
-      aria-label="Make it yours — customize the Axtra Lounge Chair"
+      aria-label={`Make it yours — customize the ${productName}`}
       className="relative overflow-hidden lg:h-[100dvh]"
       style={{ backgroundColor: T.bgBase }}
     >
-      {/* chairless interior — the canvas chair is the only chair */}
-      <div
+      {/* The original product retains its photographic interior. */}
+      {!product?.fullScene && <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url(/media/customizer/bg-interior.webp)" }}
-      />
+      />}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -368,15 +400,17 @@ export default function CustomizerHero() {
             behind both (they sit at z-10) and bleeds toward the bottom edge.
             A stage that overflows its column is what makes the chair read as
             standing in the room rather than pasted into a slot. */}
-        <div className="relative z-0 order-last h-[62vh] w-full lg:absolute lg:bottom-[-16%] lg:left-[6%] lg:right-[8%] lg:top-[4%] lg:order-none lg:h-auto lg:w-auto">
+        <div className={product?.fullScene
+          ? "relative z-0 order-last h-[62vh] w-full overflow-hidden rounded-lg lg:absolute lg:inset-0 lg:order-none lg:h-auto lg:w-auto lg:rounded-none"
+          : "relative z-0 order-last h-[62vh] w-full lg:absolute lg:bottom-[-16%] lg:left-[6%] lg:right-[8%] lg:top-[4%] lg:order-none lg:h-auto lg:w-auto"}>
           {/* The piece itself: a real WebGL scene. Drag it to orbit; the
               panel's four views fly the camera on a GSAP tween. */}
           <div
-            role="img"
-            aria-label={`Axtra Lounge Chair, ${ANGLES[angle].label}${finish ? `, ${finish} finish` : ""}${fabric ? `, ${fabric} fabric` : ""}.${stage === "webgl" ? " Drag to rotate." : ""}`}
+            role={product ? "group" : "img"}
+            aria-label={`${productName}, ${angles[angle].label}${finish ? `, ${finish} finish` : ""}${fabric ? `, ${fabric} fabric` : ""}.${stage === "webgl" ? " Drag to rotate." : ""}`}
             className="relative h-full w-full"
           >
-            {stage === "flat" ? (
+            {product ? product.renderStage({ ...stageProps, viewerOpen }) : stage === "flat" ? (
               <ChairStage2D
                 sources={ANGLE_SRCS}
                 angle={angle}
@@ -392,6 +426,7 @@ export default function CustomizerHero() {
                 fabricColor={fabricHex}
               />
             ) : null}
+            {product?.fullScene && <div aria-hidden className="pointer-events-none absolute inset-0 hidden lg:block" style={{ background: "linear-gradient(90deg, rgba(10,7,5,0.44) 0%, rgba(10,7,5,0.16) 27%, transparent 44%, transparent 62%, rgba(10,7,5,0.2) 100%)" }} />}
           </div>
         </div>
 
@@ -436,13 +471,13 @@ export default function CustomizerHero() {
                     1. Choose your finish
                   </p>
                   <div className="mt-3.5 flex justify-between">
-                    {FINISHES.map((f) => (
+                    {finishes.map((f) => (
                       <Swatch
                         key={f.name}
                         name={f.name}
                         img={f.img}
                         selected={finish === f.name}
-                        onSelect={() => setFinish(f.name)}
+                        onSelect={() => updateSelection({ finish: f.name })}
                       />
                     ))}
                   </div>
@@ -453,14 +488,14 @@ export default function CustomizerHero() {
                     2. Choose your fabric
                   </p>
                   <div className="mt-3.5 flex justify-between">
-                    {FABRICS.map((f) => (
+                    {fabrics.map((f) => (
                       <Swatch
                         key={f.name}
                         name={f.name}
-                        label={f.label}
+                        label={product ? f.name : f.label}
                         img={f.img}
                         selected={fabric === f.name}
-                        onSelect={() => setFabric(f.name)}
+                        onSelect={() => updateSelection({ fabric: f.name })}
                       />
                     ))}
                   </div>
@@ -471,14 +506,14 @@ export default function CustomizerHero() {
                     3. Preview your piece
                   </p>
                   <div className="mt-3.5 flex justify-between">
-                    {ANGLES.map((a, i) => (
+                    {angles.map((a, i) => (
                       <button
                         key={a.src}
                         type="button"
                         aria-label={a.label}
                         aria-pressed={angle === i}
-                        onClick={() => setAngle(i)}
-                        className={`h-[94px] w-[94px] shrink-0 overflow-hidden rounded-lg transition-transform duration-150 hover:scale-105 ${focusRing}`}
+                        onClick={() => updateSelection({ angle: i })}
+                        className={`aspect-square w-[21%] lg:h-[94px] lg:w-[94px] shrink-0 overflow-hidden rounded-lg transition-transform duration-150 hover:scale-105 ${focusRing}`}
                         style={{
                           background:
                             "linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05))",
@@ -500,24 +535,25 @@ export default function CustomizerHero() {
                 className="mt-5 flex w-full flex-col justify-center rounded-lg px-7 py-5 lg:ml-auto lg:mr-[15px] lg:mt-[44px] lg:h-[var(--card-h)] lg:w-[var(--card-w)]"
                 style={{ backgroundColor: "rgba(0,0,0,0.54)" }}
               >
-                <p style={CARD_TITLE}>Axtra Lounge Chair</p>
+                <p style={CARD_TITLE}>{productName}</p>
                 <p className="mt-2" style={CARD_VARIANT}>
-                  {finish ?? "Walnut Brown"}/{fabric ?? "Olive"}
+                  {finish ?? product?.defaultFinish ?? "Walnut Brown"}/{fabric ?? product?.defaultFabric ?? "Olive"}
                 </p>
                 <div className="mt-4 flex items-center justify-between gap-4">
-                  <p style={CARD_PRICE}>Rs. 75000.00</p>
+                  <p style={CARD_PRICE}>{product?.priceLabel ?? "Rs. 75000.00"}</p>
                   {/* maroon-on-gold is what makes #741A14 legible here. */}
                   <button
                     type="button"
+                    onClick={product ? () => product.onAction(stageProps) : undefined}
                     className={`shrink-0 transition-transform duration-150 hover:scale-[1.03] ${focusRing}`}
                     style={{ ...CARD_CTA_CHIP, backgroundColor: T.goldBtn }}
                   >
-                    <span style={CARD_CTA_LABEL}>Shop Now</span>
+                    <span style={CARD_CTA_LABEL}>{product?.actionLabel ?? "Shop Now"}</span>
                   </button>
                 </div>
                 <div className="mt-4 h-px bg-white/[0.12]" />
-                <p className="mt-3 whitespace-nowrap text-center" style={CARD_DELIVERY}>
-                  Delivery in 12-15 days&ensp;|&ensp;Contact our team for best prices
+                <p className="mt-3 text-center lg:whitespace-nowrap" style={CARD_DELIVERY}>
+                  {product?.note ?? <>Delivery in 12-15 days&ensp;|&ensp;Contact our team for best prices</>}
                 </p>
               </div>
             </div>
@@ -527,7 +563,7 @@ export default function CustomizerHero() {
             type="button"
             aria-label="Open customizer panel"
             onClick={() => setPanelOpen(true)}
-            className={`hidden h-9 w-9 rotate-45 items-center justify-center rounded-full border border-white/25 text-white/55 transition-colors hover:border-white/50 hover:text-white/85 lg:absolute lg:right-6 lg:top-[90px] lg:flex ${focusRing}`}
+            className={`absolute right-6 top-6 flex h-9 w-9 rotate-45 items-center justify-center rounded-full border border-white/25 text-white/55 transition-colors hover:border-white/50 hover:text-white/85 lg:top-[90px] ${focusRing}`}
           >
             <CloseIcon />
           </button>
@@ -539,7 +575,7 @@ export default function CustomizerHero() {
       <div className="absolute bottom-6 left-0 right-0 z-10 hidden lg:block">
         <div className="flex w-full items-end justify-start gap-16 px-10">
           <Link
-            href="#"
+            href={product ? "/customize" : "#"}
             className={`group flex flex-col gap-1.5 opacity-80 transition-opacity hover:opacity-100 ${focusRing}`}
           >
             <span className="flex items-center gap-1.5 uppercase" style={{ ...PAGE_TYPE, fontSize: "12px", letterSpacing: "1.2px", color: "rgba(255,255,255,0.5)" }}>
@@ -547,11 +583,11 @@ export default function CustomizerHero() {
               Previous
             </span>
             <span className="uppercase transition-colors group-hover:text-white" style={{ ...PAGE_TYPE, color: "rgba(255,255,255,0.85)" }}>
-              Arm Chair
+              {product ? "Axtra Lounge Chair" : "Arm Chair"}
             </span>
           </Link>
           <Link
-            href="#"
+            href={product ? "https://shop.maplefurnishers.com" : "/customize/taro"}
             className={`group flex flex-col items-start gap-1.5 opacity-80 transition-opacity hover:opacity-100 ${focusRing}`}
           >
             <span className="flex items-center gap-1.5 uppercase" style={{ ...PAGE_TYPE, fontSize: "12px", letterSpacing: "1.2px", color: "rgba(255,255,255,0.5)" }}>
@@ -559,17 +595,17 @@ export default function CustomizerHero() {
               <ArrowRightIcon />
             </span>
             <span className="uppercase transition-colors group-hover:text-white" style={{ ...PAGE_TYPE, color: "rgba(255,255,255,0.85)" }}>
-              Sectional Sofa
+              {product ? "More furniture" : "Taro Armchair"}
             </span>
           </Link>
         </div>
       </div>
 
-      <Viewer360
+      {product ? product.renderViewer({ ...stageProps, open: viewerOpen, onClose: () => setViewerOpen(false) }) : <Viewer360
         open={viewerOpen}
         onClose={() => setViewerOpen(false)}
         title="Axtra Lounge Chair"
-      />
+      />}
     </section>
   );
 }

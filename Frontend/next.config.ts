@@ -51,6 +51,9 @@ const nextConfig: NextConfig = {
     ];
     return [
       { source: "/media/:path*", headers: immutable },
+      // The local Taro pilot is rebuilt in place while materials are calibrated.
+      // Switch to versioned asset paths before granting immutable caching.
+      { source: "/media/models/taro/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
       { source: "/images/:path*", headers: immutable },
       { source: "/fonts/:path*", headers: immutable },
     ];
