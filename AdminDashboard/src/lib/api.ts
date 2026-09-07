@@ -34,7 +34,7 @@ function authHeaders(): HeadersInit {
   };
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
+async function handleResponse<T>(res: Response, responseType: "json" | "blob" = "json"): Promise<T> {
   if (res.status === 401) {
     localStorage.removeItem(TOKEN_KEY);
     window.location.href = "/login";
@@ -42,10 +42,22 @@ async function handleResponse<T>(res: Response): Promise<T> {
   }
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    throw new Error(data?.error ?? `Request failed (${res.status})`);
+    const details = Array.isArray(data?.details)
+      ? data.details.map((item: { message?: unknown }) => typeof item?.message === "string" ? item.message : "").filter(Boolean).join("; ")
+      : "";
+    throw new Error(details || data?.error || `Request failed (${res.status})`);
   }
   if (res.status === 204) return undefined as T;
+  if (responseType === "blob") return res.blob() as Promise<T>;
   return res.json() as Promise<T>;
+}
+
+/** Shared authenticated transport, including raw artifact uploads. */
+export async function adminRequest<T>(path: string, options: RequestInit = {}, responseType: "json" | "blob" = "json"): Promise<T> {
+  const headers = new Headers(authHeaders());
+  new Headers(options.headers).forEach((value, key) => headers.set(key, value));
+  const res = await fetch(`${API_URL}${path}`, { ...options, headers, cache: "no-store" });
+  return handleResponse<T>(res, responseType);
 }
 
 /* ── Auth ── */

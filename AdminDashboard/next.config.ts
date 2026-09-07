@@ -10,13 +10,18 @@ import type { NextConfig } from "next";
  * BACKEND_ORIGIN is set at build time so each deployment can use its nearest
  * private backend while retaining the hosted API as a fallback.
  */
-const BACKEND_ORIGIN =
-  process.env.BACKEND_ORIGIN ?? "https://maple-furnishers-backend.vercel.app";
+const BACKEND_ORIGIN = process.env.MAPLE_BACKEND_ORIGIN ?? process.env.BACKEND_ORIGIN ?? "https://maple-furnishers-backend.vercel.app";
 /** The marketing site, which owns the product image files. */
 const SITE_ORIGIN = "https://maple-furnishers-revamp-frontend.vercel.app";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Match the API's 50 MiB artifact limit; Next otherwise truncates proxy
+  // uploads at 10 MiB. Allow time for larger files to reach the backend.
+  experimental: {
+    middlewareClientMaxBodySize: "50mb",
+    proxyTimeout: 120000,
+  },
   // Lets a build run against its own output dir while `next dev` still owns
   // .next — on OneDrive the two colliding surface as EINVAL/readlink.
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),

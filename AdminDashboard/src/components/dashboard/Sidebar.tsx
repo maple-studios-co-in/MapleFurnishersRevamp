@@ -12,6 +12,7 @@ import {
   ChevronRight,
   BarChart3,
   Settings,
+  Box,
 } from "lucide-react";
 import { ROUTES } from "@/lib/constants";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,6 +26,7 @@ interface SidebarProps {
 const NAV_ITEMS = [
   { label: "Overview", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
   { label: "Products", href: ROUTES.PRODUCTS, icon: Package },
+  { label: "3D Assets", href: ROUTES.THREE_D_ASSETS, icon: Box },
   { label: "Inquiries", href: ROUTES.INQUIRIES, icon: MessageSquare },
   { label: "Subscribers", href: ROUTES.SUBSCRIBERS, icon: Mail },
   { label: "Analytics", href: ROUTES.ANALYTICS, icon: BarChart3 },

@@ -3,6 +3,7 @@ export const ROUTES = {
   LOGIN: "/login",
   DASHBOARD: "/dashboard",
   PRODUCTS: "/dashboard/products",
+  THREE_D_ASSETS: "/dashboard/3d-assets",
   INQUIRIES: "/dashboard/inquiries",
   SUBSCRIBERS: "/dashboard/subscribers",
   ANALYTICS: "/dashboard/analytics",

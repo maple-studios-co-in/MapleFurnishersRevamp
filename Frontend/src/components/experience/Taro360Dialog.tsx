@@ -3,8 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import TaroRoomScene from "./TaroRoomScene";
+import type { PublicManifest } from "@/lib/three-d/manifest";
 
-export default function Taro360Dialog({ open, onClose, view, finishColor, fabricColor }: {
+export default function Taro360Dialog({ open, onClose, view, finishColor, fabricColor, finishName, fabricName, manifest }: {
+  manifest?: PublicManifest;
+  finishName?: string | null;
+  fabricName?: string | null;
   open: boolean;
   onClose: () => void;
   view: number;
@@ -47,7 +51,7 @@ export default function Taro360Dialog({ open, onClose, view, finishColor, fabric
       <div className="relative w-full max-w-[1100px]">
         <div className="mb-3 flex items-end justify-between gap-4">
           <div>
-            <p id="taro-360-title" className="uppercase" style={{ color: "#fff", fontFamily: '"Red Hat Display", var(--font-redhat)', fontSize: "15px", fontWeight: 600, letterSpacing: "1.5px" }}>Taro</p>
+            <p id="taro-360-title" className="uppercase" style={{ color: "#fff", fontFamily: '"Red Hat Display", var(--font-redhat)', fontSize: "15px", fontWeight: 600, letterSpacing: "1.5px" }}>{manifest?.name ?? 'Taro'}</p>
             <p id="taro-360-instructions" className="mt-1 uppercase" style={{ color: "rgba(255,255,255,0.6)", fontFamily: '"Red Hat Display", var(--font-redhat)', fontSize: "10px", letterSpacing: "1px" }}>Drag to rotate · Scroll or pinch to zoom</p>
           </div>
           <button ref={closeRef} type="button" onClick={onClose} aria-label="Close 360 degree view" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/25 text-white/70 transition-colors hover:border-white/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#DFA35C] focus-visible:outline-offset-2">
@@ -55,9 +59,9 @@ export default function Taro360Dialog({ open, onClose, view, finishColor, fabric
           </button>
         </div>
         <div className="relative h-[min(64dvh,620px)] min-h-[260px] w-full cursor-grab touch-none select-none overflow-hidden rounded-lg bg-[#111c23] active:cursor-grabbing">
-          <TaroRoomScene view={view} finishColor={finishColor} fabricColor={fabricColor} expanded />
+          <TaroRoomScene manifest={manifest} view={view} finishColor={finishColor} fabricColor={fabricColor} finishName={finishName} fabricName={fabricName} expanded />
         </div>
-        <p id="taro-360-disclaimer" className="mt-4 font-sans text-xs text-white/60">Illustrative model · measurements and materials pending</p>
+        <p id="taro-360-disclaimer" className="mt-4 font-sans text-xs text-white/60">{manifest?.disclaimer ?? 'Illustrative model · measurements and materials pending'}</p>
       </div>
     </div>
   </dialog>, document.body);

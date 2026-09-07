@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   [ROUTES.DASHBOARD]: { title: "Overview", subtitle: "Real-time metrics & recent activity" },
   [ROUTES.PRODUCTS]: { title: "Products Catalogue", subtitle: "Manage furniture items, pricing & publishing" },
+  [ROUTES.THREE_D_ASSETS]: { title: "3D Assets", subtitle: "Produce, review and publish Maple customizer models" },
   [ROUTES.INQUIRIES]: { title: "Consultation Inquiries", subtitle: "Track client inquiry requests & status" },
   [ROUTES.SUBSCRIBERS]: { title: "Newsletter Subscribers", subtitle: "Audience mailing list & subscriptions" },
 };

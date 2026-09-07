@@ -10,6 +10,7 @@ import { adminInquiriesRouter } from "./modules/admin/inquiries.routes";
 import { adminNewsletterRouter } from "./modules/admin/newsletter.routes";
 import { adminProductsRouter } from "./modules/admin/products.routes";
 import { adminStatsRouter } from "./modules/admin/stats.routes";
+import { adminThreeDRouter, publicThreeDRouter } from "./modules/three-d/routes";
 import { publicInquiriesRouter } from "./modules/public/inquiries.routes";
 import { publicNewsletterRouter } from "./modules/public/newsletter.routes";
 import { publicProductsRouter } from "./modules/public/products.routes";
@@ -21,16 +22,9 @@ export function createApp() {
   app.use(helmet());
   app.use(cors({ origin: corsOrigins }));
   app.use(express.json({ limit: "100kb" }));
-  app.use(
-    pinoHttp({
-      logger,
-      redact: {
-        paths: ["req.headers.authorization", "req.headers.cookie"],
-        censor: "[Redacted]",
-      },
-      autoLogging: { ignore: (req) => req.url === "/health" },
-    }),
-  );
+  app.use(pinoHttp({ logger, redact: { paths: ['req.headers.authorization', 'req.headers.cookie'], censor: '[Redacted]' }, autoLogging: { ignore: (req) => req.url === "/health" }, serializers: {
+    req: (req) => ({ id: req.id, method: req.method, url: req.url?.replace(/([?&]preview=)[^&]*/g, "$1[redacted]") }),
+  } }));
 
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", uptime: Math.round(process.uptime()) });
@@ -44,6 +38,8 @@ export function createApp() {
      routers end in a `/:slug` catch-all that would otherwise swallow
      concrete admin paths like /all and /:id/placements. */
   app.use("/api/auth", authRouter);
+  app.use("/api/admin/3d", adminThreeDRouter);
+  app.use("/api/3d", publicThreeDRouter);
   app.use("/api/admin", adminStatsRouter);
 
   app.use("/api/products", adminProductsRouter);

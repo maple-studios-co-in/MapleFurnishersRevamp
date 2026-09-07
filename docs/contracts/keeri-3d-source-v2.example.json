@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 2,
+  "tenantId": "tenant-a",
+  "modelId": "chair",
+  "name": "Chair",
+  "code": "CHAIR",
+  "readyFor3D": true,
+  "sourceRevision": "0b024c0418bb890d9123efcb5085c4f2a6d4d8ac2ef62417ed320a7ea0a0d263",
+  "approval": {
+    "revision": "0b024c0418bb890d9123efcb5085c4f2a6d4d8ac2ef62417ed320a7ea0a0d263",
+    "approvedAt": "2026-09-07T10:00:00.000Z",
+    "approvedBy": "approver-a"
+  },
+  "geometryGroups": [
+    {
+      "id": "geometry-standard",
+      "dimensionsMm": {
+        "width": 700,
+        "depth": 700,
+        "height": 800
+      },
+      "measurement": {
+        "method": "Measured physical sample",
+        "verifiedAt": "2026-09-07T09:00:00.000Z",
+        "verifiedBy": "measurer-a"
+      },
+      "captureSetId": "capture-standard"
+    }
+  ],
+  "variants": [
+    {
+      "variantId": "variant-oak",
+      "sku": "CHAIR-OAK",
+      "geometryGroupId": "geometry-standard",
+      "attributes": {
+        "finish": "Oak",
+        "fabric": "Ivory"
+      }
+    }
+  ],
+  "references": [
+    {
+      "id": "angle",
+      "role": "angle",
+      "geometryGroupId": "geometry-standard",
+      "captureSetId": "capture-standard",
+      "variantId": "variant-oak",
+      "url": "https://keeri.example/api/integrations/maple/3d/products/chair/references/angle?revision=0b024c0418bb890d9123efcb5085c4f2a6d4d8ac2ef62417ed320a7ea0a0d263",
+      "checksum": "79d67cab43bcc2c581ee0623800b3e8997fa4bf75516bafa94d32f1a49f141d6",
+      "sizeBytes": 68,
+      "provenance": "photograph"
+    },
+    {
+      "id": "back",
+      "role": "back",
+      "geometryGroupId": "geometry-standard",
+      "captureSetId": "capture-standard",
+      "variantId": "variant-oak",
+      "url": "https://keeri.example/api/integrations/maple/3d/products/chair/references/back?revision=0b024c0418bb890d9123efcb5085c4f2a6d4d8ac2ef62417ed320a7ea0a0d263",
+      "checksum": "79d67cab43bcc2c581ee0623800b3e8997fa4bf75516bafa94d32f1a49f141d6",
+      "sizeBytes": 68,
+      "provenance": "photograph"
+    },
+    {
+      "id": "front",
+      "role": "front",
+      "geometryGroupId": "geometry-standard",
+      "captureSetId": "capture-standard",
+      "variantId": "variant-oak",
+      "url": "https://keeri.example/api/integrations/maple/3d/products/chair/references/front?revision=0b024c0418bb890d9123efcb5085c4f2a6d4d8ac2ef62417ed320a7ea0a0d263",
+      "checksum": "79d67cab43bcc2c581ee0623800b3e8997fa4bf75516bafa94d32f1a49f141d6",
+      "sizeBytes": 68,
+      "provenance": "photograph"
+    },
+    {
+      "id": "side",
+      "role": "side",
+      "geometryGroupId": "geometry-standard",
+      "captureSetId": "capture-standard",
+      "variantId": "variant-oak",
+      "url": "https://keeri.example/api/integrations/maple/3d/products/chair/references/side?revision=0b024c0418bb890d9123efcb5085c4f2a6d4d8ac2ef62417ed320a7ea0a0d263",
+      "checksum": "79d67cab43bcc2c581ee0623800b3e8997fa4bf75516bafa94d32f1a49f141d6",
+      "sizeBytes": 68,
+      "provenance": "photograph"
+    }
+  ]
+}

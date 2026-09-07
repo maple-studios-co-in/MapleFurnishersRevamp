@@ -4,12 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "prisma generate && tsc -p tsconfig.json",
+    "build": "cd .. && prisma generate --schema Backend/prisma/schema.prisma && tsc -p Backend/tsconfig.json",
     "start": "node dist/server.js",
+    "worker:3d-imports": "node dist/modules/three-d/import-worker.js",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test:3d": "tsx --test test/three-d*.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
