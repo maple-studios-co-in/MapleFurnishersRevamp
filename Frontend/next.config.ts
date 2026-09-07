@@ -17,6 +17,11 @@ const CATALOGUE_ORIGIN =
     ? "http://localhost:4173"
     : "https://catalogue-eta-three.vercel.app";
 
+const BACKEND_ORIGIN =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:4000"
+    : "https://maple-furnishers-backend.vercel.app";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Lets a build run against its own output dir while `next dev` still owns
@@ -25,6 +30,7 @@ const nextConfig: NextConfig = {
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   async rewrites() {
     return [
+      { source: "/api/:path*", destination: `${BACKEND_ORIGIN}/api/:path*` },
       { source: "/catalogue", destination: `${CATALOGUE_ORIGIN}/` },
       { source: "/catalogue/:path*", destination: `${CATALOGUE_ORIGIN}/:path*` },
       { source: "/assets/:path*", destination: `${CATALOGUE_ORIGIN}/assets/:path*` },
