@@ -3,45 +3,36 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import CustomizerHero, { CUSTOMIZER_FABRICS, CUSTOMIZER_FINISHES, type CustomizerSelection, type CustomizerStageProps } from "@/components/sections/CustomizerHero";
+import { resolveSelection, selectionFromQuery, type PublicManifest } from "@/lib/three-d/manifest";
+import { TARO_FALLBACK } from "@/lib/three-d/taro-fallback";
 
 const TaroRoomScene = dynamic(() => import("./TaroRoomScene"), { ssr: false });
 const Taro360Dialog = dynamic(() => import("./Taro360Dialog"), { ssr: false });
 const VIEW_IDS = ["perspective", "side", "front", "back"];
-const INITIAL: CustomizerSelection = { finish: "Walnut Brown", fabric: "Ivory", angle: 0 };
-const LEGACY_WOODS: Record<string, string> = { natural: "Natural Ash", walnut: "Walnut Brown", ebonised: "Ebony" };
-const LEGACY_FABRICS: Record<string, string> = { oat: "Ivory", moss: "Sand", clay: "Mauve", ink: "Charcoal" };
 
 /** Reuse the original /customize component so the two layouts cannot drift apart. */
-export default function TaroExperience() {
-  const [selection, setSelection] = useState<CustomizerSelection>(INITIAL);
+export default function TaroExperience({ manifest = TARO_FALLBACK, preview = false }: { manifest?: PublicManifest; preview?: boolean }) {
+  const initial: CustomizerSelection = { ...manifest.defaults, angle: 0 };
+  const [selection, setSelection] = useState<CustomizerSelection>(initial);
   const [hydrated, setHydrated] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     const restore = () => {
-      const params = new URLSearchParams(window.location.search);
-      const wood = params.get("finish") ?? LEGACY_WOODS[params.get("wood") ?? ""];
-      const upholstery = params.get("fabric");
-      const fabric = LEGACY_FABRICS[upholstery ?? ""] ?? upholstery;
-      const view = VIEW_IDS.indexOf(params.get("view") ?? "perspective");
-      setSelection({
-        finish: CUSTOMIZER_FINISHES.some(f => f.name === wood) ? wood : INITIAL.finish,
-        fabric: CUSTOMIZER_FABRICS.some(f => f.name === fabric) ? fabric : INITIAL.fabric,
-        angle: view >= 0 ? view : 0,
-      });
+      setSelection(selectionFromQuery(manifest, new URLSearchParams(window.location.search)));
       setHydrated(true);
     };
     restore();
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
-  }, []);
+  }, [manifest]);
 
   useEffect(() => {
     if (!hydrated) return;
     const url = new URL(window.location.href);
     for (const key of ["wood", "light", "savedWood", "savedFabric", "savedLight", "compare"]) url.searchParams.delete(key);
-    url.searchParams.set("finish", selection.finish ?? INITIAL.finish!);
-    url.searchParams.set("fabric", selection.fabric ?? INITIAL.fabric!);
+    if (selection.finish) url.searchParams.set("finish", selection.finish); else url.searchParams.delete("finish");
+    if (selection.fabric) url.searchParams.set("fabric", selection.fabric); else url.searchParams.delete("fabric");
     url.searchParams.set("view", VIEW_IDS[selection.angle]);
     window.history.replaceState(window.history.state, "", url);
     setSaved(false);
@@ -49,46 +40,44 @@ export default function TaroExperience() {
 
   function saveLook(value: CustomizerStageProps) {
     const summary = [
-      "MAPLE FURNISHERS — TARO ARMCHAIR",
-      `Finish: ${value.finish ?? INITIAL.finish}`,
-      `Fabric: ${value.fabric ?? INITIAL.fabric}`,
+      `MAPLE FURNISHERS — ${manifest.name.toUpperCase()}`,
+      ...(value.finish ? [`Finish: ${value.finish}`] : []),
+      ...(value.fabric ? [`Fabric: ${value.fabric}`] : []),
       `View: ${VIEW_IDS[value.angle]}`,
       "",
-      "Illustrative 3D prototype. Shape, finishes and measurements await approval.",
+      manifest.disclaimer,
       "This is a saved visual choice, not a quote or order.",
       "",
-      `Reopen: ${window.location.href}`,
+      `Reopen: ${(() => { const url = new URL(window.location.href); url.searchParams.delete('preview'); return url.href; })()}`,
     ].join("\n");
     const url = URL.createObjectURL(new Blob([summary], { type: "text/plain;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = "Maple-Taro-saved-look.txt";
+    link.download = `Maple-${manifest.slug}-saved-look.txt`;
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setSaved(true);
   }
 
   return <main>
-    <CustomizerHero selection={selection} onSelectionChange={setSelection} product={{
-      name: "Taro Armchair",
-      modelUrl: "/media/models/taro/taro-v4.glb",
+    {preview && <div role="status" className="fixed left-4 top-24 z-50 rounded bg-[#741A14] px-4 py-2 text-sm text-white">Private preview · Not published</div>}
+    <CustomizerHero selection={selection} onSelectionChange={next => setSelection(resolveSelection(manifest, next, next.fabric !== selection.fabric ? 'fabric' : 'finish'))} product={{
+      name: manifest.name,
+      modelUrl: manifest.modelUrl,
       fullScene: true,
-      angles: [
-        { src: "/media/models/taro/taro-v4-perspective.webp", label: "Three-quarter view" },
-        { src: "/media/models/taro/taro-v4-side.webp", label: "Side view" },
-        { src: "/media/models/taro/taro-v4-front.webp", label: "Front view" },
-        { src: "/media/models/taro/taro-v4-back.webp", label: "Back view" },
-      ],
-      defaultFinish: INITIAL.finish!,
-      defaultFabric: INITIAL.fabric!,
-      priceLabel: saved ? "Look saved" : "Visual prototype",
-      note: "Illustrative model | Measurements & finishes unverified",
+      angles: manifest.angles.map((angle, index) => ({ ...angle, label: ['Three-quarter view', 'Side view', 'Front view', 'Back view'][index] })),
+      finishes: manifest.finishes.filter(s => !manifest.variantBindings.length || manifest.variantBindings.some(b => b.finish === s.name)).map(s => ({ ...s, img: manifest.viewerProfile === 'taro-photo-room-v1' ? CUSTOMIZER_FINISHES.find(f => f.name === s.name)?.img : undefined })),
+      fabrics: manifest.fabrics.filter(s => !manifest.variantBindings.length || manifest.variantBindings.some(b => b.fabric === s.name)).map(s => ({ ...s, img: manifest.viewerProfile === 'taro-photo-room-v1' ? CUSTOMIZER_FABRICS.find(f => f.name === s.name)?.img : undefined })),
+      defaultFinish: manifest.defaults.finish,
+      defaultFabric: manifest.defaults.fabric,
+      priceLabel: saved ? "Look saved" : preview ? "Private preview" : "Visual prototype",
+      note: manifest.disclaimer,
       actionLabel: "Save look",
       onAction: saveLook,
       // The modal owns the one active room renderer while it is open. Two
       // texture-rich contexts waste GPU memory and can evict the main view.
-      renderStage: ({ angle, finishColor, fabricColor, viewerOpen }) => viewerOpen ? null : <TaroRoomScene view={angle} finishColor={finishColor} fabricColor={fabricColor} className="!absolute inset-0 cursor-grab active:cursor-grabbing" />,
-      renderViewer: ({ open, onClose, angle, finishColor, fabricColor }) => <Taro360Dialog open={open} onClose={onClose} view={angle} finishColor={finishColor} fabricColor={fabricColor} />,
+      renderStage: ({ angle, finish, fabric, finishColor, fabricColor, viewerOpen }) => viewerOpen ? null : <TaroRoomScene manifest={manifest} view={angle} finishName={finish} fabricName={fabric} finishColor={finishColor} fabricColor={fabricColor} className="!absolute inset-0 cursor-grab active:cursor-grabbing" />,
+      renderViewer: ({ open, onClose, angle, finish, fabric, finishColor, fabricColor }) => <Taro360Dialog manifest={manifest} open={open} onClose={onClose} view={angle} finishName={finish} fabricName={fabric} finishColor={finishColor} fabricColor={fabricColor} />,
     }} />
   </main>;
 }

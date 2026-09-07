@@ -6,6 +6,7 @@ import { ContactShadows, Environment, Lightformer, useGLTF } from "@react-three/
 import * as THREE from "three";
 import { gsap } from "@/lib/gsap";
 import PhotoRoomViewport from "./PhotoRoomViewport";
+import type { PublicManifest } from "@/lib/three-d/manifest";
 
 const MODEL_URL = "/media/models/taro/taro-v4.glb";
 // Linear multipliers preserve the authored reference materials. The old
@@ -101,6 +102,9 @@ function WindowShadows() {
 }
 
 export type TaroRoomSceneProps = {
+  manifest?: PublicManifest;
+  finishName?: string | null;
+  fabricName?: string | null;
   view: number;
   finishColor: string | null;
   fabricColor: string | null;
@@ -114,8 +118,8 @@ class ModelBoundary extends Component<{ children: ReactNode; fallback: ReactNode
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
-function Furniture({ finishColor, fabricColor, onReady }: Pick<TaroRoomSceneProps, "finishColor" | "fabricColor"> & { onReady: () => void }) {
-  const { scene } = useGLTF(MODEL_URL);
+function Furniture({ finishColor, fabricColor, finishName, fabricName, manifest, onReady }: Pick<TaroRoomSceneProps, "finishColor" | "fabricColor" | "finishName" | "fabricName" | "manifest"> & { onReady: () => void }) {
+  const { scene } = useGLTF(manifest?.modelUrl ?? MODEL_URL);
   const invalidate = useThree((state) => state.invalidate);
   const model = useMemo(() => {
     const clone = scene.clone(true);
@@ -127,13 +131,19 @@ function Furniture({ finishColor, fabricColor, onReady }: Pick<TaroRoomSceneProp
       mesh.material = Array.isArray(mesh.material) ? mesh.material.map((material) => material.clone()) : mesh.material.clone();
       for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
         const physical = material as THREE.MeshPhysicalMaterial;
+        if (physical.isMeshStandardMaterial) physical.userData.authoredColor = physical.color.toArray();
         if (physical.isMeshPhysicalMaterial) {
           physical.userData.authoredSheenColor = physical.sheenColor.toArray();
         }
       }
     });
+    if (manifest?.viewerProfile === 'studio-v1') {
+      const bounds = new THREE.Box3().setFromObject(clone);
+      const center = bounds.getCenter(new THREE.Vector3());
+      clone.position.sub(new THREE.Vector3(center.x, bounds.min.y, center.z));
+    }
     return clone;
-  }, [scene]);
+  }, [scene, manifest?.viewerProfile]);
 
   useEffect(() => {
     model.traverse((object) => {
@@ -145,9 +155,23 @@ function Furniture({ finishColor, fabricColor, onReady }: Pick<TaroRoomSceneProp
         if (!material.isMeshStandardMaterial) return;
         // Keep the authored grain, weave, normals, roughness and UVs. These
         // per-view clones tint the reference material without discarding it.
-        if (material.name === "Wood_Frame") material.color.setRGB(...(WOOD_TINTS[finishColor ?? ""] ?? WOOD_TINTS["#5e4230"]));
-        if (material.name.startsWith("Fabric_")) {
-          material.color.setRGB(...(FABRIC_TINTS[fabricColor ?? ""] ?? FABRIC_TINTS["#beb4a5"]));
+        const isFinish = manifest ? manifest.materialSlots.finish.includes(material.name) : material.name === 'Wood_Frame';
+        const isFabric = manifest ? manifest.materialSlots.fabric.includes(material.name) : material.name.startsWith('Fabric_');
+        if (manifest && material.userData.authoredColor) material.color.fromArray(material.userData.authoredColor);
+        const applySwatch = (options: PublicManifest['finishes'], color: string | null, name?: string | null) => {
+          const swatch = name ? options.find(item => item.name === name) : options.find(item => item.hex === color);
+          if (swatch?.linearColor) material.color.setRGB(...swatch.linearColor);
+          else if (swatch) material.color.set(swatch.hex);
+          // Explicit linear factors preserve calibrated materials. A hex-only
+          // choice is an illustrative tint; it is reviewed with the version.
+        };
+        if (isFinish) {
+          if (manifest) applySwatch(manifest.finishes, finishColor, finishName);
+          else material.color.setRGB(...(WOOD_TINTS[finishColor ?? ''] ?? WOOD_TINTS['#5e4230']));
+        }
+        if (isFabric) {
+          if (manifest) applySwatch(manifest.fabrics, fabricColor, fabricName);
+          else material.color.setRGB(...(FABRIC_TINTS[fabricColor ?? ''] ?? FABRIC_TINTS['#beb4a5']));
           // Preserve the low-intensity sheen authored in the exported asset.
           // Always tint from the source so repeated swatch changes do not compound.
           if (material.isMeshPhysicalMaterial && material.userData.authoredSheenColor) {
@@ -158,7 +182,7 @@ function Furniture({ finishColor, fabricColor, onReady }: Pick<TaroRoomSceneProp
       });
     });
     invalidate();
-  }, [model, finishColor, fabricColor, invalidate]);
+  }, [model, finishColor, fabricColor, finishName, fabricName, manifest, invalidate]);
 
   useEffect(() => { onReady(); }, [onReady]);
   useEffect(() => () => {
@@ -171,7 +195,7 @@ function Furniture({ finishColor, fabricColor, onReady }: Pick<TaroRoomSceneProp
   return <primitive object={model} dispose={null} />;
 }
 
-function ChairTurntable({ view, children }: { view: number; children: ReactNode }) {
+function ChairTurntable({ view, children, name = 'Taro' }: { view: number; children: ReactNode; name?: string }) {
   const group = useRef<THREE.Group>(null);
   const tween = useRef<gsap.core.Tween | null>(null);
   const { gl, invalidate } = useThree();
@@ -203,7 +227,7 @@ function ChairTurntable({ view, children }: { view: number; children: ReactNode 
     let drag: { pointer: number; x: number } | null = null;
     canvas.tabIndex = 0;
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", "Taro in a furnished room. Drag or use left and right arrow keys to turn the chair. Home restores the selected view.");
+    canvas.setAttribute("aria-label", `${name} in 3D. Drag or use left and right arrow keys to turn the piece. Home restores the selected view.`);
     const turn = (amount: number) => {
       if (!group.current) return;
       tween.current?.kill();
@@ -255,22 +279,27 @@ function ChairTurntable({ view, children }: { view: number; children: ReactNode 
       canvas.removeEventListener("pointercancel", pointerUp);
       canvas.removeEventListener("keydown", keyDown);
     };
-  }, [gl, invalidate, view]);
+  }, [gl, invalidate, view, name]);
   return <group ref={group}>{children}</group>;
 }
 
-function ResponsiveFraming({ expanded }: { expanded: boolean }) {
+function ResponsiveFraming({ expanded, manifest }: { expanded: boolean; manifest?: PublicManifest }) {
   const { camera, size, invalidate } = useThree();
   useLayoutEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera) || !size.width || !size.height) return;
     const aspect = size.width / size.height;
     const tangent = Math.tan(THREE.MathUtils.degToRad(FOV) / 2);
     const desktopHero = !expanded && size.width >= 1024;
-    const heightRadius = MODEL_HEIGHT / (2 * (desktopHero ? 0.55 : 0.62) * tangent) + 0.30;
-    const widthRadius = MODEL_DIAGONAL / (2 * (desktopHero ? 0.40 : 0.82) * tangent * aspect) + 0.20;
+    const height = manifest ? manifest.dimensionsMm.height / 1000 : MODEL_HEIGHT;
+    const diagonal = manifest ? Math.hypot(manifest.dimensionsMm.width, manifest.dimensionsMm.depth) / 1000 : MODEL_DIAGONAL;
+    const studio = manifest?.viewerProfile === 'studio-v1';
+    const target: [number, number, number] = studio ? [0, height / 2, 0] : TARGET;
+    const heightRadius = height / (2 * (desktopHero ? 0.55 : 0.62) * tangent) + 0.30;
+    const widthRadius = diagonal / (2 * (desktopHero ? 0.40 : 0.82) * tangent * aspect) + 0.20;
     const radius = Math.max(heightRadius, widthRadius);
-    camera.position.set(...TARGET).addScaledVector(CAMERA_DIRECTION, radius);
-    camera.lookAt(...TARGET);
+    camera.position.set(...target).addScaledVector(CAMERA_DIRECTION, radius);
+    camera.lookAt(...target);
+    camera.far = Math.max(30, radius * 4);
     camera.clearViewOffset();
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
@@ -279,7 +308,7 @@ function ResponsiveFraming({ expanded }: { expanded: boolean }) {
     // rug location in that crop; reserve the original desktop material panel.
     // Camera metadata is unavailable, so this is visual alignment, not a scan.
     const plateHeight = Math.max(size.height, size.width * 1086 / 1448);
-    const floorY = size.height - plateHeight * 0.22;
+    const floorY = studio ? size.height * 0.78 : size.height - plateHeight * 0.22;
     const floorX = size.width * (desktopHero ? (aspect >= 1.5 ? 0.52 : 0.47) : 0.50);
     const floor = new THREE.Vector3(0, 0, 0).project(camera);
     camera.setViewOffset(size.width, size.height,
@@ -288,7 +317,7 @@ function ResponsiveFraming({ expanded }: { expanded: boolean }) {
       size.width, size.height);
     camera.updateProjectionMatrix();
     invalidate();
-  }, [camera, expanded, invalidate, size.height, size.width]);
+  }, [camera, expanded, invalidate, size.height, size.width, manifest]);
   return null;
 }
 
@@ -309,13 +338,20 @@ function RoomLighting() {
   </>;
 }
 
-export default function TaroRoomScene({ view, finishColor, fabricColor, className, expanded = false }: TaroRoomSceneProps) {
+function Backdrop({ studio, expanded, children }: { studio: boolean; expanded: boolean; children: ReactNode }) {
+  return <PhotoRoomViewport expanded={expanded} mode={studio ? 'studio' : 'photo'}>{children}</PhotoRoomViewport>;
+}
+
+export default function TaroRoomScene({ view, finishColor, fabricColor, finishName, fabricName, className, expanded = false, manifest }: TaroRoomSceneProps) {
   const [supported, setSupported] = useState<boolean | null>(null);
   const [ready, setReady] = useState(false);
   const [contextLost, setContextLost] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const markReady = useCallback(() => setReady(true), []);
+  const modelUrl = manifest?.modelUrl ?? MODEL_URL;
+  const studio = manifest?.viewerProfile === 'studio-v1';
+  const modelExtent = manifest ? Math.max(manifest.dimensionsMm.width, manifest.dimensionsMm.depth) / 1000 : 1;
 
   useEffect(() => {
     const probe = document.createElement("canvas");
@@ -332,7 +368,7 @@ export default function TaroRoomScene({ view, finishColor, fabricColor, classNam
   }, [supported, ready, attempt]);
 
   const retry = () => {
-    useGLTF.clear(MODEL_URL);
+    useGLTF.clear(modelUrl);
     setReady(false);
     setContextLost(false);
     setSupported(null);
@@ -340,7 +376,7 @@ export default function TaroRoomScene({ view, finishColor, fabricColor, classNam
   };
   const fallback = <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-white" role="status">
     {/* eslint-disable-next-line @next/next/no-img-element */}
-    <img src="/media/models/taro/reference-front.webp" alt="Taro reference; selected finishes are not shown" className="max-h-[35%] w-auto rounded object-contain" />
+    <img src={manifest?.angles[2].src ?? '/media/models/taro/reference-front.webp'} alt={`${manifest?.name ?? 'Taro'} reference; selected finishes are not shown`} className="max-h-[35%] w-auto rounded object-contain" />
     <div className="max-w-[320px] rounded bg-black/75 p-4 font-sans text-sm">
       <p className="font-semibold">3D view is unavailable</p>
       <p className="mt-1 text-xs text-white/75">This reference does not reflect your selected materials. The 3D model is an illustrative prototype.</p>
@@ -348,9 +384,9 @@ export default function TaroRoomScene({ view, finishColor, fabricColor, classNam
     </div>
   </div>;
 
-  return <div className={className} style={{ width: "100%", height: "100%", position: "relative", background: "#17130f" }} aria-label="Interactive Taro chair in a furnished room" data-lenis-prevent>
-    <PhotoRoomViewport expanded={expanded}>
-    {supported === false || contextLost ? fallback : <ModelBoundary key={attempt} fallback={fallback}>
+  return <div className={className} style={{ width: "100%", height: "100%", position: "relative", background: "#17130f" }} aria-label={`Interactive ${manifest?.name ?? 'Taro chair'} in ${studio ? 'a studio' : 'a furnished room'}`} data-lenis-prevent>
+    <Backdrop studio={studio} expanded={expanded}>
+    {supported === false || contextLost ? fallback : <ModelBoundary key={`${modelUrl}-${attempt}`} fallback={fallback}>
       {supported && <Canvas ref={canvasRef} resize={{ offsetSize: true }} shadows dpr={[1, 1.75]} frameloop="demand" style={{ touchAction: expanded ? "none" : "pan-y" }} gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, preserveDrawingBuffer: false }} camera={{ position: [1.45, 1.08, 2.02], fov: FOV, near: 0.05, far: 30 }}>
         <WindowShadows />
         <RoomLighting />
@@ -359,17 +395,17 @@ export default function TaroRoomScene({ view, finishColor, fabricColor, classNam
             <planeGeometry args={[12, 12]} />
             <shadowMaterial transparent opacity={0.32} color="#21170e" depthWrite={false} />
           </mesh>
-          <ChairTurntable view={view}>
-            <Furniture finishColor={finishColor} fabricColor={fabricColor} onReady={markReady} />
+          <ChairTurntable view={view} name={manifest?.name}>
+            <Furniture manifest={manifest} finishColor={finishColor} fabricColor={fabricColor} finishName={finishName} fabricName={fabricName} onReady={markReady} />
           </ChairTurntable>
           {/* Demand rendering redraws contact shadows during turns and zoom,
               then sleeps. A one-frame shadow would retain the previous pose. */}
-          <ContactShadows frames={Infinity} position={[0, 0.002, 0]} opacity={0.30} scale={2.35} blur={2.0} far={0.18} resolution={512} color="#21170e" />
+          <ContactShadows frames={Infinity} position={[0, 0.002, 0]} opacity={0.30} scale={studio ? Math.max(2.35, modelExtent * 2.5) : 2.35} blur={2.0} far={0.18} resolution={512} color="#21170e" />
         </Suspense>
-        <ResponsiveFraming expanded={expanded} />
+        <ResponsiveFraming expanded={expanded} manifest={manifest} />
       </Canvas>}
       {!ready && <div className="pointer-events-none absolute inset-0 flex items-center justify-center" role="status"><span className="rounded bg-black/65 px-4 py-2 font-sans text-xs text-white">Preparing your room…</span></div>}
     </ModelBoundary>}
-    </PhotoRoomViewport>
+    </Backdrop>
   </div>;
 }

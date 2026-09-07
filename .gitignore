@@ -32,6 +32,7 @@ Thumbs.db
 # AdminDashboard/.next cache once slipped into a commit via the old
 # Frontend-only rule.
 .next/
+.next-*/
 out/
 build/
 next-env.d.ts
@@ -39,6 +40,7 @@ next-env.d.ts
 # --- Backend (placeholder for when it lands) ---
 Backend/dist/
 Backend/build/
+var/three-d/
 
 # --- Catalogue (Vite) ---
 Catalogue/dist/

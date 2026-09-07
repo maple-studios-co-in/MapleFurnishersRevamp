@@ -12,6 +12,10 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     res.status(err.statusCode).json({ error: err.message, details: err.details });
     return;
   }
+  if (err && typeof err === "object" && "type" in err) {
+    if (err.type === "entity.too.large") { res.status(413).json({ error: "Request exceeds the allowed size" }); return; }
+    if (err.type === "entity.parse.failed") { res.status(400).json({ error: "Invalid JSON request" }); return; }
+  }
   logger.error({ err }, "Unhandled error");
   res.status(500).json({ error: isProd ? "Internal server error" : String(err) });
 }

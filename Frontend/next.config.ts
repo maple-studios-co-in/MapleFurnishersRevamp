@@ -18,9 +18,9 @@ const CATALOGUE_ORIGIN =
     : "https://catalogue-eta-three.vercel.app";
 
 const BACKEND_ORIGIN =
-  process.env.NODE_ENV === "development"
+  process.env.MAPLE_BACKEND_ORIGIN ?? (process.env.NODE_ENV === "development"
     ? "http://localhost:4000"
-    : "https://maple-furnishers-backend.vercel.app";
+    : "https://maple-furnishers-backend.vercel.app");
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,

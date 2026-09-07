@@ -88,3 +88,127 @@ enum InquiryStatus {
   CONTACTED
   CLOSED
 }
+
+// Maple 3D production is independent from the commerce Product catalogue.
+model ThreeDProduct {
+  id                 String   @id @default(cuid())
+  slug               String   @unique
+  name               String
+  sourceType         String   @default("manual")
+  sourceTenantId     String?
+  sourceModelId      String?
+  sourceRevision     String?
+  publishedVersionId String?  @unique
+  publishedVersion   ThreeDVersion? @relation("PublishedVersion", fields: [publishedVersionId], references: [id], onDelete: Restrict)
+  imports            ThreeDImport[]
+  jobs               ThreeDJob[]
+  assets             ThreeDAsset[]
+  versions           ThreeDVersion[] @relation("ProductVersions")
+  publications       ThreeDPublication[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([sourceTenantId, sourceModelId])
+}
+
+model ThreeDImport {
+  id             String   @id @default(cuid())
+  productId      String
+  product        ThreeDProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sourceRevision String
+  snapshot       Json
+  jobs           ThreeDJob[]
+  createdAt      DateTime @default(now())
+
+  @@unique([productId, sourceRevision])
+}
+
+model ThreeDJob {
+  id             String @id @default(cuid())
+  productId      String
+  product        ThreeDProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  recipeId       String
+  recipeVersion  Int
+  idempotencyKey String
+  status         ThreeDJobStatus @default(awaiting_delivery)
+  importId       String?
+  sourceImport   ThreeDImport? @relation(fields: [importId], references: [id], onDelete: Restrict)
+  inputSnapshot  Json
+  version        ThreeDVersion?
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+
+  @@unique([productId, idempotencyKey])
+}
+
+enum ThreeDJobStatus {
+  awaiting_delivery
+  completed
+}
+
+model ThreeDAsset {
+  id          String @id @default(cuid())
+  productId   String
+  product     ThreeDProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  kind        ThreeDAssetKind
+  filename    String
+  contentType String
+  sizeBytes   Int
+  sha256      String
+  storageKey  String @unique
+  masterVersions ThreeDVersion[] @relation("VersionMaster")
+  createdAt   DateTime @default(now())
+
+  @@index([productId])
+}
+
+enum ThreeDAssetKind {
+  web_model
+  blender_master
+  preview
+  texture
+  reference
+}
+
+model ThreeDVersion {
+  id          String @id @default(cuid())
+  productId   String
+  product     ThreeDProduct @relation("ProductVersions", fields: [productId], references: [id], onDelete: Restrict)
+  publishedBy ThreeDProduct? @relation("PublishedVersion")
+  sequence    Int
+  productName String
+  sourceRevision String?
+  masterAssetId String?
+  masterAsset ThreeDAsset? @relation("VersionMaster", fields: [masterAssetId], references: [id], onDelete: Restrict)
+  jobId       String? @unique
+  job         ThreeDJob? @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  manifest    Json
+  notes       String @default("")
+  status      ThreeDVersionStatus @default(draft)
+  reviewNotes String?
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  publications ThreeDPublication[]
+  createdAt   DateTime @default(now())
+
+  @@unique([productId, sequence])
+}
+
+enum ThreeDVersionStatus {
+  draft
+  approved
+  rejected
+}
+
+model ThreeDPublication {
+  id                String @id @default(cuid())
+  productId         String
+  product           ThreeDProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  versionId         String
+  version           ThreeDVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  previousVersionId String?
+  publishedBy       String
+  createdAt         DateTime @default(now())
+
+  @@index([productId, createdAt])
+}

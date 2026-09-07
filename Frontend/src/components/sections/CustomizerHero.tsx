@@ -194,6 +194,8 @@ export type CustomizerProduct = {
   angles: readonly { src: string; label: string }[];
   defaultFinish: string;
   defaultFabric: string;
+  finishes?: readonly { name: string; hex: string; img?: string; label?: string }[];
+  fabrics?: readonly { name: string; hex: string; img?: string; label?: string }[];
   priceLabel: string;
   note: string;
   actionLabel: string;
@@ -205,9 +207,9 @@ export type CustomizerProduct = {
 };
 
 function Swatch({
-  name, label, img, selected, onSelect,
+  name, label, img, hex, selected, onSelect,
 }: {
-  name: string; label?: string; img: string; selected: boolean; onSelect: () => void;
+  name: string; label?: string; img?: string; hex?: string; selected: boolean; onSelect: () => void;
 }) {
   return (
     <div className="flex flex-col items-center gap-2">
@@ -218,13 +220,14 @@ function Swatch({
         onClick={onSelect}
         className={`h-[54px] w-[54px] sm:h-[68px] sm:w-[68px] overflow-hidden rounded-full transition-all duration-200 hover:scale-110 ${focusRing}`}
         style={{
+          backgroundColor: hex,
           boxShadow: selected
             ? `0 0 0 2.5px ${T.gold}, 0 0 16px rgba(223,163,92,0.35)`
             : "none",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={img} alt="" className="h-full w-full object-cover" />
+        {img && <img src={img} alt="" className="h-full w-full object-cover" />}
       </button>
       <span
         className="text-center leading-[1.3] text-white/70"
@@ -243,8 +246,8 @@ export default function CustomizerHero({ product, selection, onSelectionChange }
   selection?: CustomizerSelection;
   onSelectionChange?: (selection: CustomizerSelection) => void;
 } = {}) {
-  const finishes = CUSTOMIZER_FINISHES;
-  const fabrics = CUSTOMIZER_FABRICS;
+  const finishes = product?.finishes ?? CUSTOMIZER_FINISHES;
+  const fabrics = product?.fabrics ?? CUSTOMIZER_FABRICS;
   const angles = product?.angles ?? ANGLES;
   const productName = product?.name ?? "Axtra Lounge Chair";
   const modelUrl = product?.modelUrl ?? CHAIR_GLB_URL;
@@ -466,44 +469,46 @@ export default function CustomizerHero({ product, selection, onSelectionChange }
                 className="flex w-full flex-col justify-between px-[29px] py-7 lg:h-[561px] lg:w-[var(--panel-w)]"
                 style={{ backgroundColor: "rgba(0,0,0,0.33)" }}
               >
-                <div>
+                {finishes.length > 0 && <div>
                   <p className="uppercase" style={PAGE_TYPE}>
                     1. Choose your finish
                   </p>
-                  <div className="mt-3.5 flex justify-between">
+                  <div className="mt-3.5 flex flex-wrap justify-between gap-y-4">
                     {finishes.map((f) => (
                       <Swatch
                         key={f.name}
                         name={f.name}
                         img={f.img}
+                        hex={f.hex}
                         selected={finish === f.name}
                         onSelect={() => updateSelection({ finish: f.name })}
                       />
                     ))}
                   </div>
-                </div>
+                </div>}
 
-                <div>
+                {fabrics.length > 0 && <div>
                   <p className="uppercase" style={PAGE_TYPE}>
-                    2. Choose your fabric
+                    {finishes.length ? '2' : '1'}. Choose your fabric
                   </p>
-                  <div className="mt-3.5 flex justify-between">
+                  <div className="mt-3.5 flex flex-wrap justify-between gap-y-4">
                     {fabrics.map((f) => (
                       <Swatch
                         key={f.name}
                         name={f.name}
                         label={product ? f.name : f.label}
                         img={f.img}
+                        hex={f.hex}
                         selected={fabric === f.name}
                         onSelect={() => updateSelection({ fabric: f.name })}
                       />
                     ))}
                   </div>
-                </div>
+                </div>}
 
                 <div>
                   <p className="uppercase" style={PAGE_TYPE}>
-                    3. Preview your piece
+                    {1 + Number(finishes.length > 0) + Number(fabrics.length > 0)}. Preview your piece
                   </p>
                   <div className="mt-3.5 flex justify-between">
                     {angles.map((a, i) => (
@@ -537,7 +542,7 @@ export default function CustomizerHero({ product, selection, onSelectionChange }
               >
                 <p style={CARD_TITLE}>{productName}</p>
                 <p className="mt-2" style={CARD_VARIANT}>
-                  {finish ?? product?.defaultFinish ?? "Walnut Brown"}/{fabric ?? product?.defaultFabric ?? "Olive"}
+                  {[finish ?? product?.defaultFinish ?? 'Walnut Brown', fabric ?? product?.defaultFabric ?? 'Olive'].filter(Boolean).join('/') || 'Original materials'}
                 </p>
                 <div className="mt-4 flex items-center justify-between gap-4">
                   <p style={CARD_PRICE}>{product?.priceLabel ?? "Rs. 75000.00"}</p>

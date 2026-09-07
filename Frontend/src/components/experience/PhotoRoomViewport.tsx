@@ -4,10 +4,11 @@ import { useEffect, useRef, type ReactNode } from "react";
 
 const MAX_ZOOM = 1.65;
 
-/** Keep the photographic plate and rendered chair in the same zoomed frame. */
-export default function PhotoRoomViewport({ expanded, children }: {
+/** Keep the background and furniture in the same accessible zoomed frame. */
+export default function PhotoRoomViewport({ expanded, children, mode = 'photo' }: {
   expanded: boolean;
   children: ReactNode;
+  mode?: 'photo' | 'studio';
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -133,12 +134,12 @@ export default function PhotoRoomViewport({ expanded, children }: {
       clearPointers();
       setZoom(1);
     };
-  }, [expanded]);
+  }, [expanded, mode]);
 
   return <div
     ref={viewportRef}
     data-photo-room-viewport={expanded ? "expanded" : "embedded"}
-    data-room-mode="photo"
+    data-room-mode={mode}
     data-photo-zoom="1.000"
     style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}
   >
@@ -146,7 +147,7 @@ export default function PhotoRoomViewport({ expanded, children }: {
       width: "100%",
       height: "100%",
       position: "relative",
-      backgroundImage: "url(/media/customizer/bg-interior.webp)",
+      backgroundImage: mode === 'studio' ? 'radial-gradient(ellipse at 38% 32%, #b9b0a2, #665f55)' : 'url(/media/customizer/bg-interior.webp)',
       backgroundSize: "cover",
       backgroundPosition: "center bottom",
       transform: "scale(1)",
