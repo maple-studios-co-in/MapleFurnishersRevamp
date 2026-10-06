@@ -1,0 +1,32 @@
+/* Route-change curtain — the burgundy blueprint sheet from the About
+   footer, carrying the wordmark in paper. GSAP owns its transform. */
+.curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  visibility: hidden;
+  background: #741a14;
+  will-change: transform;
+}
+
+/* The site's 24px ruling, tan on burgundy. */
+.grid {
+  position: absolute;
+  inset: 0;
+  background: url("/media/about/graph-paper-960.svg") center top / 1440px auto repeat;
+  opacity: 0.6;
+}
+
+.mark {
+  position: relative;
+  color: #f3ead5;
+}
+
+.logo {
+  display: block;
+  width: clamp(130px, 13vw, 200px);
+  height: auto;
+}

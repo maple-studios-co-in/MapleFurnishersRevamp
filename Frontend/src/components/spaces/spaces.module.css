@@ -1,0 +1,726 @@
+/* ==========================================================================
+   Spaces — Figma file Lurp612Dny6LlrAcdK0qk5, frames "1" (2550:347),
+   "2" (2550:457), "3" (2550:684) and "4" (2583:186), each 1440 × 950.
+
+   Desktop (≥1024px): each frame is one full-screen composition. Sizes are
+   design px × --s, the scale that fits the 1440 × 950 frame inside the
+   viewport (above 1px on large screens: these are posters, not columns).
+   Positions keep the frame's own anchoring: the centre pieces hang off the
+   middle of the screen, the copy and the collection link sit on the bottom
+   edge, and their x positions scale with the width (--sw) so the margins
+   hold on wide screens.
+
+   With motion allowed the scenes are layered in one fixed stage and the
+   director (film/director.ts) plays between them; with reduced motion
+   they become static full-screen sections. Phones get a single column.
+   ========================================================================== */
+
+.page {
+  --burgundy: #741a14;
+  --charcoal: #1e1e1e;
+  --pearl: var(--font-pearl), var(--font-catilde), ui-serif, Georgia, serif;
+  --redhat: var(--font-redhat-var), var(--font-redhat), ui-sans-serif, system-ui, sans-serif;
+
+  /* One design px across the width, and the uniform fit scale. The page
+     hides its scrollbar (below), so 100vw is the real content width. */
+  --sw: calc(100vw / 1440);
+  --s: min(calc(100vw / 1440), calc(100vh / 950));
+
+  background: #bcab98;
+  color: var(--charcoal);
+  overflow-x: clip;
+}
+
+:global(html):has(.page) {
+  scrollbar-width: none;
+}
+
+:global(html):has(.page)::-webkit-scrollbar {
+  display: none;
+}
+
+.stage {
+  position: relative;
+}
+
+.scene {
+  position: relative;
+  overflow: hidden;
+}
+
+/* --- Phones: one column ---------------------------------------------------- */
+
+.landing,
+.nimbus,
+.terra {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  padding: 104px 22px 64px;
+  text-align: center;
+}
+
+.sceneBg,
+.landingBg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Frames 1–2: radial "maple bg", #E7DDD4 → #BCAB98 over a 1003.5 × 662
+   ellipse centred on the 1440 × 950 frame. */
+.landingBg {
+  background: radial-gradient(69.6875% 69.6842% at 50% 50%, #e7ddd4 0%, #bcab98 100%);
+  transform-origin: 50% 50%;
+}
+
+/* Frame 3: Rectangle 19's linear fill. */
+.nimbusBg {
+  background: linear-gradient(178.738deg, #d6d9dc 23.108%, #eeebe1 111.01%);
+}
+
+/* Frame 4: Rectangle 19's fill, olive at the foot to umber at the head. */
+.terraBg {
+  background: linear-gradient(to top, #9d9167 26.895%, #361100 76.526%);
+}
+
+.sceneInner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.depth {
+  display: contents;
+}
+
+/* --- Landing type ---------------------------------------------------------- */
+
+.headline {
+  position: relative;
+  margin: 0;
+  font-family: var(--pearl);
+  font-size: clamp(30px, 8.6vw, 50px);
+  font-weight: 400;
+  line-height: 1.38;
+  letter-spacing: 0.05em;
+  color: var(--burgundy);
+}
+
+.headlineLine {
+  display: block;
+}
+
+.sub {
+  position: relative;
+  margin: 18px 0 0;
+  font-family: var(--redhat);
+  font-size: clamp(17px, 4.6vw, 24px);
+  font-weight: 300;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  text-transform: capitalize;
+  color: var(--charcoal);
+}
+
+/* "SCROLL DOWN" on its arc, over the plumb line and ring (Group 38). */
+.cue {
+  --s: 0.72px;
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  width: calc(199.71 * var(--s));
+  height: calc(137.3 * var(--s));
+  margin-left: calc(-99.855 * var(--s));
+  pointer-events: none;
+}
+
+.cueGlyph {
+  position: absolute;
+  top: calc(var(--y) * var(--s));
+  left: calc(var(--x) * var(--s));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--w) * var(--s));
+  height: calc(var(--h) * var(--s));
+}
+
+.cueGlyph > span {
+  display: block;
+  flex: none;
+  font-family: var(--redhat);
+  font-size: calc(21.8629 * var(--s));
+  font-weight: 400;
+  line-height: normal;
+  color: var(--charcoal);
+  white-space: nowrap;
+}
+
+.cueMark {
+  position: absolute;
+  top: calc(69.09 * var(--s));
+  left: calc(86 * var(--s));
+  width: calc(28.8591 * var(--s));
+  height: calc(68.2123 * var(--s));
+}
+
+.cueMarkArt {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: url("/media/spaces/scroll-mark.svg") center / 100% 100% no-repeat;
+}
+
+.boxFallback,
+.portal,
+.terraShadow,
+.dim {
+  display: none;
+}
+
+/* --- Worlds (phones) ------------------------------------------------------- */
+
+.worldTitle {
+  position: relative;
+  order: 2;
+  margin: 0;
+  font-family: var(--pearl);
+  font-size: 16.5vw;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.titleNimbus,
+.titleNimbus :global(.spaces-char) {
+  background-image: linear-gradient(to top, #fff 0%, #a3adb1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Once split, each letter carries the gradient: every letter box spans the
+   full line, so the fill still reads as one vertical gradient. */
+.titleNimbus[data-split] {
+  background-image: none;
+}
+
+.titleTerra {
+  color: #613f26;
+}
+
+.tagline {
+  position: relative;
+  order: 1;
+  margin: 0;
+  font-family: var(--redhat);
+  font-size: clamp(14px, 4.2vw, 22px);
+  font-weight: 300;
+  line-height: 2;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.nimbus .tagline {
+  color: #fff;
+  text-shadow: 0 1px 14px rgb(130 140 150 / 0.35);
+}
+
+.photo {
+  position: relative;
+  order: 3;
+  width: min(100%, 560px);
+  margin-top: -6vw;
+}
+
+.photoNimbus {
+  aspect-ratio: 1033.38 / 479;
+}
+
+.photoTerra {
+  aspect-ratio: 828 / 540;
+}
+
+.photoImg {
+  object-fit: cover;
+}
+
+.copy {
+  position: relative;
+  order: 5;
+  align-self: stretch;
+  margin-top: 28px;
+  text-align: left;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--redhat);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.body {
+  margin: 8px 0 0;
+  font-family: var(--redhat);
+  font-size: 19px;
+  font-weight: 300;
+  line-height: 1.32;
+  letter-spacing: 0.1em;
+}
+
+.nimbus .copy,
+.nimbus .switch {
+  color: var(--charcoal);
+}
+
+.terra .copy,
+.terra .switch {
+  color: #fff;
+}
+
+/* NEXT → / ← PREVIOUS over the collection name (Group 85). */
+.switch {
+  position: relative;
+  order: 6;
+  align-self: flex-end;
+  display: block;
+  width: 221px;
+  height: 55px;
+  margin-top: 28px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.switchLabel,
+.switchArrow,
+.switchCollection {
+  position: absolute;
+}
+
+.switchLabel {
+  top: 0;
+  font-family: var(--redhat);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.switchCollection {
+  top: 31px;
+  left: 0;
+  font-family: var(--redhat);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Line 32: 18px with an arrowhead cap; the asset points left. */
+.switchArrow {
+  top: 4.32px;
+  width: 19px;
+  height: 7.364px;
+  background: center / 100% 100% no-repeat;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.arrowDark {
+  background-image: url("/media/spaces/arrow-dark.svg");
+}
+
+.arrowLight {
+  background-image: url("/media/spaces/arrow-light.svg");
+}
+
+.switchNext .switchLabel {
+  left: 0;
+}
+
+.switchNext .switchArrow {
+  left: 39.5px;
+  transform: scaleX(-1);
+}
+
+.switchPrev .switchLabel {
+  left: 29px;
+}
+
+.switchPrev .switchArrow {
+  left: -0.5px;
+}
+
+.switchNext:hover .switchArrow,
+.switchNext:focus-visible .switchArrow {
+  transform: translateX(6px) scaleX(-1);
+}
+
+.switchPrev:hover .switchArrow,
+.switchPrev:focus-visible .switchArrow {
+  transform: translateX(-6px);
+}
+
+.switch:focus-visible,
+.enter:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 6px;
+}
+
+/* Ellipse 41 (157, white 0.785 inside stroke) with "Click to Enter". */
+.enter {
+  position: relative;
+  order: 4;
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  margin-top: 22px;
+  border-radius: 50%;
+  color: #fff;
+  text-decoration: none;
+}
+
+.nimbus .enter {
+  color: var(--charcoal);
+}
+
+.nimbus .enterRing {
+  filter: invert(0.88);
+}
+
+.enterRing {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: url("/media/spaces/enter-ring.svg") center / 100% 100% no-repeat;
+  /* --draw sweeps the stroke in, as if drawn round with a compass. */
+  -webkit-mask-image: conic-gradient(from 0deg, #000 calc(var(--draw, 1) * 360deg), transparent 0);
+  mask-image: conic-gradient(from 0deg, #000 calc(var(--draw, 1) * 360deg), transparent 0);
+  transition:
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.6s ease;
+}
+
+.enterText {
+  position: relative;
+  font-family: var(--redhat);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.enter:hover .enterRing,
+.enter:focus-visible .enterRing {
+  transform: scale(1.08);
+  background-color: rgb(255 255 255 / 0.12);
+}
+
+/* ==========================================================================
+   Desktop: the frames' compositions
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+  .landing,
+  .nimbus,
+  .terra {
+    display: block;
+    height: 100vh;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .terraTrack {
+    position: relative;
+  }
+
+  .sceneInner {
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
+
+  .depth {
+    position: absolute;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+  }
+
+  /* Frame 1: "Don’t Choose Furniture / Choose A World." — TAN PEARL 50,
+     5% tracking, two 69px lines, top at frame y 343. */
+  .headline {
+    position: absolute;
+    top: calc(50% - 132 * var(--s));
+    right: 0;
+    left: 0;
+    font-size: calc(50 * var(--s));
+    line-height: calc(69 * var(--s));
+  }
+
+  /* Red Hat Display Light 32 / 150%, 10% tracking, title case, y 499. */
+  .sub {
+    position: absolute;
+    top: calc(50% + 24 * var(--s));
+    right: 0;
+    left: 0;
+    margin: 0;
+    font-size: calc(32 * var(--s));
+    line-height: calc(48 * var(--s));
+  }
+
+  /* The cue's box starts at frame (620, 768.85). */
+  .cue {
+    --s: inherit;
+    top: calc(50% + 293.85 * var(--s));
+    bottom: auto;
+    left: calc(50% - 100 * var(--s));
+    margin-left: 0;
+  }
+
+  /* Frames 3–4: the collection name at 250, 200% leading (a 500px line),
+     5% tracking, its line box from frame y 175. */
+  .worldTitle {
+    position: absolute;
+    top: calc(50% - 300 * var(--s));
+    right: 0;
+    left: 0;
+    font-size: calc(250 * var(--s));
+    line-height: calc(500 * var(--s));
+    text-align: center;
+  }
+
+  /* Red Hat Display Light 40 / 200%, 20% tracking, uppercase, y 178. */
+  .tagline {
+    position: absolute;
+    top: calc(50% - 297 * var(--s));
+    right: 0;
+    left: 0;
+    font-size: calc(40 * var(--s));
+    line-height: calc(80 * var(--s));
+    text-align: center;
+  }
+
+  .nimbus .tagline {
+    text-shadow: none;
+  }
+
+  .photo {
+    position: absolute;
+    width: auto;
+    margin: 0;
+  }
+
+  /* image 84: 1033.38 × 479 at (203.65, 312). */
+  .photoNimbus {
+    top: calc(50% - 163 * var(--s));
+    left: calc(50% - 516.35 * var(--s));
+    width: calc(1033.38 * var(--s));
+    height: calc(479 * var(--s));
+  }
+
+  /* image 85: 828 × 540 at (306, 298). */
+  .photoTerra {
+    top: calc(50% - 177 * var(--s));
+    left: calc(50% - 414 * var(--s));
+    width: calc(828 * var(--s));
+    height: calc(540 * var(--s));
+    transform-origin: 50% 90%;
+  }
+
+  /* Group 69: eyebrow at (100, 810.18), body 28px below it. */
+  .copy {
+    position: absolute;
+    top: calc(100% - 139.82 * var(--s));
+    left: calc(100 * var(--sw));
+    width: calc(467 * var(--s));
+    margin: 0;
+  }
+
+  .copyWide {
+    width: calc(599 * var(--s));
+  }
+
+  .eyebrow {
+    font-size: calc(14.4526 * var(--s));
+    line-height: calc(19 * var(--s));
+  }
+
+  .body {
+    margin-top: calc(9 * var(--s));
+    font-size: calc(25 * var(--s));
+    line-height: calc(33 * var(--s));
+  }
+
+  /* Group 85 from frame (1170, 849); the collection name 31px lower. */
+  .switch {
+    position: absolute;
+    top: calc(100% - 101 * var(--s));
+    left: calc(1170 * var(--sw));
+    width: calc(221 * var(--s));
+    height: calc(55 * var(--s));
+    margin: 0;
+  }
+
+  .switchLabel {
+    font-size: calc(12 * var(--s));
+  }
+
+  .switchCollection {
+    top: calc(31 * var(--s));
+    font-size: calc(18 * var(--s));
+  }
+
+  .switchArrow {
+    top: calc(4.32 * var(--s));
+    width: calc(19 * var(--s));
+    height: calc(7.364 * var(--s));
+  }
+
+  .switchNext .switchArrow {
+    left: calc(39.5 * var(--s));
+  }
+
+  .switchPrev .switchLabel {
+    left: calc(29 * var(--s));
+  }
+
+  .switchPrev .switchArrow {
+    left: calc(-0.5 * var(--s));
+  }
+
+  /* Ellipse 41 at (641, 442), 157 across; the label centred in it. */
+  .enter {
+    position: absolute;
+    top: calc(50% - 33 * var(--s));
+    left: calc(50% - 79 * var(--s));
+    width: calc(157 * var(--s));
+    height: calc(157 * var(--s));
+    margin: 0;
+  }
+
+  .nimbus .enter {
+    color: #fff;
+  }
+
+  .nimbus .enterRing {
+    filter: none;
+  }
+
+  .enterText {
+    font-size: calc(19.625 * var(--s));
+  }
+}
+
+/* ==========================================================================
+   Desktop film: one fixed stage, scenes layered, the director plays them
+   ========================================================================== */
+
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .stage {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    background: #bcab98;
+  }
+
+  .landing,
+  .nimbus,
+  .terra {
+    position: absolute;
+    inset: 0;
+    height: auto;
+  }
+
+  .terraTrack {
+    position: absolute;
+    inset: 0;
+    visibility: hidden;
+  }
+
+  /* Nimbus and Terra are unveiled by the film; the canvas only shows while
+     the box is on screen. */
+  .nimbus {
+    visibility: hidden;
+  }
+
+  .portal {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  /* Terra's leading edge casts onto Nimbus as it slides across. */
+  .terraShadow {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 100%;
+    display: block;
+    width: 28vw;
+    background: linear-gradient(90deg, rgb(32 10 0 / 0.42), rgb(32 10 0 / 0.16) 38%, rgb(32 10 0 / 0));
+    pointer-events: none;
+  }
+
+  .dim {
+    position: absolute;
+    inset: 0;
+    display: block;
+    background: #1d0a02;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .boxFallback {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: block;
+    background: linear-gradient(178.738deg, #d6d9dc 23.108%, #eeebe1 111.01%) fixed;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* The landing's type waits for the entrance; if script never runs it is
+     shown anyway after a beat. */
+  .page:not([data-entered]) [data-enter] {
+    opacity: 0;
+    animation: spaces-failsafe 0.8s ease 4s forwards;
+  }
+}
+
+@keyframes spaces-failsafe {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switchArrow,
+  .enterRing {
+    transition: none;
+  }
+}
