@@ -1,0 +1,200 @@
+/* Desktop About film stage. Tokens (--ink, --paper, --u, fonts) come from
+   .page in about.module.css. Geometry that depends on the viewport is set
+   as custom properties by filmDirector (layout()). */
+
+.film {
+  position: relative;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  background: var(--paper) url("/media/about/graph-paper-960.svg") center top / calc(1440 * var(--u)) auto
+    repeat;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Hero ---------------------------------------------------------------- */
+
+.hero {
+  position: absolute;
+  top: var(--hero-title-top, 150px);
+  right: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.heroTitle {
+  margin: 0;
+  font-family: var(--pearl);
+  font-size: var(--hero-size, 80px);
+  font-weight: 400;
+  line-height: 1.325;
+  letter-spacing: -0.04em;
+  text-align: center;
+  color: var(--ink);
+  -webkit-text-stroke: var(--hero-stroke, 2px) var(--ink);
+  paint-order: stroke fill;
+}
+
+.tagline {
+  position: absolute;
+  top: var(--tagline-top, 860px);
+  right: calc(40 * var(--u));
+  margin: 0;
+  font-family: var(--sans);
+  font-variation-settings: "opsz" 14;
+  font-size: max(12px, calc(14 * var(--u)));
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--burgundy);
+}
+
+.tagline > span {
+  display: inline-block;
+}
+
+/* --- Chapters: copy in the paper column beside the film window ----------- */
+
+.chapter {
+  position: absolute;
+  top: var(--copy-y, 50%);
+  width: calc(372 * var(--u));
+  transform: translateY(-50%);
+}
+
+.chapterLeft {
+  left: calc(64 * var(--u));
+}
+
+.chapterRight {
+  right: calc(64 * var(--u));
+}
+
+.chapterInner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(22 * var(--u));
+}
+
+.chapterLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--hand);
+  font-size: max(17px, calc(22 * var(--u)));
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--burgundy);
+}
+
+.chapterNo {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-family: var(--sans);
+  font-variation-settings: "opsz" 14;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.chapterTitle {
+  margin: 0;
+  font-family: var(--pearl);
+  font-size: calc(var(--hs) * var(--u));
+  font-weight: 400;
+  line-height: var(--hlh);
+  color: var(--ink);
+  -webkit-text-stroke: calc(2 * var(--u)) var(--stroke-color, transparent);
+  paint-order: stroke fill;
+}
+
+/* Titles with lines set in the design break only where it breaks them:
+   letter-split text loses kerning and would otherwise re-wrap. */
+.chapterTitleSet {
+  white-space: nowrap;
+}
+
+.chapterBody {
+  width: calc(360 * var(--u));
+  margin: 0;
+  font-family: var(--sans);
+  font-variation-settings: "opsz" 14;
+  font-size: max(15px, calc(18 * var(--u)));
+  font-weight: 400;
+  line-height: max(24px, calc(28 * var(--u)));
+  color: var(--muted);
+}
+
+/* --- Chrome --------------------------------------------------------------- */
+
+/* Thin progress rail on the right edge: the page has no scrollbar. */
+.progress {
+  position: absolute;
+  top: calc(100 * var(--u));
+  right: 6px;
+  bottom: 16px;
+  width: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(116 26 20 / 0.12);
+  z-index: 10;
+}
+
+.progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--burgundy);
+  transform: scaleY(0);
+  transform-origin: 50% 0;
+}
+
+/* Drafting-table cursor readout, aligned with the chapter copy's edge. */
+.coords {
+  position: absolute;
+  bottom: 14px;
+  left: calc(64 * var(--u));
+  z-index: 10;
+  margin: 0;
+  font-family: var(--sans);
+  font-variation-settings: "opsz" 14;
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  color: rgb(116 26 20 / 0.55);
+}
+
+.axis {
+  color: rgb(116 26 20 / 0.9);
+}
+
+.spacer {
+  height: 2600vh;
+}

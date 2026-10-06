@@ -31,9 +31,23 @@ export const SECTIONS: readonly SectionDef[] = [
   { id: "contact", label: "06", title: "Beyond The Door", theme: "dark" },
 ] as const;
 
+// A "#" href is a home-page chapter; a "/" href is its own route.
 export const NAV_LINKS = [
   { label: "Home", href: "#intro" },
-  { label: "About Us", href: "#craft" },
+  { label: "About Us", href: "/about" },
   { label: "Services", href: "#spaces" },
-  { label: "Spaces", href: "#spaces" },
+  { label: "Spaces", href: "/spaces" },
 ] as const;
+
+/**
+ * Resolves a NAV_LINKS href for use off the home page, where a chapter can
+ * only be reached through "/" and the intro chapter is simply the top of it.
+ */
+export const navHref = (href: string) =>
+  href === "#intro" ? "/" : href.startsWith("#") ? `/${href}` : href;
+
+/** Routes that wear the light PaperHeader instead of the film SiteHeader. */
+export const PAPER_HEADER_ROUTES: readonly string[] = ["/about", "/spaces"];
+
+export const usesPaperHeader = (pathname: string) =>
+  PAPER_HEADER_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));

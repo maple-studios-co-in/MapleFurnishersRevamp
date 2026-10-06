@@ -9,6 +9,7 @@ import {
 } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
+import PageTransitionProvider from "@/components/layout/PageTransition";
 import SectionRail from "@/components/layout/SectionRail";
 import SectionTheme from "@/components/layout/SectionTheme";
 import SiteHeader from "@/components/layout/SiteHeader";
@@ -113,15 +114,18 @@ export default function RootLayout({
             element inside a transformed ancestor resolves against that
             ancestor rather than the viewport. */}
         <SmoothScroll>
-          <SectionTheme />
-          {/* Below lg the page shows the DesktopGate takeover, which brings
-              its own logo — hide the site chrome so the plate stands alone. */}
-          <div className="max-lg:hidden">
-            <SiteHeader />
-            <SectionRail />
-            <SocialRail />
-          </div>
-          {children}
+          {/* Owns the route-change curtain, so it must outlive every page. */}
+          <PageTransitionProvider>
+            <SectionTheme />
+            {/* Below lg the page shows the DesktopGate takeover, which brings
+                its own logo — hide the site chrome so the plate stands alone. */}
+            <div className="max-lg:hidden">
+              <SiteHeader />
+              <SectionRail />
+              <SocialRail />
+            </div>
+            {children}
+          </PageTransitionProvider>
         </SmoothScroll>
       </body>
     </html>

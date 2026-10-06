@@ -1,10 +1,12 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
-import { NAV_LINKS } from "@/lib/sections";
+import { NAV_LINKS, usesPaperHeader } from "@/lib/sections";
 import MapleLogo from "@/components/ui/MapleLogo";
 import { chromeType } from "@/lib/typography";
 import { useSmoothScroll } from "./SmoothScroll";
+import TransitionLink from "./TransitionLink";
 
 /**
  * Fixed site header — always transparent, so the film runs edge to edge
@@ -20,6 +22,10 @@ import { useSmoothScroll } from "./SmoothScroll";
  */
 export default function SiteHeader() {
   const { scrollTo } = useSmoothScroll();
+  const pathname = usePathname();
+
+  // Light editorial routes (e.g. /about) mount their own PaperHeader.
+  if (usesPaperHeader(pathname)) return null;
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 bg-transparent">
@@ -44,17 +50,29 @@ export default function SiteHeader() {
             eats free space that then re-splits evenly, so it moves the nav
             by only HALF its value — 90px buys the 45px shift. */}
         <nav className="hidden lg:flex lg:items-center lg:gap-[min(154px,10.7vw)] lg:ml-[min(90px,6.25vw)]">
-          {NAV_LINKS.map((l) => (
-            <button
-              key={l.label}
-              type="button"
-              onClick={() => scrollTo(l.href)}
-              className="transition-colors duration-300 hover:text-[rgb(var(--chrome-accent))]"
-              style={chromeType(400)}
-            >
-              {l.label}
-            </button>
-          ))}
+          {NAV_LINKS.map((l) =>
+            // Route links (About Us → /about) navigate; chapter links scroll.
+            l.href.startsWith("/") ? (
+              <TransitionLink
+                key={l.label}
+                href={l.href}
+                className="transition-colors duration-300 hover:text-[rgb(var(--chrome-accent))]"
+                style={chromeType(400)}
+              >
+                {l.label}
+              </TransitionLink>
+            ) : (
+              <button
+                key={l.label}
+                type="button"
+                onClick={() => scrollTo(l.href)}
+                className="transition-colors duration-300 hover:text-[rgb(var(--chrome-accent))]"
+                style={chromeType(400)}
+              >
+                {l.label}
+              </button>
+            ),
+          )}
         </nav>
 
         <a

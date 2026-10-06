@@ -1,0 +1,309 @@
+/* Figma "header 63" (About page frame, node 2667:627) — 1440 × 78.
+   Measurements are design px multiplied by --u: 1px from 1440 up, scaled
+   down in proportion below it. Type and the CTA pill stay at their real
+   px size because they are text-bound. */
+
+.root {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 50;
+  /* Children resolve cqw against this element (= the viewport width
+     without the scrollbar), so the bar scales exactly like the page. */
+  container-type: inline-size;
+  --u: min(1px, 100cqw / 1440);
+}
+
+/* Paper backdrop, shown once the bar has docked to the top. */
+.bar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 64px;
+  background: rgb(243 234 213 / 0.92);
+  border-bottom: 1px solid rgb(217 203 178 / 0.9);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.root[data-docked="true"] .bar {
+  opacity: 1;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 16px;
+}
+
+/* --- Wordmark: the frame's "Maple Logo (1) 1" — same artwork as MapleLogo. */
+.logo {
+  display: block;
+  flex: none;
+  width: 96px;
+  height: 58px;
+  color: #741a14;
+  transition: opacity 0.3s ease;
+}
+
+.logo:hover {
+  opacity: 0.75;
+}
+
+.logo:focus-visible {
+  outline: 1px solid #741a14;
+  outline-offset: 4px;
+}
+
+.logoSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Links: Manrope 14 / 400, tracking 20% (2.8px). */
+.nav {
+  display: none;
+}
+
+.link {
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: 2.8px;
+  white-space: nowrap;
+  color: #1e1e1e;
+  opacity: 0.5;
+  text-decoration: none;
+  transition:
+    opacity 0.3s ease,
+    color 0.3s ease;
+}
+
+.link:hover {
+  opacity: 1;
+}
+
+.link:focus-visible {
+  opacity: 1;
+  outline: 1px solid #741a14;
+  outline-offset: 6px;
+}
+
+.link[aria-current="page"] {
+  color: #000;
+  opacity: 1;
+}
+
+/* --- "Bulk Order" pill: 139 × 38, radius 18.7, #741A14. Label and the
+   stroke glyph are placed at their frame offsets inside the pill. */
+.cta {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 139px;
+  height: 38px;
+  border-radius: 18.6957px;
+  background: #741a14;
+  color: #fff;
+  text-decoration: none;
+  transition: background-color 0.3s ease;
+}
+
+.cta:hover {
+  background: #5c140f;
+}
+
+.cta:focus-visible {
+  outline: 2px solid #741a14;
+  outline-offset: 3px;
+}
+
+.ctaLabel {
+  position: absolute;
+  top: 9px;
+  left: 59.5px;
+  transform: translateX(-50%);
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: 2.8px;
+  white-space: nowrap;
+}
+
+.ctaGlyph {
+  position: absolute;
+  top: 13.87px;
+  left: 111.56px;
+  width: 17.37px;
+  height: 13px;
+}
+
+.ctaLine {
+  position: absolute;
+  height: 3px;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.ctaLine1 {
+  top: 0;
+  left: 2.73px;
+  width: 14.6415px;
+  background-image: url("/media/about/bulk-order-line-1.svg");
+}
+
+.ctaLine2 {
+  top: 5px;
+  left: 0;
+  width: 17.369px;
+  background-image: url("/media/about/bulk-order-line-2.svg");
+}
+
+.ctaLine3 {
+  top: 10px;
+  left: 0;
+  width: 14.3659px;
+  background-image: url("/media/about/bulk-order-line-3.svg");
+}
+
+/* --- Desktop: the frame's geometry. Logo at x 100, nav centred on the
+   frame with 160px between links, pill ending at x 1329. */
+@media (min-width: 1024px) {
+  .bar {
+    height: calc(78 * var(--u));
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    max-width: calc(1440 * var(--u));
+    height: calc(78 * var(--u));
+    margin-inline: auto;
+    padding: 0 calc(100 * var(--u));
+    transform: translateY(var(--dock, calc(24 * var(--u))));
+  }
+
+  .logo {
+    justify-self: start;
+    width: calc(130 * var(--u));
+    height: calc(78 * var(--u));
+  }
+
+  /* 160px between links at 1440, easing to 80px at 1024 so the row keeps
+     clear of the logo and pill. The frame sets the link text 1.5px below
+     the bar's centre line; a 3px top margin on a centred item does that. */
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: clamp(64px, calc(19.23cqw - 116.9px), 160px);
+    margin-top: calc(3 * var(--u));
+  }
+
+  .cta {
+    justify-self: end;
+    margin-right: calc(11 * var(--u));
+  }
+}
+
+/* --- Spaces variant (Figma "header 63" on the Spaces frames) ------------
+   The Spaces film is one full-screen stage that never scrolls, so the bar
+   sits flush with the top, with no paper backdrop: just the frame's
+   hairline (0.2px of white at 33%) along its foot. The pill is a 12% tint
+   behind dark type. Logo, links and pill turn light one by one
+   (data-tone="dark") as the dark Terra scene slides in beneath them.
+   Off the film (phones, reduced motion) the page scrolls past dark
+   scenes, so a paper backdrop keeps the bar legible there. */
+.root[data-variant="spaces"] .bar {
+  opacity: 1;
+  background: rgb(231 221 212 / 0.9);
+  border-bottom-color: rgb(188 171 152 / 0.55);
+}
+
+.root[data-variant="spaces"] .logo,
+.root[data-variant="spaces"] .link {
+  transition:
+    opacity 0.3s ease,
+    color 0.45s ease;
+}
+
+.root[data-variant="spaces"] .cta {
+  background: transparent;
+  color: #000;
+  transition: color 0.45s ease;
+}
+
+.root[data-variant="spaces"] .cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #741a14;
+  opacity: 0.12;
+  transition:
+    opacity 0.3s ease,
+    background-color 0.45s ease;
+}
+
+.root[data-variant="spaces"] .cta:hover {
+  background: transparent;
+}
+
+.root[data-variant="spaces"] .cta:hover::before {
+  opacity: 0.2;
+}
+
+.root[data-variant="spaces"] .logo[data-tone="dark"] {
+  color: #fff3d3;
+}
+
+.root[data-variant="spaces"] .link[data-tone="dark"],
+.root[data-variant="spaces"] .cta[data-tone="dark"] {
+  color: #fff;
+}
+
+.root[data-variant="spaces"] .cta[data-tone="dark"]::before {
+  background: #fff3d3;
+}
+
+.root[data-variant="spaces"] [data-tone="dark"]:focus-visible {
+  outline-color: #fff3d3;
+}
+
+@media (min-width: 1024px) {
+  .root[data-variant="spaces"] .row {
+    transform: none;
+  }
+}
+
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .root[data-variant="spaces"] .bar {
+    display: none;
+  }
+
+  .root[data-variant="spaces"]::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: rgb(255 255 255 / 0.08);
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .logo,
+  .link,
+  .cta {
+    transition: none;
+  }
+}
