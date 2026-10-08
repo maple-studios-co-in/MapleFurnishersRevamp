@@ -1,4 +1,5 @@
 import DesktopGate from "@/components/layout/DesktopGate";
+import MobileHome from "@/components/mobile/MobileHome";
 import ChairShowcase from "@/components/sections/ChairShowcase";
 import HeroFilm from "@/components/sections/HeroFilm";
 import OutroScene from "@/components/sections/OutroScene";
@@ -21,7 +22,7 @@ export default async function Home() {
   const sceneProducts = await fetchSceneProducts();
 
   return (
-    <DesktopGate>
+    <DesktopGate mobile={<MobileHome sceneProducts={sceneProducts} />}>
       <main>
         <HeroFilm />      {/* 01 intro + 02 furnish (in-scrub marker) */}
         <ChairShowcase /> {/* 03 craft   */}

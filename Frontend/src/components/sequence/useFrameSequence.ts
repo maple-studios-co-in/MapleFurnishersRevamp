@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDesktopActive } from "@/components/layout/DesktopGate";
 import { gsap } from "@/lib/gsap";
 
 export interface FrameSequenceConfig {
@@ -124,6 +125,9 @@ export function useFrameSequence(
   progressRef.current = onProgress;
 
   const [shouldPreload, setShouldPreload] = useState(preloadMargin === 0);
+  // Phones hydrate the desktop films too, for an instant, before the gate
+  // retires them: nothing may be fetched until the gate says it's desktop.
+  const active = useDesktopActive();
   const [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -169,7 +173,7 @@ export function useFrameSequence(
 
   /* ---- preload ---- */
   useEffect(() => {
-    if (!shouldPreload || totalFrames <= 0) return;
+    if (!shouldPreload || !active || totalFrames <= 0) return;
     let cancelled = false;
     const imgs: HTMLImageElement[] = new Array(totalFrames);
     imagesRef.current = imgs;
@@ -203,7 +207,7 @@ export function useFrameSequence(
     return () => {
       cancelled = true;
     };
-  }, [shouldPreload, framePath, totalFrames, framePattern]);
+  }, [shouldPreload, active, framePath, totalFrames, framePattern]);
 
   /* ---- paint ---- */
   const draw = useCallback(function paint(idx: number) {

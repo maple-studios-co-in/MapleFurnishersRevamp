@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { gsap } from "@/lib/gsap";
 import { useFrameSequence } from "@/components/sequence/useFrameSequence";
 import ScrollCue from "@/components/ui/ScrollCue";
+import { useDesktopActive } from "@/components/layout/DesktopGate";
 import { useSmoothScroll } from "@/components/layout/SmoothScroll";
 import { SEQUENCES } from "@/lib/sequences";
 import { chromeType } from "@/lib/typography";
@@ -42,6 +43,9 @@ export default function HeroFilm() {
   const [introDone, setIntroDone] = useState(false);
   const [skipped, setSkipped] = useState(false);
   const { stop, start } = useSmoothScroll();
+  // Phones hydrate this film for an instant before the gate retires it:
+  // hold the scroll lock and the playback until the gate says desktop.
+  const active = useDesktopActive();
 
   /**
    * The canvas stays hidden while the page rests on the frozen title card;
@@ -201,6 +205,7 @@ export default function HeroFilm() {
 
   /* ---- scroll stays locked for the duration of the film ---- */
   useEffect(() => {
+    if (!active) return;
     if (introDone) {
       start();
       devLog("scroll-unlocked");
@@ -208,7 +213,7 @@ export default function HeroFilm() {
     }
     stop();
     devLog("scroll-locked");
-  }, [introDone, stop, start]);
+  }, [active, introDone, stop, start]);
 
   const watch = useCallback(() => {
     const v = videoRef.current;
@@ -218,6 +223,7 @@ export default function HeroFilm() {
   }, [finishIntro, showTitleA]);
 
   useEffect(() => {
+    if (!active) return;
     const v = videoRef.current;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce || !v) {
@@ -249,7 +255,7 @@ export default function HeroFilm() {
     return () => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     };
-  }, [finishIntro, watch]);
+  }, [active, finishIntro, watch]);
 
   const canvasVisible = introDone && ready && scrubbing;
 
@@ -282,13 +288,18 @@ export default function HeroFilm() {
         data-hero-stage
         className="relative h-[100dvh] w-full overflow-hidden"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/media/video/hero-blueprint.jpg"
-          alt=""
-          aria-hidden
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        {/* The poster and the film below load only at desktop widths
+            (the media conditions): this markup is also in a phone's HTML,
+            hidden, until the gate retires it. */}
+        <picture>
+          <source media="(min-width: 1024px)" srcSet="/media/video/hero-blueprint.jpg" />
+          <img
+            src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        </picture>
 
         {skipped ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -301,7 +312,6 @@ export default function HeroFilm() {
           <video
             ref={videoRef}
             className="absolute inset-0 h-full w-full object-cover"
-            src="/media/video/hero-intro-clean.mp4"
             muted
             playsInline
             preload="auto"
@@ -311,7 +321,19 @@ export default function HeroFilm() {
               setSkipped(true);
               finishIntro();
             }}
-          />
+          >
+            {/* A failed <source> reports here, not on the <video>. */}
+            <source
+              src="/media/video/hero-intro-clean.mp4"
+              type="video/mp4"
+              media="(min-width: 1024px)"
+              onError={() => {
+                devLog("skip:video-error");
+                setSkipped(true);
+                finishIntro();
+              }}
+            />
+          </video>
         )}
 
         <canvas
