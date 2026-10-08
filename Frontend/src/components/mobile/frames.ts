@@ -11,6 +11,10 @@
  *
  * Images are decoded before they count as ready, so drawing never stalls
  * the main thread on a decode.
+ *
+ * A film that plays one way (the phone home's Previous / Next) leans its
+ * window that way (`setLead`), and the beat it is likely to play next can
+ * be fetched ahead into the HTTP cache (`warm`) without decoding a frame.
  */
 export type Frame = HTMLImageElement | ImageBitmap;
 
@@ -48,6 +52,13 @@ export class FrameBank {
   private destroyed = false;
   private focusAt = 0;
   private plannedAt = Number.NaN;
+  /** Which way the playhead is heading: 1, -1, or 0 for either. */
+  private lead = 0;
+  /** Frames fetched into the HTTP cache ahead of time, and the queue. */
+  private readonly warmed: boolean[];
+  private warmQueue: number[] = [];
+  private warming = 0;
+  private warmJob = new AbortController();
   /** Images still loading or decoding, each settled exactly once. */
   private readonly pending = new WeakSet<HTMLImageElement>();
   /** Called whenever a frame finishes decoding. */
@@ -59,6 +70,7 @@ export class FrameBank {
     this.frames = new Array(count).fill(null);
     this.ready = new Array(count).fill(false);
     this.fetches = new Array(count).fill(null);
+    this.warmed = new Array(count).fill(false);
     this.keep = keep;
     this.stride = stride;
     this.concurrency = concurrency;
@@ -86,6 +98,30 @@ export class FrameBank {
     if (this.active && Math.abs(this.focusAt - this.plannedAt) >= 3) this.plan(false);
   }
 
+  /** Lean the window the way the film is about to play. */
+  setLead(dir: number) {
+    const lead = Math.sign(dir);
+    if (lead === this.lead) return;
+    this.lead = lead;
+    if (this.active) this.plan(false);
+  }
+
+  /**
+   * Fetch frames `from`..`to` into the HTTP cache, two at a time and in
+   * playing order, so the next beat decodes from disk instead of waiting
+   * on the network. Nothing is decoded or kept in memory.
+   */
+  warm(from: number, to: number) {
+    if (!this.bitmaps || this.destroyed) return;
+    const a = Math.max(0, Math.min(this.count - 1, Math.round(from)));
+    const b = Math.max(0, Math.min(this.count - 1, Math.round(to)));
+    const dir = b >= a ? 1 : -1;
+    const queue: number[] = [];
+    for (let i = a; i !== b + dir; i += dir) if (!this.warmed[i] && !this.ready[i]) queue.push(i);
+    this.warmQueue = queue;
+    this.pumpWarm();
+  }
+
   /** Whether exactly this frame is decoded and ready to draw. */
   isReady(index: number): boolean {
     return index >= 0 && index < this.count && this.ready[index];
@@ -105,14 +141,26 @@ export class FrameBank {
   destroy() {
     this.release();
     this.destroyed = true;
+    this.warmQueue = [];
+    this.warmJob.abort();
   }
 
   private isKey(i: number) {
     return i % this.stride === 0 || i === this.count - 1;
   }
 
+  /** The window: `keep` either side, or three quarters of it ahead when leaning. */
   private wanted(i: number) {
-    return this.isKey(i) || Math.abs(i - this.focusAt) <= this.keep;
+    if (this.isKey(i)) return true;
+    const d = (i - this.focusAt) * (this.lead || 1);
+    if (!this.lead) return Math.abs(d) <= this.keep;
+    return d >= -Math.round(this.keep / 2) && d <= Math.round(this.keep * 1.5);
+  }
+
+  /** Fetch order: nearest first, and ahead before behind when leaning. */
+  private distance(i: number) {
+    const d = (i - this.focusAt) * (this.lead || 1);
+    return d >= 0 || !this.lead ? Math.abs(d) : -d * 2;
   }
 
   /** Loaded, loading or decoding. */
@@ -159,7 +207,7 @@ export class FrameBank {
         const kb = this.isKey(b) ? 0 : 1;
         if (ka !== kb && Math.min(Math.abs(a - this.focusAt), Math.abs(b - this.focusAt)) > 2) return ka - kb;
       }
-      return Math.abs(a - this.focusAt) - Math.abs(b - this.focusAt);
+      return this.distance(a) - this.distance(b);
     });
     this.queue = missing;
     this.pump();
@@ -172,6 +220,26 @@ export class FrameBank {
       this.inFlight++;
       if (this.bitmaps) this.fetchBitmap(i);
       else this.loadImage(i);
+    }
+  }
+
+  private pumpWarm() {
+    while (this.warming < 2 && this.warmQueue.length && !this.destroyed) {
+      const i = this.warmQueue.shift()!;
+      if (this.warmed[i] || this.ready[i]) continue;
+      this.warming++;
+      fetch(this.url(i), { signal: this.warmJob.signal, priority: "low" } as RequestInit)
+        .then((res) => (res.ok ? res.blob() : null))
+        .then(
+          () => {
+            this.warmed[i] = true;
+          },
+          () => {},
+        )
+        .finally(() => {
+          this.warming--;
+          this.pumpWarm();
+        });
     }
   }
 

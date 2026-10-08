@@ -1,11 +1,11 @@
 /* The home page on a phone (below 1024px). The director (director.ts) owns
    every moving value; this sheet sets the stage and the resting states.
 
-   Sizing: stages are 100lvh tall (the screen with the browser toolbars
-   tucked away), so footage and plate never leave a gap or jump when a
-   toolbar slides. Copy (and the craft chair) live in .ui, a 100svh box at
-   the top of the stage: the part of the screen on show whatever the
-   toolbars do, so nothing hides under one and nothing moves when it goes.
+   Sizing: nothing scrolls by hand — the Previous / Next bar plays the
+   story — so the browser's toolbars never tuck away and the screen is the
+   visible viewport, --screen (100dvh). Every stage, and the .ui box its
+   copy lives in, is exactly that. Copy near the foot of a stage sits on
+   --dock, the height of the Previous / Next bar.
 
    Type: the desktop specs, scaled to a phone's measure —
      headlines  TAN PEARL 400, stroked in their own colour, 0.05em
@@ -13,6 +13,9 @@
      chrome     Manrope 500, 0.2em, uppercase */
 
 .home {
+  --screen: 100vh;
+  --dock-core: 64px;
+  --dock: calc(var(--dock-core) + env(safe-area-inset-bottom));
   --cream: #f4f2ec;
   --wash: #691511;
   --brand: #741a14;
@@ -27,30 +30,24 @@
   overflow-anchor: none;
 }
 
+@supports (height: 100dvh) {
+  .home {
+    --screen: 100dvh;
+  }
+}
+
 /* ------------------------------------------------------------ chapters -- */
 
 .chapter {
   position: relative;
-  height: calc(100vh + var(--run, 0px));
-}
-
-@supports (height: 100lvh) {
-  .chapter {
-    height: calc(100lvh + var(--run, 0px));
-  }
+  height: calc(var(--screen) + var(--run, 0px));
 }
 
 .stage {
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: var(--screen);
   overflow: hidden;
-}
-
-@supports (height: 100lvh) {
-  .stage {
-    height: 100lvh;
-  }
 }
 
 /* What a stage scales or pushes into. */
@@ -59,18 +56,12 @@
   inset: 0;
 }
 
-/* The always-visible part of a stage (see the top of this sheet). */
+/* A stage's copy layer (see the top of this sheet). */
 .ui {
   position: absolute;
   inset: 0 0 auto;
-  height: 100vh;
+  height: var(--screen);
   pointer-events: none;
-}
-
-@supports (height: 100svh) {
-  .ui {
-    height: 100svh;
-  }
 }
 
 .media {
@@ -170,7 +161,7 @@
 .kicker {
   position: absolute;
   left: 7%;
-  bottom: 13%;
+  bottom: calc(var(--dock) + 4.5%);
   z-index: 2;
   margin: 0;
   font-family: var(--font-redhat);
@@ -183,43 +174,6 @@
   text-shadow: 0 2px 16px rgb(23 19 16 / 0.55);
   visibility: hidden;
   opacity: 0;
-}
-
-/* The desktop cue, smaller: the arched label over a plumb line threaded
-   through a ring that drifts down it. */
-.cue {
-  position: absolute;
-  left: 50%;
-  bottom: 2.5%;
-  z-index: 3;
-  width: 176px;
-  margin-left: -88px;
-  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.85)) drop-shadow(0 4px 14px rgb(0 0 0 / 0.5));
-  pointer-events: none;
-  visibility: hidden;
-  opacity: 0;
-}
-
-.cue svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  overflow: visible;
-}
-
-.cueRing {
-  animation: cue-drift 1.5s ease-in-out infinite alternate;
-}
-
-@keyframes cue-drift {
-  from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(14px);
-    opacity: 0.5;
-  }
 }
 
 .skip {
@@ -250,13 +204,7 @@
    stages pinned; it stays invisible until then (the director). */
 .craft {
   z-index: 2;
-  margin-top: calc(-100vh - var(--bridge, 0px));
-}
-
-@supports (height: 100lvh) {
-  .craft {
-    margin-top: calc(-100lvh - var(--bridge, 0px));
-  }
+  margin-top: calc(-1 * var(--screen) - var(--bridge, 0px));
 }
 
 .plate {
@@ -308,9 +256,10 @@
   opacity: 0;
 }
 
+/* The director sets `bottom` so the feet clear the notes and the bar. */
 .chairBox {
   position: absolute;
-  inset: 15% 6% 26%;
+  inset: 15% 6% 34%;
   z-index: 3;
   opacity: 0;
 }
@@ -339,7 +288,7 @@
   position: absolute;
   left: 8%;
   right: 8%;
-  bottom: 8%;
+  bottom: calc(var(--dock) + 3.5%);
   z-index: 4;
   margin: 0;
   font-family: var(--font-redhat);
@@ -357,7 +306,7 @@
   position: absolute;
   left: 8%;
   right: 8%;
-  bottom: 7%;
+  bottom: calc(var(--dock) + 3%);
   z-index: 4;
   visibility: hidden;
   opacity: 0;
@@ -399,13 +348,7 @@
 /* Slides over the pinned craft stage like a sheet laid on top. */
 .rooms {
   z-index: 3;
-  margin-top: -100vh;
-}
-
-@supports (height: 100lvh) {
-  .rooms {
-    margin-top: -100lvh;
-  }
+  margin-top: calc(-1 * var(--screen));
 }
 
 .roomsStage {
@@ -446,7 +389,7 @@
   position: absolute;
   left: 7%;
   right: 6%;
-  bottom: 12%;
+  bottom: calc(var(--dock) + 4.5%);
   z-index: 3;
   pointer-events: none;
 }
@@ -565,6 +508,35 @@
   box-shadow: 0 0 8px rgb(255 255 255 / 0.9);
 }
 
+/* The open piece's dot leads; the room's copy and other dots step back. */
+.dot[data-active]::after {
+  border-color: #fff;
+  background: rgb(255 255 255 / 0.55);
+}
+
+.dot[data-active]::before {
+  animation: none;
+  transform: scale(1.6);
+  opacity: 0.3;
+}
+
+.dot::before,
+.dot::after,
+.dotCore,
+.home [data-m-scene] {
+  transition: opacity 0.4s ease;
+}
+
+.home[data-spot-open] .dot:not([data-active])::before,
+.home[data-spot-open] .dot:not([data-active])::after,
+.home[data-spot-open] .dot:not([data-active]) .dotCore {
+  opacity: 0.4;
+}
+
+.home[data-spot-open] [data-m-scene] {
+  opacity: 0.16;
+}
+
 @keyframes dot-ping {
   75%,
   100% {
@@ -577,7 +549,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: max(26px, env(safe-area-inset-bottom) + 14px);
+  bottom: calc(var(--dock) + 16px);
   z-index: 3;
   margin: 0;
   font-family: var(--font-manrope);
@@ -601,30 +573,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 100vh;
-  padding: calc(env(safe-area-inset-top) + 88px) 24px calc(env(safe-area-inset-bottom) + 28px);
+  min-height: var(--screen);
+  padding: calc(env(safe-area-inset-top) + 88px) 24px calc(var(--dock) + 26px);
   overflow: hidden;
   background: var(--card);
   color: #eeeae2;
   text-align: center;
 }
 
-@supports (height: 100lvh) {
-  .finale {
-    min-height: 100lvh;
-  }
-}
-
 @media (prefers-reduced-motion: no-preference) {
   .finale {
-    margin-top: -100vh;
+    margin-top: calc(-1 * var(--screen));
     box-shadow: 0 -24px 60px rgb(0 0 0 / 0.35);
-  }
-
-  @supports (height: 100lvh) {
-    .finale {
-      margin-top: -100lvh;
-    }
   }
 }
 
@@ -759,18 +719,6 @@
 
 .header > * {
   pointer-events: auto;
-}
-
-.progress {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 2px;
-  background: rgb(var(--chrome) / 0.55);
-  transform: scaleX(0);
-  transform-origin: 0 50%;
-  pointer-events: none;
-  /* Moves every frame: its own tiny layer, so the header never repaints. */
-  will-change: transform;
 }
 
 .logo {
@@ -968,15 +916,54 @@
 
 /* ---------------------------------------------------- the piece card -- */
 
-.card {
+/* A screen-sized layer the card and its stem are placed in, by the tapped
+   dot (SpotCard sets --x/--y, the stem's --sx/--sy/--sh, and data-side). */
+.spot {
   position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom));
+  inset: 0;
   z-index: 45;
+  pointer-events: none;
+}
+
+/* Draws out of the dot's ring first; the card grows from its far end. */
+.stem {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: var(--sh, 0px);
+  translate: var(--sx, 0px) var(--sy, 0px);
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 0 8px rgb(255 255 255 / 0.6);
+  transform-origin: 50% 0;
+  scale: 1 0;
+  transition: scale 0.25s cubic-bezier(0.7, 0, 0.84, 0);
+}
+
+.spot[data-side="above"] .stem {
+  transform-origin: 50% 100%;
+}
+
+.spot[data-open="true"] .stem {
+  scale: 1 1;
+  transition: scale 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.spot[data-glide][data-open="true"] .stem {
+  transition:
+    scale 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    translate 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: flex;
   gap: 14px;
   align-items: center;
+  width: min(calc(100vw - 24px), 380px);
   padding: 12px;
   border: 1px solid rgb(255 255 255 / 0.55);
   border-radius: 18px;
@@ -985,18 +972,38 @@
   backdrop-filter: blur(18px);
   box-shadow: 0 18px 50px rgb(23 19 16 / 0.4);
   color: #000;
-  transform: translateY(calc(100% + 40px));
+  translate: var(--x, 12px) var(--y, 0px);
+  transform-origin: var(--ox, 50%) 0;
+  scale: 0.92;
+  opacity: 0;
   visibility: hidden;
+  pointer-events: auto;
   transition:
-    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    visibility 0s linear 0.5s;
+    opacity 0.22s ease,
+    scale 0.28s cubic-bezier(0.7, 0, 0.84, 0),
+    visibility 0s linear 0.28s;
 }
 
-.card[data-open="true"] {
-  transform: none;
+.spot[data-side="above"] .card {
+  transform-origin: var(--ox, 50%) 100%;
+}
+
+.spot[data-open="true"] .card {
+  scale: 1;
+  opacity: 1;
   visibility: visible;
   transition:
-    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.4s ease 0.14s,
+    scale 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.12s,
+    visibility 0s;
+}
+
+/* Another piece of the same room: the card glides to its dot. */
+.spot[data-glide][data-open="true"] .card {
+  transition:
+    opacity 0.4s ease,
+    scale 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+    translate 0.6s cubic-bezier(0.16, 1, 0.3, 1),
     visibility 0s;
 }
 
@@ -1098,6 +1105,299 @@
   box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
 }
 
+/* Under its dot the card's top edge is the stem's: the close goes below. */
+.spot[data-side="below"] .cardClose {
+  top: auto;
+  bottom: -14px;
+}
+
+/* ------------------------------------------------- previous / next bar -- */
+
+/* The bar (Dock.tsx): full width on the foot of the screen, two halves a
+   hairline apart, the story's progress along its top edge. Cream over the
+   films with a soft veil under it; timber, bare, over the craft plate. */
+.dock {
+  --chrome: 238 234 226;
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 44;
+  height: var(--dock);
+  padding-bottom: env(safe-area-inset-bottom);
+  color: rgb(var(--chrome));
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.6s,
+    color 0.5s ease;
+}
+
+.dock[data-ready="true"] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 1s cubic-bezier(0.16, 1, 0.3, 1) 0.45s,
+    transform 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.45s,
+    visibility 0s,
+    color 0.5s ease;
+}
+
+.dock[data-tone="light"] {
+  --chrome: 46 29 16;
+}
+
+.dock::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: calc(100% + 72px);
+  background: linear-gradient(to top, rgb(12 9 7 / 0.68), rgb(12 9 7 / 0.34) 52%, rgb(12 9 7 / 0));
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+.dock[data-tone="light"]::before {
+  opacity: 0;
+}
+
+.dockTrack {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  overflow: hidden;
+  background: rgb(var(--chrome) / 0.16);
+  transition: background-color 0.5s ease;
+}
+
+/* Moves with the films: its own tiny layer, so the bar never repaints. */
+.dockFill {
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--chrome) / 0.9);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  will-change: transform;
+  transition: background-color 0.5s ease;
+}
+
+.dockRule {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--dock-core) / 2 - 15px);
+  width: 1px;
+  height: 30px;
+  background: rgb(var(--chrome) / 0.24);
+  transition:
+    opacity 0.6s ease 0.1s,
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.1s,
+    background-color 0.5s ease;
+}
+
+.dockButton {
+  position: absolute;
+  top: 0;
+  height: var(--dock-core);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dockButton:disabled {
+  cursor: default;
+}
+
+.dockPrev {
+  left: 0;
+  width: 50%;
+  transition:
+    opacity 0.6s ease 0.15s,
+    visibility 0s;
+}
+
+.dockNext {
+  right: 0;
+  width: 50%;
+}
+
+/* The first beat: nothing behind it, so Next has the whole bar, centred. */
+.dock[data-first="true"] .dockPrev {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.25s ease,
+    visibility 0s linear 0.25s;
+}
+
+.dock[data-first="true"] .dockNext {
+  width: 100%;
+}
+
+.dock[data-first="true"] .dockRule {
+  opacity: 0;
+  transform: scaleY(0);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.dockInner {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  gap: 7px;
+  max-width: calc(100% - 34px);
+  transform: translateY(-50%);
+  transition: opacity 0.2s ease;
+}
+
+.dockPrev .dockInner {
+  left: 20px;
+  justify-items: start;
+  text-align: left;
+}
+
+.dockNext .dockInner {
+  right: 20px;
+  justify-items: end;
+  text-align: right;
+}
+
+.dock[data-first="true"] .dockNext .dockInner {
+  right: 50%;
+  justify-items: center;
+  text-align: center;
+  transform: translate(50%, -50%);
+}
+
+.dockButton:active .dockInner {
+  opacity: 0.66;
+}
+
+.dockLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-manrope);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgb(var(--chrome) / 0.64);
+  animation: dock-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* The tracking trails the last letter; give it back on the arrow side. */
+.dockNext .dockLabel {
+  margin-right: -0.24em;
+}
+
+.dockName {
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--font-hero);
+  font-size: clamp(13px, 3.8vw, 16px);
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgb(var(--chrome));
+  -webkit-text-stroke: 0.25px rgb(var(--chrome));
+  animation: dock-in 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.07s both;
+}
+
+.dock:not([data-tone="light"]) .dockLabel,
+.dock:not([data-tone="light"]) .dockName {
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.45);
+}
+
+@keyframes dock-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+}
+
+.dockArrow {
+  flex: none;
+  width: 19px;
+  height: 8px;
+  overflow: visible;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dockLoop {
+  width: 13px;
+  height: 13px;
+}
+
+.dockPrev:active .dockArrow {
+  transform: translateX(-5px);
+}
+
+.dockNext:active .dockArrow {
+  transform: translateX(5px);
+}
+
+/* On the first beat the arrow leans on: the old scroll cue's invitation. */
+.dock[data-first="true"][data-ready="true"] .dockNext .dockArrow {
+  animation: dock-lean 1.5s ease-in-out 1.6s infinite alternate;
+}
+
+@keyframes dock-lean {
+  to {
+    transform: translateX(6px);
+  }
+}
+
+.dockButton:focus-visible {
+  outline: none;
+}
+
+.dockButton:focus-visible .dockInner {
+  outline: 1px solid rgb(var(--chrome) / 0.55);
+  outline-offset: 7px;
+  border-radius: 2px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
+  white-space: nowrap;
+}
+
+/* A far beat (the menu, the wordmark, Replay): the intro's burgundy falls
+   over the page while it moves, and lifts on the new frame. */
+.curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 47;
+  background:
+    radial-gradient(110% 70% at 50% 42%, rgb(140 36 28 / 0.5), rgb(140 36 28 / 0) 72%),
+    var(--wash);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .cardClose svg,
 .cardStep svg {
   width: 14px;
@@ -1119,7 +1419,8 @@
     display: block;
   }
 
-  .progress {
+  .dock,
+  .curtain {
     display: none;
   }
 }
@@ -1196,7 +1497,7 @@
 
   .beauty,
   .note {
-    bottom: 5.5%;
+    bottom: calc(var(--dock) + 2%);
   }
 
   .noteTitle {
@@ -1212,9 +1513,39 @@
     top: calc(env(safe-area-inset-top) + 88px);
   }
 
-  /* Clear of the settled chair's feet when Safari's toolbar is out. */
+  /* Clear of the settled chair's feet. */
   .kicker {
-    bottom: 8%;
+    bottom: calc(var(--dock) + 2.5%);
+  }
+
+  .sceneSplit {
+    bottom: calc(var(--dock) + 3%);
+  }
+
+  .finale {
+    padding-top: calc(env(safe-area-inset-top) + 76px);
+  }
+
+  .finaleLogo {
+    width: min(56vw, 260px);
+  }
+
+  .finaleCtas {
+    gap: 8px;
+    padding-top: 26px;
+  }
+
+  .ctaPrimary,
+  .ctaGhost {
+    height: 46px;
+  }
+
+  .socials {
+    margin-top: 20px;
+  }
+
+  .legal {
+    margin-top: 14px;
   }
 }
 
@@ -1232,6 +1563,26 @@
 
   .menuSocials {
     margin-top: 16px;
+  }
+
+  /* The brand card's ways on, two abreast under Shop Now. */
+  .finaleCtas {
+    grid-template-columns: 1fr 1fr;
+    padding-top: 20px;
+  }
+
+  .ctaPrimary {
+    grid-column: 1 / -1;
+  }
+
+  .ctaGhost {
+    padding: 0 8px;
+    letter-spacing: 0.14em;
+  }
+
+  .social {
+    width: 42px;
+    height: 42px;
   }
 }
 

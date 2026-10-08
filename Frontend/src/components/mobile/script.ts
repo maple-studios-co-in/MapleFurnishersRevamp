@@ -1,5 +1,5 @@
 /**
- * The phone home page's script: footage, scroll pacing, copy and hotspots.
+ * The phone home page's script: footage, pacing, beats, copy and hotspots.
  *
  * The footage is the user's portrait renders of the desktop films, cut into
  * frame sequences by the scratchpad build (build_mobile_v2.py):
@@ -16,8 +16,8 @@
 
 export const PHONE_QUERY = "(max-width: 1023px)";
 
-/** Asks the director to end a still-playing intro (it holds the scroll). */
-export const SKIP_INTRO_EVENT = "maple:skip-intro";
+/** Asks the director for a beat by id (detail), behind a curtain. */
+export const GO_STEP_EVENT = "maple:go-step";
 
 export interface FilmSpec {
   path: string;
@@ -43,8 +43,10 @@ export const INTRO = {
 } as const;
 
 /**
- * A scroll script: [frame, screens of scroll since the previous knot].
- * Repeating a frame makes a hold — the film rests while its copy is read.
+ * A film's script: [frame, screens of page since the previous knot]. The
+ * page is never scrolled by hand any more — the director plays it beat to
+ * beat — but its length still sets the order and spacing of everything.
+ * Repeating a frame makes a hold: the film rests there while a beat is read.
  */
 export type Knot = readonly [frame: number, screens: number];
 
@@ -81,6 +83,9 @@ export const CRAFT_SCRIPT: readonly Knot[] = [
 export const EXPLODE_FRAME = 25;
 
 export interface CraftNote {
+  /** The beat's id and its name on the Previous / Next bar. */
+  id: string;
+  step: string;
   title: string;
   body: string;
   /** First frame this note owns (it holds until the next one's). */
@@ -90,16 +95,22 @@ export interface CraftNote {
 /** The desktop's three callouts, given the stage one at a time, all set left. */
 export const CRAFT_NOTES: readonly CraftNote[] = [
   {
+    id: "comfort",
+    step: "The Comfort",
     title: "Comfort Is\nEngineered.",
     body: "Balanced support beneath every moment of relaxation.",
     from: EXPLODE_FRAME,
   },
   {
+    id: "curve",
+    step: "The Curve",
     title: "Every Curve Has\nA Purpose.",
     body: "Sculpted for comfort. Refined through precision.",
     from: 43,
   },
   {
+    id: "strength",
+    step: "The Strength",
     title: "Strength Hidden\nIn Plain Sight.",
     body: "Solid wood craftsmanship that defines every silhouette.",
     from: 58,
@@ -149,6 +160,8 @@ export interface RoomScene {
   /** Matches the desktop scene keys, which key the products API. */
   key: "day-room" | "evening-room" | "dining" | "bedroom" | "terrace";
   label: string;
+  /** Its name on the Previous / Next bar. */
+  step: string;
   /** Frames the copy is up for. */
   copy: readonly [number, number];
   /** Frames the dots are up for — only once the furniture has settled. */
@@ -163,6 +176,7 @@ export const ROOM_SCENES: readonly RoomScene[] = [
   {
     key: "day-room",
     label: "Living room",
+    step: "Living Room",
     copy: [1, 24],
     dots: [4, 22],
     still: 11,
@@ -181,6 +195,7 @@ export const ROOM_SCENES: readonly RoomScene[] = [
   {
     key: "evening-room",
     label: "Living room, evening",
+    step: "Evening",
     copy: [64, 102],
     // The dissolve into the dining film reframes the room from 90 on.
     dots: [70, 89],
@@ -197,6 +212,7 @@ export const ROOM_SCENES: readonly RoomScene[] = [
   {
     key: "dining",
     label: "Dining room",
+    step: "Dining Room",
     copy: [170, 181],
     dots: [174, 181],
     still: 180,
@@ -219,6 +235,7 @@ export const ROOM_SCENES: readonly RoomScene[] = [
   {
     key: "bedroom",
     label: "Bedroom",
+    step: "Bedroom",
     copy: [237, 246],
     dots: [239, 246],
     still: 245,
@@ -239,6 +256,7 @@ export const ROOM_SCENES: readonly RoomScene[] = [
   {
     key: "terrace",
     label: "Terrace",
+    step: "Terrace",
     copy: [302, 319],
     dots: [306, 319],
     still: 319,
@@ -254,6 +272,37 @@ export const ROOM_SCENES: readonly RoomScene[] = [
       { name: "Ceramic Planters", x: 77, y: 50.5, desc: "Glazed terracotta, frost-safe.", img: "/images/products/planter.webp" },
     ],
   },
+];
+
+/** Where a beat rests: the top, a frame of one of the films, or the end. */
+export type StepAt =
+  | { film: "top" }
+  | { film: "furnish" | "chair" | "rooms"; frame: number }
+  | { film: "end" };
+
+export interface Step {
+  id: string;
+  /** Its name on the Previous / Next bar. */
+  title: string;
+  at: StepAt;
+}
+
+/**
+ * The story in beats, the way the Previous / Next bar walks it: every place
+ * the desktop film stops to say something. Each beat rests where its copy
+ * (and, in a room, its dots) is up; the notes rest mid-way through their
+ * frames, the rooms on the frames the still page uses.
+ */
+export const STEPS: readonly Step[] = [
+  { id: "story", title: "Every Home", at: { film: "top" } },
+  { id: "furnish", title: "Furnish Yours", at: { film: "furnish", frame: FILMS.furnish.frames - 1 } },
+  { id: "craft", title: "Craftsmanship", at: { film: "chair", frame: 0 } },
+  ...CRAFT_NOTES.map((n, i): Step => {
+    const after = CRAFT_NOTES[i + 1];
+    return { id: n.id, title: n.step, at: { film: "chair", frame: after ? (n.from + after.from) / 2 : n.from + 3 } };
+  }),
+  ...ROOM_SCENES.map((s): Step => ({ id: s.key, title: s.step, at: { film: "rooms", frame: s.still } })),
+  { id: "home", title: "Your Home", at: { film: "end" } },
 ];
 
 /** A frame of a sequence, by 0-based index. */

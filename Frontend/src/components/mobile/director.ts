@@ -11,25 +11,45 @@ import {
   FILMS,
   FURNISH_COPY_FRAME,
   FURNISH_SCRIPT,
+  GO_STEP_EVENT,
   INTRO,
   ROOM_SCENES,
   ROOMS_SCRIPT,
-  SKIP_INTRO_EVENT,
+  STEPS,
   type FilmSpec,
   type Knot,
+  type Step,
 } from "./script";
+
+export interface StepState {
+  /** The beat the story rests on (or last left). */
+  at: number;
+  /** The beat it is playing toward: `at` itself when at rest. */
+  target: number;
+  playing: boolean;
+  /** The intro is over and the Previous / Next bar is up. */
+  ready: boolean;
+}
 
 export interface DirectorOptions {
   /** Hold (true) or release (false) the page's smooth scroller. */
   lock: (on: boolean) => void;
+  /** The story set off, turned, or came to rest. */
+  onStep: (state: StepState) => void;
 }
 
 export interface Director {
+  /** Play one beat on (1) or back (-1). */
+  step(dir: 1 | -1): void;
+  /** Cut straight to a beat, behind a curtain. */
+  go(index: number): void;
   destroy(): void;
 }
 
 /** Top of the assembled chair in the m-chair-v1 crop (ink row 299 of 999). */
 const CHAIR_TOP = 299 / 999;
+/** The assembled chair's feet, down its contained box. */
+const CHAIR_FEET = 0.96;
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 /** A scale, or nothing at rest — an identity transform still costs a layer. */
@@ -41,7 +61,7 @@ const ramp = (a: number, b: number, v: number) => {
   return t * t * (3 - 2 * t);
 };
 
-/** Scroll (in screens) → a frame, along a script of knots. */
+/** Page position (in screens) → a frame, along a script of knots. */
 class Script {
   private readonly at: number[] = [];
   private readonly frames: number[] = [];
@@ -65,12 +85,29 @@ class Script {
     }
     return frames[frames.length - 1];
   }
+
+  /** Where the script rests on `frame`: mid-hold if it holds there, else where it passes it. */
+  screensFor(frame: number) {
+    const { at, frames } = this;
+    for (let i = 1; i < at.length; i++) {
+      if (frames[i] === frame && frames[i - 1] === frame) return (at[i - 1] + at[i]) / 2;
+    }
+    if (frame <= frames[0]) return at[0];
+    for (let i = 1; i < at.length; i++) {
+      const a = frames[i - 1];
+      const b = frames[i];
+      if (a !== b && frame >= Math.min(a, b) && frame <= Math.max(a, b)) {
+        return at[i - 1] + ((frame - a) / (b - a)) * (at[i] - at[i - 1]);
+      }
+    }
+    return at[at.length - 1];
+  }
 }
 
 /**
  * One frame sequence painted into one canvas. The playhead is fractional:
  * between two decoded frames it cross-fades them, so footage sampled at
- * 12 fps still glides under a slow thumb.
+ * 12 fps still glides.
  */
 class Film {
   readonly bank: FrameBank;
@@ -151,6 +188,17 @@ class Film {
     if (Math.abs(target - this.frame) < 0.004) this.frame = target;
   }
 
+  /** A cut: the playhead lands on `frame` without passing the ones between. */
+  snap(frame: number) {
+    this.frame = frame;
+    this.dirty = true;
+  }
+
+  /** Whether the footage at `frame` is decoded (either side of a blend). */
+  near(frame: number) {
+    return this.bank.isReady(Math.floor(frame)) || this.bank.isReady(Math.ceil(frame));
+  }
+
   /** Paint the playhead; a no-op when nothing has changed. */
   paint() {
     const { ctx, box } = this;
@@ -169,9 +217,9 @@ class Film {
       this.exact = false;
       return;
     }
-    // Blend only while the film glides: in a fast flick (over half a frame
-    // per refresh) the cross-fade can't be seen, and the second frame would
-    // be one more fresh image to hand the GPU in the same refresh.
+    // Blend only while the film glides: past half a frame per refresh the
+    // cross-fade can't be seen, and the second frame would be one more
+    // fresh image to hand the GPU in the same refresh.
     const gliding = this.painted < 0 || Math.abs(q - this.painted) <= 0.5;
     let b = gliding && t > 0.03 && i0 < last && this.bank.isReady(i0 + 1) ? this.bank.get(i0 + 1) : null;
     if (b === a) b = null;
@@ -234,7 +282,7 @@ const SOFT: Motion = {
 /**
  * A set of nodes revealed and retired together. Every change kills the
  * group's running tween instance first — a queued stagger left alive would
- * revive copy after its hide on a fast flick (the desktop's stray-callout
+ * revive copy after its hide on a fast pass (the desktop's stray-callout
  * lesson).
  */
 class Group {
@@ -261,20 +309,60 @@ class Group {
   }
 }
 
+/* ---------------------------------------------------------- the pacing -- */
+
+/**
+ * Seconds per unit of change, which is how a beat's length is worked out:
+ * the films at their playing speeds (frames), the hand-off and the two
+ * sheets at their own (0 → 1 each). A beat lasts as long as what changes
+ * on the way to it — a held frame costs nothing, so a tap never waits on
+ * dead air, and the weave takes the time a weave needs.
+ */
+const PACE = {
+  furnish: 1 / 64, // ~2.7× the renders' 24 fps
+  chair: 1 / 22,
+  rooms: 1 / 34,
+  bridge: 1.9,
+  cover: 1.15,
+  finale: 1.2,
+  /** A screen of page where nothing moves. */
+  idle: 0.08,
+} as const;
+const WEIGHTS = [PACE.furnish, PACE.chair, PACE.rooms, PACE.bridge, PACE.cover, PACE.finale] as const;
+/** Seconds to reach full speed, and the braking that brings a beat to rest. */
+const T_ACC = 0.5;
+/** No beat plays in much under a second, however little changes. */
+const T_MIN = 0.7;
+
+/** One beat's stretch of page, measured in seconds of playing time. */
+interface Path {
+  ys: Float64Array;
+  cum: Float64Array;
+  n: number;
+  total: number;
+  /** Which films change on the way: furnish, chair, rooms. */
+  moves: [boolean, boolean, boolean];
+}
+
 /* ------------------------------------------------------------ director -- */
 
 /**
- * The phone home page, driven by native scrolling. Chapters are tall
- * sections with sticky full-screen stages; each tick reads the scroll
- * position once and:
- *  - plays the intro film with the page held, then lets it rest on the
- *    titled frame, like the desktop hero,
- *  - scrubs each film along its script (holds included) with an eased,
- *    cross-faded playhead,
+ * The phone home page: a film told in beats, moved only by its Previous
+ * and Next buttons. The page itself is the old scroll-scrubbed story —
+ * tall chapters with sticky full-screen stages — but no gesture moves it:
+ * the director plays it from beat to beat, scrolling it by hand.
+ *
+ * Each tick reads the story's position once and:
+ *  - plays the intro film, then rests on the titled frame like the desktop,
+ *  - runs each film along its script with an eased, cross-faded playhead,
  *  - dissolves the hero room into the craft plate around a rising chair,
  *  - slides each following chapter over the last like a sheet,
  *  - reveals copy and dots on the same frame windows the desktop uses,
  *  - keeps only the frames near the screen decoded, for phone memory.
+ * A beat plays at the films' own pace: it eases off, holds a film's
+ * speed, and brakes to rest on the beat — slowing rather than showing a
+ * stale frame if the footage has not decoded yet. Tapping again while it
+ * plays carries straight on (or turns back) without a stop.
  * Returns null if the markup isn't all there.
  */
 export function createDirector(root: HTMLElement, opts: DirectorOptions): Director | null {
@@ -287,7 +375,6 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   const rest = one<HTMLImageElement>("img[data-m-rest]");
   const furnishCanvas = one<HTMLCanvasElement>("canvas[data-m-furnish-canvas]");
   const title = one("[data-m-title]");
-  const cue = one("[data-m-cue]");
   const skip = one<HTMLButtonElement>("[data-m-skip]");
   const craft = one("[data-m-craft]");
   const craftFrame = one("[data-m-craft-frame]");
@@ -301,15 +388,18 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   const roomsCanvas = one<HTMLCanvasElement>("canvas[data-m-rooms-canvas]");
   const finale = one("[data-m-finale]");
   const header = one("[data-m-header]");
+  const dock = one("[data-m-dock]");
   const progress = one("[data-m-progress]");
+  const curtain = one("[data-m-curtain]");
   const heroStage = heroFrame?.parentElement;
   const craftStage = craftFrame?.parentElement;
   const craftDim = craftStage?.querySelector<HTMLElement>("[data-m-dim]");
   const roomsDim = roomsStage?.querySelector<HTMLElement>("[data-m-dim]");
   if (
-    !hero || !heroFrame || !heroStage || !video || !rest || !furnishCanvas || !title || !cue || !skip ||
+    !hero || !heroFrame || !heroStage || !video || !rest || !furnishCanvas || !title || !skip ||
     !craft || !craftFrame || !craftStage || !craftDim || !plate || !wordmark || !chairBox || !chairCanvas ||
-    !rooms || !roomsStage || !roomsFrame || !roomsDim || !roomsCanvas || !finale || !header || !progress
+    !rooms || !roomsStage || !roomsFrame || !roomsDim || !roomsCanvas || !finale || !header || !dock ||
+    !progress || !curtain
   ) {
     return null;
   }
@@ -317,13 +407,16 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   const furnish = new Film(FILMS.furnish, furnishCanvas, "cover", false, { keep: 10, stride: 24 });
   const chair = new Film(FILMS.chair, chairCanvas, "contain", true, { keep: 8, stride: 8, concurrency: 3 });
   const roomsFilm = new Film(FILMS.rooms, roomsCanvas, "cover", false, { keep: 8, stride: 20 });
+  const films = [furnish, chair, roomsFilm];
   const furnishScript = new Script(FURNISH_SCRIPT);
   const craftScript = new Script(CRAFT_SCRIPT);
   const roomsScript = new Script(ROOMS_SCRIPT);
+  const last = STEPS.length - 1;
 
   const sceneEls = all("[data-m-scene]");
   const dots = all("[data-m-dots]").map((el) => all("[data-m-dot]", el));
   const assembled = all("[data-m-assembled]"); // eyebrow, wordmark, beauty
+  const noteEls = all("[data-m-note]");
   const G = {
     // Centred on the screen: top 50% in CSS, and every state of the
     // reveal carries yPercent -50 so GSAP's y never undoes the centring.
@@ -338,12 +431,7 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
       out: { autoAlpha: 0, y: 16, duration: 0.4, ease: "power2.in" },
     }),
     heroScrim: new Group(all("[data-m-hero-scrim]"), SOFT),
-    cue: new Group([cue], {
-      from: { autoAlpha: 0, y: 12 },
-      to: { autoAlpha: 1, y: 0, duration: 1.1, ease: "power2.out" },
-      out: { autoAlpha: 0, duration: 0.5 },
-    }),
-    notes: all("[data-m-note]").map(
+    notes: noteEls.map(
       (n) =>
         new Group([n], {
           from: { autoAlpha: 0, y: 22 },
@@ -375,7 +463,7 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     el.style[prop] = value;
   };
   // The number is compared first: a string per element per frame is
-  // garbage the collector would have to sweep mid-scroll.
+  // garbage the collector would have to sweep mid-play.
   const shownAs = new WeakMap<HTMLElement, number>();
   const opacity = (el: HTMLElement, v: number) => {
     const q = Math.round(v * 1000) / 1000;
@@ -407,8 +495,27 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     roomsTop: 0,
     finaleTop: 0,
     end: 1,
+    /** Where each beat rests, px down the page. */
+    steps: STEPS.map(() => 0),
   };
   const pageTop = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
+
+  /**
+   * The chair stands as large as the screen allows above its lowest copy
+   * (the beauty line and the notes, which sit on the Previous / Next bar):
+   * its feet clear the tallest of them by 16px.
+   */
+  const lowCopy = [assembled[2], ...noteEls].filter((el): el is HTMLElement => !!el);
+  const placeChair = () => {
+    const H = chairBox.parentElement?.clientHeight ?? 0;
+    if (!H) return;
+    chairBox.style.bottom = "";
+    const top = chairBox.offsetTop;
+    let copyTop = H;
+    for (const el of lowCopy) copyTop = Math.min(copyTop, el.offsetTop);
+    const bottom = H - top - (copyTop - 16 - top) / CHAIR_FEET;
+    chairBox.style.bottom = `${Math.max(0, Math.round(bottom))}px`;
+  };
 
   /**
    * The wordmark stands behind the assembled chair: its baseline a fifth of
@@ -439,20 +546,18 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
 
   /**
    * Dots ride the footage. A dot that would land under its room's copy, on
-   * a screen edge or below the always-visible box (a very short phone, a
-   * long headline) sits that room out instead — its piece is still a swipe
-   * away in the card.
+   * a screen edge or down by the Previous / Next bar sits that room out
+   * instead — its piece is still an arrow away in the card.
    */
   const placeDots = () => {
     const w = roomsCanvas.clientWidth;
+    const barTop = (roomsCanvas.clientHeight || window.innerHeight) - dock.offsetHeight;
     dots.forEach((list, s) => {
       const scene = sceneEls[s];
       const top = scene?.querySelector<HTMLElement>("[data-m-copy='top']");
       const low = scene?.querySelector<HTMLElement>("[data-m-copy='low']");
-      const ui = top?.offsetParent as HTMLElement | null;
       const copyBottom = top ? top.offsetTop + top.offsetHeight : 0;
       const lowTop = low ? low.offsetTop : Infinity;
-      const visibleBottom = ui ? ui.offsetHeight : Infinity;
       for (const dot of list) {
         const p = roomsFilm.project(Number(dot.dataset.x), Number(dot.dataset.y));
         dot.style.left = `${p.x.toFixed(1)}px`;
@@ -460,11 +565,28 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
         dot.hidden =
           p.y - 16 < copyBottom + 6 ||
           p.y + 16 > lowTop - 6 ||
-          p.y > visibleBottom - 34 ||
+          p.y + 16 > barTop - 10 ||
           p.x < 18 ||
           p.x > w - 18;
       }
     });
+  };
+
+  /** Where a beat rests, px down the page. */
+  const stepY = (s: Step) => {
+    const at = s.at;
+    switch (at.film) {
+      case "top":
+        return L.heroTop;
+      case "furnish":
+        return L.heroTop + furnishScript.screensFor(at.frame) * L.V;
+      case "chair":
+        return L.craftTop + L.bridge + craftScript.screensFor(at.frame) * L.V;
+      case "rooms":
+        return L.roomsTop + roomsScript.screensFor(at.frame) * L.V;
+      case "end":
+        return L.end;
+    }
   };
 
   /** Positions and canvas sizes — after anything that may move them. */
@@ -474,18 +596,16 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     L.roomsTop = pageTop(rooms);
     L.finaleTop = pageTop(finale);
     L.end = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    L.steps = STEPS.map((s) => Math.round(Math.min(L.end, stepY(s))));
     furnish.resize();
     chair.resize();
     roomsFilm.resize();
+    placeChair();
     placeDots();
     placeWordmark();
   };
 
-  /**
-   * Scroll runs, in px of the screen height at layout time. Re-run only when
-   * the width changes or the height changes a lot (rotation) — the toolbar
-   * sliding in and out must not re-pace the page under the thumb.
-   */
+  /** The page's runs, in px of the screen height. */
   const layout = () => {
     L.V = window.innerHeight;
     L.width = window.innerWidth;
@@ -501,6 +621,224 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     measure();
   };
 
+  /* ---------------------------------------------------------- the story */
+
+  /** The story's place on the page: the director's alone, never a gesture's. */
+  const pos = { y: 0 };
+  let at = 0;
+  let target = 0;
+  const setY = (y: number) => {
+    pos.y = y;
+    window.scrollTo(0, y);
+  };
+
+  /** What the page shows at `y`: three playheads, the hand-off and the two sheets. */
+  const sample = (y: number, out: Float64Array) => {
+    const V = L.V;
+    out[0] = furnishScript.frameAt(Math.max(0, y - L.heroTop) / V);
+    out[1] = craftScript.frameAt(Math.max(0, y - L.craftTop - L.bridge) / V);
+    out[2] = roomsScript.frameAt(Math.max(0, y - L.roomsTop) / V);
+    out[3] = clamp01((y - L.craftTop) / L.bridge);
+    out[4] = clamp01(1 - (L.roomsTop - y) / V);
+    out[5] = clamp01(1 - (L.finaleTop - y) / V);
+  };
+  const S = new Float64Array(6);
+  const S2 = new Float64Array(6);
+
+  /** Price the stretch from y0 to y1 in seconds of playing time, every 3px. */
+  const buildPath = (y0: number, y1: number): Path => {
+    const n = Math.max(2, Math.min(8000, Math.ceil(Math.abs(y1 - y0) / 3)));
+    const ys = new Float64Array(n + 1);
+    const cum = new Float64Array(n + 1);
+    const moves: [boolean, boolean, boolean] = [false, false, false];
+    ys[0] = y0;
+    sample(y0, S);
+    for (let i = 1; i <= n; i++) {
+      const y = y0 + ((y1 - y0) * i) / n;
+      sample(y, S2);
+      let cost = (PACE.idle * Math.abs(y - ys[i - 1])) / L.V;
+      for (let k = 0; k < 6; k++) {
+        const d = Math.abs(S2[k] - S[k]);
+        cost += d * WEIGHTS[k];
+        if (k < 3 && d > 1e-6) moves[k] = true;
+      }
+      ys[i] = y;
+      cum[i] = cum[i - 1] + cost;
+      S.set(S2);
+    }
+    return { ys, cum, n, total: cum[n], moves };
+  };
+
+  /** The page position `cost` seconds into a path. */
+  const yAtCost = (p: Path, cost: number) => {
+    let lo = 0;
+    let hi = p.n;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (p.cum[mid] <= cost) lo = mid;
+      else hi = mid;
+    }
+    const span = p.cum[hi] - p.cum[lo];
+    return lerp(p.ys[lo], p.ys[hi], span > 0 ? clamp01((cost - p.cum[lo]) / span) : 1);
+  };
+
+  /** The story's place in beats: 3.5 is half-way from the fourth to the fifth. */
+  const beatAt = (y: number) => {
+    const ys = L.steps;
+    if (y <= ys[0]) return 0;
+    for (let i = 1; i < ys.length; i++) {
+      if (y <= ys[i]) return i - 1 + (ys[i] > ys[i - 1] ? (y - ys[i - 1]) / (ys[i] - ys[i - 1]) : 1);
+    }
+    return last;
+  };
+
+  /** Whether every film on screen at `y` has its frame decoded (only the moving ones, given `moves`). */
+  const decoded = (y: number, moves: readonly boolean[] = [true, true, true]) => {
+    sample(y, S);
+    if (moves[0] && S[3] < 1 && y - L.heroTop > 2 && !furnish.near(S[0])) return false;
+    if (moves[1] && S[3] > 0.2 && S[4] < 1 && !chair.near(S[1])) return false;
+    if (moves[2] && S[4] > 0 && S[5] < 1 && !roomsFilm.near(S[2])) return false;
+    return true;
+  };
+
+  const play = {
+    path: null as Path | null,
+    /** Seconds of playing time into the path, and the speed through it. */
+    c: 0,
+    v: 0,
+    /** Fast-forward for beats asked for ahead, and the slow-down while frames decode. */
+    rate: 1,
+    buffer: 1,
+    dir: 0,
+  };
+
+  let lastEmit = "";
+  const emit = () => {
+    const state: StepState = { at, target, playing: play.path !== null, ready: intro.done };
+    const key = `${at}|${target}|${state.playing}|${state.ready}`;
+    if (key === lastEmit) return;
+    lastEmit = key;
+    opts.onStep(state);
+  };
+
+  /** Fetch the next beat's footage into the cache while this one is read. */
+  const warmNext = () => {
+    if (at >= last || !framesGo) return;
+    sample(L.steps[at], S);
+    sample(L.steps[at + 1], S2);
+    films.forEach((film, k) => {
+      if (Math.abs(S2[k] - S[k]) > 0.5) film.bank.warm(S[k], S2[k]);
+    });
+  };
+
+  const arrive = () => {
+    setY(L.steps[target]);
+    play.path = null;
+    play.v = 0;
+    play.dir = 0;
+    at = target;
+    // Resting: the next beat is the likelier ask.
+    for (const film of films) film.bank.setLead(1);
+    emit();
+    warmNext();
+  };
+
+  /** Move the story along its path: ease off, hold the films' pace, brake onto the beat. */
+  const advance = (dt: number) => {
+    const p = play.path;
+    if (!p) return;
+    const ahead = Math.abs(target - beatAt(pos.y));
+    play.rate += (Math.min(2.6, Math.max(1, 1 + 0.8 * (ahead - 1))) - play.rate) * (1 - Math.exp(-dt * 5));
+    play.buffer += ((decoded(pos.y, p.moves) ? 1 : 0.22) - play.buffer) * (1 - Math.exp(-dt * 14));
+    const vmax = play.rate * Math.min(1, p.total / T_MIN);
+    const acc = Math.max(vmax, 0.2) / T_ACC;
+    const left = p.total - play.c;
+    const want = Math.min(vmax * play.buffer, Math.sqrt(2 * acc * Math.max(0, left)));
+    play.v = play.v < want ? Math.min(want, play.v + acc * dt) : Math.max(want, play.v - acc * 2.5 * dt);
+    const stepC = play.v * dt;
+    if (left <= 1e-4 || stepC >= left) {
+      arrive();
+      return;
+    }
+    play.c += stepC;
+    setY(yAtCost(p, play.c));
+  };
+
+  /** Play one beat on or back; asked again mid-beat, carry on (or turn) from where it is. */
+  const step = (dir: 1 | -1) => {
+    if (!intro.done || cutting) return;
+    if (dir > 0 && target === last && !play.path) {
+      go(0);
+      return;
+    }
+    const next = Math.max(0, Math.min(last, target + dir));
+    if (next === target) return;
+    target = next;
+    const y1 = L.steps[target];
+    const way = Math.sign(y1 - pos.y);
+    // Same way: keep the speed, so a second tap never stutters the film.
+    if (way !== play.dir) play.v = 0;
+    play.dir = way;
+    play.path = buildPath(pos.y, y1);
+    play.c = 0;
+    for (const film of films) film.bank.setLead(way);
+    emit();
+  };
+
+  /* ------------------------------------------------------------ the cut */
+
+  let cutting = false;
+  let lifter = 0;
+  /** Snap every playhead to the page as it stands (after a cut). */
+  const snapFilms = () => {
+    sample(pos.y, S);
+    films.forEach((film, k) => film.snap(S[k]));
+    was.bp = was.cp = was.fp = was.progress = -1;
+  };
+
+  /**
+   * Straight to a beat (the menu, the logo, Replay): a curtain in the
+   * intro's burgundy falls, the page moves under it, and it lifts once the
+   * new frame has decoded (or after a moment, whichever comes first).
+   */
+  const go = (index: number) => {
+    const i = Math.max(0, Math.min(last, Math.round(index)));
+    if (!intro.done) finishIntro();
+    if (cutting || (i === at && i === target && !play.path)) return;
+    cutting = true;
+    play.path = null;
+    play.v = 0;
+    play.dir = 0;
+    target = i;
+    emit();
+    gsap.killTweensOf(curtain);
+    gsap.to(curtain, {
+      autoAlpha: 1,
+      duration: 0.45,
+      ease: "power2.in",
+      onComplete: () => {
+        if (destroyed) return;
+        setY(L.steps[i]);
+        snapFilms();
+        at = i;
+        for (const film of films) film.bank.setLead(1);
+        const t0 = performance.now();
+        const lift = () => {
+          if (destroyed) return;
+          if (!decoded(pos.y) && performance.now() - t0 < 900) {
+            lifter = window.setTimeout(lift, 40);
+            return;
+          }
+          cutting = false;
+          emit();
+          warmNext();
+          gsap.to(curtain, { autoAlpha: 0, duration: 0.85, ease: "power2.out" });
+        };
+        lift();
+      },
+    });
+  };
+
   /* -------------------------------------------------------------- intro */
 
   const intro = { done: false, title: false, timer: 0, frameCb: 0 };
@@ -512,15 +850,24 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   };
   // The pill eases in after a beat; an intro that ends first must stop it.
   const skipIn = gsap.to(skip, { opacity: 1, duration: 0.8, delay: 1.2, paused: true });
+
+  // No gesture moves this page — only the director, through setY. Two
+  // fingers still pinch-zoom.
+  const html = document.documentElement;
+  const saved = { overflow: html.style.overflow, behavior: html.style.scrollBehavior, overscroll: html.style.overscrollBehavior };
   let held = false;
   const block = (e: Event) => {
+    if ((e as TouchEvent).touches && (e as TouchEvent).touches.length > 1) return;
     if (e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
   };
   const hold = (on: boolean) => {
     if (on === held) return;
     held = on;
-    document.documentElement.style.overflow = on ? "hidden" : "";
+    html.style.overflow = on ? "hidden" : saved.overflow;
+    // Every move is the director's: never a smooth-scroll of the browser's own.
+    html.style.scrollBehavior = on ? "auto" : saved.behavior;
+    html.style.overscrollBehavior = on ? "none" : saved.overscroll;
     if (on) {
       window.addEventListener("touchmove", block, { passive: false, capture: true });
       window.addEventListener("wheel", block, { passive: false, capture: true });
@@ -545,7 +892,8 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     skipIn.kill();
     gsap.to(skip, { autoAlpha: 0, duration: 0.4, onComplete: () => skip.setAttribute("hidden", "") });
     letFramesGo();
-    hold(false);
+    emit();
+    warmNext();
   };
 
   const watch = () => {
@@ -560,7 +908,6 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   };
 
   const startIntro = () => {
-    hold(true);
     video.muted = true;
     video.defaultMuted = true;
     video.playsInline = true;
@@ -599,6 +946,8 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   };
 
   let tone = "dark";
+  let barTone = "dark";
+  let finaleInert: boolean | null = null;
   // Each transition writes only while its progress moves.
   const was = { bp: -1, cp: -1, fp: -1, progress: -1 };
   const heroMovers = [heroFrame, plate, chairBox];
@@ -612,12 +961,15 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     const now = performance.now();
     const dt = Math.min(0.1, (now - lastT) / 1000);
     lastT = now;
-    const y = window.scrollY;
-    const vh = window.innerHeight;
+    if (play.path) advance(dt);
+    // Nothing else may move the page (a focus jump, find-in-page): put it back.
+    else if (Math.abs(window.scrollY - pos.y) > 1.5) window.scrollTo(0, pos.y);
+    const y = pos.y;
     const V = L.V;
+    const vh = V;
     const k = 1 - Math.exp(-dt * 11);
 
-    /* 01–02 · the intro film rests; the weave plays under the thumb */
+    /* 01–02 · the intro film rests; the weave plays */
     const heroOff = y - L.heroTop;
     furnish.ease(intro.done ? furnishScript.frameAt(Math.max(0, heroOff) / V) : 0, k);
     const scrubbing = intro.done && heroOff > 4;
@@ -626,7 +978,6 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     const furnished = intro.done && furnish.frame >= FURNISH_COPY_FRAME;
     G.furnish.set(furnished);
     G.heroScrim.set(furnished);
-    G.cue.set(intro.done && y < 40);
 
     /* hand-off: the room dissolves into the craft plate as the camera
        eases toward the chair, and the craft chair rises in its place */
@@ -674,7 +1025,7 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     const rf = Math.round(roomsFilm.frame);
     const landed = roomsOff > -0.12 * V;
     let anyCopy = false;
-    let lowCopy = false;
+    let lowCopyOn = false;
     for (let s = 0; s < ROOM_SCENES.length; s++) {
       const scene = ROOM_SCENES[s];
       const copyOn = landed && rf >= scene.copy[0] && rf <= scene.copy[1];
@@ -682,11 +1033,11 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
       G.dots[s]?.set(landed && fp < 1 && rf >= scene.dots[0] && rf <= scene.dots[1]);
       if (copyOn) {
         anyCopy = true;
-        if (scene.text.split) lowCopy = true;
+        if (scene.text.split) lowCopyOn = true;
       }
     }
     G.scrimTop.set(anyCopy);
-    G.scrimBottom.set(lowCopy);
+    G.scrimBottom.set(lowCopyOn);
     const first = ROOM_SCENES[0].dots;
     G.hint.set(!hintDone && landed && rf >= first[0] && rf <= first[1]);
 
@@ -699,10 +1050,15 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
       sheetCorners(finale, fp < 1);
     }
     G.finale.set(fp > 0.55);
+    // Its links take focus only once it has arrived.
+    const inert = fp < 0.999;
+    if (inert !== finaleInert) finale.inert = finaleInert = inert;
 
-    /* chrome */
+    /* chrome: the header reads the top of the screen, the bar the bottom */
     const nextTone = finaleEdge < 34 || roomsEdge < 34 ? "dark" : plateIn > 0.5 ? "light" : "dark";
     if (nextTone !== tone) header.dataset.tone = tone = nextTone;
+    const nextBar = finaleEdge < vh - 40 || roomsEdge < vh - 40 ? "dark" : plateIn > 0.5 ? "light" : "dark";
+    if (nextBar !== barTone) dock.dataset.tone = barTone = nextBar;
     const read = Math.round(clamp01(y / L.end) * 2000) / 2000;
     if (read !== was.progress) {
       was.progress = read;
@@ -736,6 +1092,42 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   const onDotTap = (e: Event) => {
     if ((e.target as Element | null)?.closest?.("[data-m-dot]")) hintDone = true;
   };
+  const onGo = (e: Event) => {
+    const i = STEPS.findIndex((s) => s.id === (e as CustomEvent<string>).detail);
+    if (i >= 0) go(i);
+  };
+  // Keys walk the beats too (a tablet's keyboard, a narrow desktop window).
+  const onKey = (e: KeyboardEvent) => {
+    if (!intro.done || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return;
+    if (document.querySelector("#m-menu[data-open='true']")) return;
+    const onControl = !!(e.target as Element | null)?.closest?.("button, a, input, textarea, select");
+    let dir: 1 | -1;
+    switch (e.key) {
+      case "ArrowDown":
+      case "ArrowRight":
+      case "PageDown":
+        dir = 1;
+        break;
+      case "ArrowUp":
+      case "ArrowLeft":
+      case "PageUp":
+        dir = -1;
+        break;
+      case " ":
+        if (onControl) return;
+        dir = e.shiftKey ? -1 : 1;
+        break;
+      case "Home":
+      case "End":
+        e.preventDefault();
+        go(e.key === "Home" ? 0 : last);
+        return;
+      default:
+        return;
+    }
+    e.preventDefault();
+    step(dir);
+  };
   // Sideways, the page is covered by a "turn your phone" card (CSS): hold
   // the layout as it was, so turning back finds the reader where they were.
   const sideways = window.matchMedia("(orientation: landscape) and (max-height: 600px) and (pointer: coarse)");
@@ -744,14 +1136,22 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
       if (sideways.matches) return;
-      if (window.innerWidth !== L.width || Math.abs(window.innerHeight - L.V) > 160) {
-        // A real change of screen (a tablet turning, split view): re-pace
-        // the page and keep the reader at the same point of the story.
-        const at = window.scrollY / L.end;
-        layout();
-        if (at > 0) window.scrollTo(0, Math.round(at * L.end));
-      } else {
+      if (window.innerWidth === L.width && window.innerHeight === L.V) {
         measure();
+      } else {
+        // A new screen: re-pace the page, and land on the beat in hand.
+        if (play.path) {
+          play.path = null;
+          play.v = 0;
+          play.dir = 0;
+          at = target;
+          emit();
+        }
+        layout();
+      }
+      if (!play.path && !cutting) {
+        setY(L.steps[at]);
+        snapFilms();
       }
     }, 150);
   };
@@ -759,19 +1159,21 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
 
   const restoration = history.scrollRestoration;
   history.scrollRestoration = "manual";
-  // Instant, whatever the page's smooth-scroll CSS says.
-  const html = document.documentElement;
-  const behavior = html.style.scrollBehavior;
-  html.style.scrollBehavior = "auto";
-  window.scrollTo(0, 0);
-  html.style.scrollBehavior = behavior;
+  hold(true);
+  setY(0);
   layout();
   rest.src = INTRO.rest;
+  dock.dataset.tone = barTone;
   skip.addEventListener("click", finishIntro);
-  window.addEventListener(SKIP_INTRO_EVENT, finishIntro);
+  window.addEventListener(GO_STEP_EVENT, onGo);
+  window.addEventListener("keydown", onKey);
   root.addEventListener("click", onDotTap);
   window.addEventListener("resize", onResize);
-  void document.fonts?.ready.then(() => !destroyed && measure());
+  void document.fonts?.ready.then(() => {
+    if (destroyed) return;
+    measure();
+    if (!play.path && !cutting && Math.abs(L.steps[at] - pos.y) > 1) setY(L.steps[at]);
+  });
   gsap.fromTo(
     all("[data-m-chrome]", header),
     { autoAlpha: 0, y: -10 },
@@ -779,19 +1181,33 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   );
   skipIn.play();
   startIntro();
+  emit();
   gsap.ticker.add(tick);
   if (process.env.NODE_ENV !== "production") {
-    (window as unknown as { __mapleHome?: unknown }).__mapleHome = { L, intro, films: { furnish, chair, rooms: roomsFilm } };
+    (window as unknown as { __mapleHome?: unknown }).__mapleHome = {
+      L,
+      intro,
+      play,
+      pos,
+      state: () => ({ at, target, cutting }),
+      step,
+      go,
+      films: { furnish, chair, rooms: roomsFilm },
+    };
   }
 
   return {
+    step,
+    go,
     destroy() {
       destroyed = true;
       gsap.ticker.remove(tick);
       window.clearTimeout(intro.timer);
       window.clearTimeout(resizeTimer);
+      window.clearTimeout(lifter);
       skip.removeEventListener("click", finishIntro);
-      window.removeEventListener(SKIP_INTRO_EVENT, finishIntro);
+      window.removeEventListener(GO_STEP_EVENT, onGo);
+      window.removeEventListener("keydown", onKey);
       root.removeEventListener("click", onDotTap);
       window.removeEventListener("resize", onResize);
       video.removeEventListener("timeupdate", watch);
@@ -804,9 +1220,7 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
       video.load();
       hold(false);
       history.scrollRestoration = restoration;
-      furnish.destroy();
-      chair.destroy();
-      roomsFilm.destroy();
+      for (const film of films) film.destroy();
       gsap.killTweensOf(root.querySelectorAll("*"));
     },
   };
