@@ -7,7 +7,7 @@ import MapleLogo from "@/components/ui/MapleLogo";
 import type { SceneProducts } from "@/lib/api";
 import { SHOP_URL } from "@/lib/links";
 import type { Director, StepState } from "./director";
-import Dock from "./Dock";
+import Dock, { createStepStore } from "./Dock";
 import MobileHeader from "./MobileHeader";
 import { resolveScenes, type ResolvedScene } from "./scenes";
 import { CRAFT_NOTES, FILMS, INTRO, PHONE_QUERY, frameUrl } from "./script";
@@ -31,16 +31,21 @@ import styles from "./mobile.module.css";
  *      the brand card, with the ways on
  *
  * Every chapter after the first arrives over the last like a sheet laid on
- * a stack. Nothing scrolls by hand: the Previous / Next bar (Dock) plays
- * the story beat by beat, and director.ts runs every film, sheet and line
- * of copy from the one position it moves. With reduced motion the same
+ * a stack. It is read two ways that stay in step: the Previous / Next
+ * bar (Dock) plays it beat by beat, and scrolling (a swipe, the wheel)
+ * steers it, a beat every two or three swipes. director.ts runs every
+ * film, sheet and line of copy from the one position both move. With reduced motion the same
  * story is a still page that scrolls.
  */
 export default function MobileHome({ sceneProducts }: { sceneProducts?: SceneProducts | null }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const scenes = useMemo(() => resolveScenes(sceneProducts), [sceneProducts]);
   const [spot, setSpot] = useState<OpenSpot | null>(null);
-  const [nav, setNav] = useState<StepState>({ at: 0, target: 0, playing: false, ready: false });
+  // The bar's state lives outside React's tree: a beat passing under a
+  // swipe re-renders the bar, never this whole page.
+  const [stepStore] = useState(() =>
+    createStepStore({ at: 0, target: 0, between: false, playing: false, ready: false } satisfies StepState),
+  );
   const directorRef = useRef<Director | null>(null);
   const targetRef = useRef(0);
   const smooth = useSmoothScroll();
@@ -73,7 +78,7 @@ export default function MobileHome({ sceneProducts }: { sceneProducts?: ScenePro
             targetRef.current = state.target;
             setSpot(null);
           }
-          setNav(state);
+          stepStore.set(state);
         },
       });
     });
@@ -82,7 +87,7 @@ export default function MobileHome({ sceneProducts }: { sceneProducts?: ScenePro
       directorRef.current?.destroy();
       directorRef.current = null;
     };
-  }, []);
+  }, [stepStore]);
 
   const onStep = useCallback((dir: 1 | -1) => {
     directorRef.current?.step(dir);
@@ -252,7 +257,7 @@ export default function MobileHome({ sceneProducts }: { sceneProducts?: ScenePro
 
       <SpotCard scenes={scenes} open={spot} onChange={setSpot} />
 
-      <Dock state={nav} onStep={onStep} />
+      <Dock store={stepStore} onStep={onStep} />
 
       {/* The cut: falls over the page while it jumps to a far beat. */}
       <div className={styles.curtain} data-m-curtain aria-hidden />

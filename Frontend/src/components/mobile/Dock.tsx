@@ -1,13 +1,16 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import type { StepState } from "./director";
 import { STEPS } from "./script";
 import styles from "./mobile.module.css";
 
 /**
- * The Previous / Next bar — how the phone home is read, in place of
- * scrolling. A full-width bar on the foot of the screen, split by a
- * hairline into two halves a thumb can't miss, each in the site's own
+ * The Previous / Next bar — one of the two ways the phone home is read;
+ * the other is scrolling, which steers the same story, so the bar always
+ * names the beats either side of it. A full-width bar on the foot of the
+ * screen, split by a hairline into two halves a thumb can't miss, each in
+ * the site's own
  * Previous / Next dress (Spaces, the customizer): a small uppercase label
  * with the thin line arrow, and under it the name of the beat it plays to.
  *
@@ -17,13 +20,15 @@ import styles from "./mobile.module.css";
  * director flips its tone (data-tone) between cream over the films and
  * timber over the craft plate. On the last beat Next becomes Replay.
  */
-export default function Dock({ state, onStep }: { state: StepState; onStep: (dir: 1 | -1) => void }) {
-  const { target, ready } = state;
+export default function Dock({ store, onStep }: { store: StepStore; onStep: (dir: 1 | -1) => void }) {
+  const state = useSyncExternalStore(store.subscribe, store.get, store.get);
+  const { at, target, between, ready } = state;
   const lastStep = STEPS.length - 1;
-  const first = target === 0;
-  const end = target === lastStep;
-  const prev = STEPS[target - 1];
-  const next = STEPS[target + 1];
+  // Scrolled part-way: Previous goes back to the beat behind, Next on.
+  const first = !between && target === 0;
+  const end = !between && target === lastStep;
+  const prev = STEPS[between ? at : target - 1];
+  const next = STEPS[between ? at + 1 : target + 1];
   const nextName = end ? "From The Top" : next?.title ?? "";
 
   return (
@@ -77,6 +82,32 @@ export default function Dock({ state, onStep }: { state: StepState; onStep: (dir
       </p>
     </nav>
   );
+}
+
+/**
+ * Where the story stands, for the bar alone: the director writes it as
+ * beats pass under a swipe, and only the bar re-renders — never the page.
+ */
+export interface StepStore {
+  get(): StepState;
+  set(state: StepState): void;
+  subscribe(listener: () => void): () => void;
+}
+
+export function createStepStore(initial: StepState): StepStore {
+  let state = initial;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => state,
+    set(next) {
+      state = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
 }
 
 /** The site's thin line arrow (Spaces "Line 32"), drawn in currentColor. */
