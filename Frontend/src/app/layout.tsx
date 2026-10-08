@@ -117,8 +117,8 @@ export default function RootLayout({
           {/* Owns the route-change curtain, so it must outlive every page. */}
           <PageTransitionProvider>
             <SectionTheme />
-            {/* Below lg the page shows the DesktopGate takeover, which brings
-                its own logo — hide the site chrome so the plate stands alone. */}
+            {/* Below lg the home page is the phone experience (MobileHome),
+                which brings its own header — the desktop chrome stays out. */}
             <div className="max-lg:hidden">
               <SiteHeader />
               <SectionRail />

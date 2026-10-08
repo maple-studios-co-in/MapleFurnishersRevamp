@@ -52,7 +52,14 @@ export default function SocialRail() {
   const [footerInView, setFooterInView] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
+    // Dispatch only on a change, not on every scroll event.
+    let last: boolean | null = null;
+    const onScroll = () => {
+      const next = window.scrollY > 40;
+      if (next === last) return;
+      last = next;
+      setScrolled(next);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);

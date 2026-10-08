@@ -3,10 +3,12 @@ import CatalogueLanding from "./pages/CatalogueLanding";
 import ChairsCollections from "./pages/ChairsCollections";
 import SofasCollections from "./pages/SofasCollections";
 import BedsCollections from "./pages/BedsCollections";
+import TablesCollections from "./pages/TablesCollections";
 import {
   CHAIR_COLLECTIONS,
   SOFA_COLLECTIONS,
   BED_COLLECTIONS,
+  TABLE_COLLECTIONS,
   DIRECT,
   LEGACY_CHAIR_SLUGS,
   LEGACY_SOFA_SLUGS,
@@ -15,6 +17,7 @@ import {
   type ChairSlug,
   type SofaSlug,
   type BedSlug,
+  type TableSlug,
 } from "./catalogues";
 import "./App.css";
 
@@ -78,6 +81,21 @@ function BedPdf() {
   return <PdfViewer cat={BED_COLLECTIONS[slug as BedSlug]} />;
 }
 
+/** /table-collections/:slug — one table collection's PDF catalogue. */
+function TablePdf() {
+  const { slug } = useParams();
+  if (!slug || !(slug in TABLE_COLLECTIONS)) {
+    return <Navigate to="/table-collections" replace />;
+  }
+  return <PdfViewer cat={TABLE_COLLECTIONS[slug as TableSlug]} />;
+}
+
+/** /tables/:slug, the short form, lands on its named route. */
+function TablesAlias() {
+  const { slug } = useParams();
+  return <Navigate to={slug ? `/table-collections/${slug}` : "/table-collections"} replace />;
+}
+
 /** Redirect an old /catalogue-N/:slug child onto its named route. */
 function LegacyChild({ map, base }: { map: Record<string, string>; base: string }) {
   const { slug } = useParams();
@@ -99,9 +117,17 @@ function App() {
       <Route path="/sofa-collections/:slug" element={<SofaPdf />} />
       <Route path="/beds-collections" element={<BedsCollections />} />
       <Route path="/beds-collections/:slug" element={<BedPdf />} />
+      <Route path="/table-collections" element={<TablesCollections />} />
+      <Route path="/table-collections/:slug" element={<TablePdf />} />
       <Route path="/cafe-collections" element={<PdfViewer cat={DIRECT.cafe} />} />
       <Route path="/restaurants" element={<PdfViewer cat={DIRECT.restaurant} />} />
       <Route path="/nimbus-collection" element={<PdfViewer cat={DIRECT.nimbus} />} />
+      <Route path="/storage" element={<PdfViewer cat={DIRECT.storage} />} />
+      <Route path="/outdoor" element={<PdfViewer cat={DIRECT.outdoor} />} />
+
+      {/* Short forms for the tables family: /tables, /tables/side-tables. */}
+      <Route path="/tables" element={<Navigate to="/table-collections" replace />} />
+      <Route path="/tables/:slug" element={<TablesAlias />} />
 
       {/* Legacy /catalogue-N routes shipped for a while — keep every old
           bookmark and shared link working via client-side redirects. */}

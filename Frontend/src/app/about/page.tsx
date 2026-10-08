@@ -8,6 +8,7 @@ import ProjectFolder from "@/components/about/ProjectFolder";
 import Questions from "@/components/about/Questions";
 import StoryRow from "@/components/about/StoryRow";
 import FilmStage from "@/components/about/film/FilmStage";
+import PhoneFilm from "@/components/about/phone/PhoneFilm";
 import { STORY_ROWS } from "@/components/about/content";
 import { aboutFontVars } from "@/components/about/fonts";
 import styles from "@/components/about/about.module.css";
@@ -43,7 +44,8 @@ export default function AboutPage() {
       <AboutExperience className={`${styles.page} ${aboutFontVars}`} fontVars={aboutFontVars}>
         <FilmStage />
         <main>
-          <div className={styles.stackedOnly}>
+          <PhoneFilm />
+          <div className={styles.stackedOnly} data-stacked-only>
             <AboutHero />
             {STORY_ROWS.map((row) => (
               <StoryRow key={row.id} row={row} />

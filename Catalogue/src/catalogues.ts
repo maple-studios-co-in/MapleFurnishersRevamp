@@ -59,11 +59,28 @@ export const BED_COLLECTIONS = {
 
 export type BedSlug = keyof typeof BED_COLLECTIONS;
 
+/** The table collections — /table-collections/:slug (Figma Scene 32).
+ *  "All Tables" opens the merged master: every chapter keeps its own cover
+ *  and "About Maple" opener, the shared Maple Promise page appears once. */
+export const TABLE_COLLECTIONS = {
+  "all-tables": { title: "All Tables", pdf: "/catalogues/all-tables.pdf" },
+  dining: { title: "Dining", pdf: "/catalogues/dining-tables.pdf" },
+  consoles: { title: "Consoles", pdf: "/catalogues/consoles.pdf" },
+  "bar-collections": { title: "Bar Collections", pdf: "/catalogues/bar-tables.pdf" },
+  "side-tables": { title: "Side Tables", pdf: "/catalogues/side-tables.pdf" },
+  "tv-units": { title: "TV Units", pdf: "/catalogues/tv-units.pdf" },
+  "coffee-tables": { title: "Coffee Tables", pdf: "/catalogues/coffee-tables.pdf" },
+} as const;
+
+export type TableSlug = keyof typeof TABLE_COLLECTIONS;
+
 /** Landing cards that open a PDF catalogue directly (no collection page). */
 export const DIRECT = {
   cafe: { title: "Cafe Collection", pdf: "/catalogues/cafe-collection.pdf" },
   restaurant: { title: "Restaurant Collection", pdf: "/catalogues/restaurant-collection.pdf" },
   nimbus: { title: "Nimbus Collection", pdf: "/catalogues/nimbus-collection.pdf" },
+  storage: { title: "Storage", pdf: "/catalogues/storage.pdf" },
+  outdoor: { title: "Outdoor", pdf: "/catalogues/outdoor.pdf" },
 } as const;
 
 /**

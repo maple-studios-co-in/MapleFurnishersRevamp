@@ -1,0 +1,1260 @@
+/* The home page on a phone (below 1024px). The director (director.ts) owns
+   every moving value; this sheet sets the stage and the resting states.
+
+   Sizing: stages are 100lvh tall (the screen with the browser toolbars
+   tucked away), so footage and plate never leave a gap or jump when a
+   toolbar slides. Copy (and the craft chair) live in .ui, a 100svh box at
+   the top of the stage: the part of the screen on show whatever the
+   toolbars do, so nothing hides under one and nothing moves when it goes.
+
+   Type: the desktop specs, scaled to a phone's measure —
+     headlines  TAN PEARL 400, stroked in their own colour, 0.05em
+     sub-text   Red Hat Display 300, 0.08–0.1em
+     chrome     Manrope 500, 0.2em, uppercase */
+
+.home {
+  --cream: #f4f2ec;
+  --wash: #691511;
+  --brand: #741a14;
+  --card: #50211e;
+  --night: #120e0b;
+  position: relative;
+  background: var(--night);
+  color: var(--cream);
+  -webkit-tap-highlight-color: transparent;
+  /* The director sizes the chapters after load; the browser must not
+     "rescue" the scroll position when it does. */
+  overflow-anchor: none;
+}
+
+/* ------------------------------------------------------------ chapters -- */
+
+.chapter {
+  position: relative;
+  height: calc(100vh + var(--run, 0px));
+}
+
+@supports (height: 100lvh) {
+  .chapter {
+    height: calc(100lvh + var(--run, 0px));
+  }
+}
+
+.stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+@supports (height: 100lvh) {
+  .stage {
+    height: 100lvh;
+  }
+}
+
+/* What a stage scales or pushes into. */
+.frame {
+  position: absolute;
+  inset: 0;
+}
+
+/* The always-visible part of a stage (see the top of this sheet). */
+.ui {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 100vh;
+  pointer-events: none;
+}
+
+@supports (height: 100svh) {
+  .ui {
+    height: 100svh;
+  }
+}
+
+.media {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A sheet arriving over this stage darkens it. */
+.dim {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: #0b0806;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------- 01–02 · the intro -- */
+
+.hero {
+  z-index: 1;
+  background: var(--wash);
+}
+
+.hero .stage {
+  background: var(--wash);
+}
+
+.hero .frame {
+  transform-origin: 56% 57%;
+}
+
+.rest {
+  opacity: 0;
+}
+
+.furnishCanvas {
+  opacity: 0;
+}
+
+.heroScrim {
+  position: absolute;
+  inset: auto 0 0;
+  height: 48%;
+  background: linear-gradient(to top, rgb(14 10 8 / 0.62), rgb(14 10 8 / 0.25) 55%, rgb(14 10 8 / 0));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.title {
+  position: absolute;
+  inset-inline: 0;
+  /* Centred on the screen; the director's reveal carries yPercent -50. */
+  top: 50%;
+  z-index: 2;
+  margin: 0;
+  padding-inline: 16px;
+  font-family: var(--font-hero);
+  /* "Every home" runs 8.0em with the tracking: 10.4vw keeps it ~83% of
+     the screen, one line, down to a 320px phone. */
+  font-size: clamp(30px, 10.4vw, 60px);
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: 0.05em;
+  text-align: center;
+  color: #fff;
+  -webkit-text-stroke: 1px #fff;
+  text-shadow: 0 4px 40px rgb(23 19 16 / 0.35);
+  visibility: hidden;
+  opacity: 0;
+}
+
+.furnish {
+  position: absolute;
+  inset-inline: 0;
+  top: 20.5%;
+  z-index: 2;
+  margin: 0;
+  font-family: var(--font-hero);
+  /* "Let's furnish" runs 8.3em. */
+  font-size: clamp(30px, 10vw, 60px);
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: 0.05em;
+  text-align: center;
+  color: var(--cream);
+  -webkit-text-stroke: 1px #fff;
+  text-shadow: 0 4px 40px rgb(23 19 16 / 0.5);
+  visibility: hidden;
+  opacity: 0;
+}
+
+.kicker {
+  position: absolute;
+  left: 7%;
+  bottom: 13%;
+  z-index: 2;
+  margin: 0;
+  font-family: var(--font-redhat);
+  font-size: clamp(15px, 4.4vw, 24px);
+  font-weight: 300;
+  line-height: 1.38;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 2px 16px rgb(23 19 16 / 0.55);
+  visibility: hidden;
+  opacity: 0;
+}
+
+/* The desktop cue, smaller: the arched label over a plumb line threaded
+   through a ring that drifts down it. */
+.cue {
+  position: absolute;
+  left: 50%;
+  bottom: 2.5%;
+  z-index: 3;
+  width: 176px;
+  margin-left: -88px;
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.85)) drop-shadow(0 4px 14px rgb(0 0 0 / 0.5));
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.cue svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.cueRing {
+  animation: cue-drift 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes cue-drift {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(14px);
+    opacity: 0.5;
+  }
+}
+
+.skip {
+  position: absolute;
+  right: 16px;
+  bottom: max(22px, env(safe-area-inset-bottom) + 10px);
+  z-index: 4;
+  padding: 9px 18px;
+  border: 1px solid rgb(232 226 214 / 0.45);
+  border-radius: 999px;
+  background: rgb(232 226 214 / 0.1);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  font-family: var(--font-manrope);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #fff;
+  opacity: 0;
+  pointer-events: auto;
+}
+
+/* ------------------------------------------------------- 03 · the craft -- */
+
+/* Pulled up over the hero's last stretch so the hand-off happens with both
+   stages pinned; it stays invisible until then (the director). */
+.craft {
+  z-index: 2;
+  margin-top: calc(-100vh - var(--bridge, 0px));
+}
+
+@supports (height: 100lvh) {
+  .craft {
+    margin-top: calc(-100lvh - var(--bridge, 0px));
+  }
+}
+
+.plate {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(69.68% 69.68% at 50% 50%, #e7ddd4 0%, #bcab98 100%);
+  opacity: 0;
+}
+
+.eyebrow {
+  position: absolute;
+  left: 8%;
+  top: calc(env(safe-area-inset-top) + 96px);
+  z-index: 2;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #2e1d10;
+  visibility: hidden;
+  opacity: 0;
+}
+
+/* Centring on the wrapper; the director moves the inner span. */
+.wordmarkWrap {
+  position: absolute;
+  left: 50%;
+  top: 31%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.wordmark {
+  display: block;
+  font-family: var(--font-hero);
+  /* "Maple" runs 3.97em: 22vw spans ~87% of the screen. */
+  font-size: clamp(70px, 22vw, 170px);
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: var(--brand);
+  -webkit-text-stroke: 2px var(--brand);
+  user-select: none;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.chairBox {
+  position: absolute;
+  inset: 15% 6% 26%;
+  z-index: 3;
+  opacity: 0;
+}
+
+.chairCanvas {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Under the assembled chair's feet (its base sits at ~96% of the box). */
+.podShadow {
+  position: absolute;
+  left: 50%;
+  bottom: 0.5%;
+  width: 66%;
+  height: 7%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 50%, rgb(70 45 25 / 0.3) 0%, rgb(70 45 25 / 0) 70%);
+  filter: blur(6px);
+}
+
+.beauty {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 8%;
+  z-index: 4;
+  margin: 0;
+  font-family: var(--font-redhat);
+  font-size: clamp(17px, 4.8vw, 26px);
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  text-transform: capitalize;
+  color: #1e1e1e;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.note {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 7%;
+  z-index: 4;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.noteRule {
+  display: block;
+  width: 40px;
+  height: 1px;
+  margin-bottom: 12px;
+  background: rgb(116 26 20 / 0.8);
+}
+
+.noteTitle {
+  margin: 0;
+  font-family: var(--font-hero);
+  font-size: clamp(21px, 6vw, 30px);
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: 0.05em;
+  white-space: pre-line;
+  color: var(--brand);
+  -webkit-text-stroke: 0.6px var(--brand);
+}
+
+.noteBody {
+  max-width: 30ch;
+  margin: 8px 0 0;
+  font-family: var(--font-redhat);
+  font-size: clamp(14px, 3.9vw, 18px);
+  font-weight: 300;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  color: #000;
+}
+
+/* ------------------------------------------------------ 04–06 · rooms -- */
+
+/* Slides over the pinned craft stage like a sheet laid on top. */
+.rooms {
+  z-index: 3;
+  margin-top: -100vh;
+}
+
+@supports (height: 100lvh) {
+  .rooms {
+    margin-top: -100lvh;
+  }
+}
+
+.roomsStage {
+  background: var(--night);
+  box-shadow: 0 -24px 60px rgb(0 0 0 / 0.35);
+}
+
+.scrim {
+  position: absolute;
+  inset-inline: 0;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scrimTop {
+  top: 0;
+  height: 52%;
+  background: linear-gradient(to bottom, rgb(12 9 7 / 0.62), rgb(12 9 7 / 0.3) 48%, rgb(12 9 7 / 0));
+}
+
+.scrimBottom {
+  bottom: 0;
+  height: 46%;
+  background: linear-gradient(to top, rgb(12 9 7 / 0.66), rgb(12 9 7 / 0.28) 52%, rgb(12 9 7 / 0));
+}
+
+.sceneCopy {
+  position: absolute;
+  left: 7%;
+  right: 6%;
+  top: calc(env(safe-area-inset-top) + 100px);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.sceneSplit {
+  position: absolute;
+  left: 7%;
+  right: 6%;
+  bottom: 12%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.line {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.sceneRule {
+  display: block;
+  width: 44px;
+  height: 1px;
+  margin-bottom: 14px;
+  background: rgb(246 241 232 / 0.8);
+}
+
+.sceneTitle {
+  margin: 0;
+  font-family: var(--font-hero);
+  /* The longest set line, "A Room Becomes A", runs 13.1em: 6.3vw holds it
+     to ~95% of the measure on every phone width. */
+  font-size: clamp(20px, 6.3vw, 36px);
+  font-weight: 400;
+  line-height: 1.22;
+  letter-spacing: 0.05em;
+  white-space: pre-line;
+  color: #fff;
+  -webkit-text-stroke: 0.6px #fff;
+  text-shadow: 0 2px 24px rgb(23 19 16 / 0.5);
+}
+
+.sceneSub {
+  margin: 12px 0 0;
+  font-family: var(--font-redhat);
+  font-size: clamp(14px, 4vw, 19px);
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  color: var(--cream);
+  text-shadow: 0 1px 14px rgb(23 19 16 / 0.55);
+}
+
+.sceneSplit .sceneSub {
+  margin-top: 0;
+}
+
+.sceneBody {
+  max-width: 32ch;
+  margin: 6px 0 0;
+  font-family: var(--font-redhat);
+  font-size: clamp(14px, 3.9vw, 18px);
+  font-weight: 300;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-shadow: 0 1px 12px rgb(23 19 16 / 0.5);
+}
+
+.sceneSplit .sceneBody {
+  margin-top: 2px;
+}
+
+/* Shoppable dots: 44px of tap target around the desktop's ring and core. */
+.dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  visibility: hidden;
+  opacity: 0;
+}
+
+/* Sat out by the director: it would land under copy or off screen. */
+.dot[hidden] {
+  display: none;
+}
+
+.dot::before,
+.dot::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+}
+
+.dot::before {
+  background: rgb(255 255 255 / 0.5);
+}
+
+.dot[data-on]::before {
+  animation: dot-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.dot::after {
+  border: 1px solid rgb(255 255 255 / 0.85);
+  background: rgb(255 255 255 / 0.22);
+}
+
+.dotCore {
+  position: relative;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px rgb(255 255 255 / 0.9);
+}
+
+@keyframes dot-ping {
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(26px, env(safe-area-inset-bottom) + 14px);
+  z-index: 3;
+  margin: 0;
+  font-family: var(--font-manrope);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-align: center;
+  text-transform: uppercase;
+  color: rgb(246 241 232 / 0.85);
+  text-shadow: 0 1px 10px rgb(0 0 0 / 0.6);
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+
+/* ---------------------------------------------------- the brand card -- */
+
+.finale {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: calc(env(safe-area-inset-top) + 88px) 24px calc(env(safe-area-inset-bottom) + 28px);
+  overflow: hidden;
+  background: var(--card);
+  color: #eeeae2;
+  text-align: center;
+}
+
+@supports (height: 100lvh) {
+  .finale {
+    min-height: 100lvh;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .finale {
+    margin-top: -100vh;
+    box-shadow: 0 -24px 60px rgb(0 0 0 / 0.35);
+  }
+
+  @supports (height: 100lvh) {
+    .finale {
+      margin-top: -100lvh;
+    }
+  }
+}
+
+.finaleGlow {
+  position: absolute;
+  inset: -20% -30% auto;
+  height: 80%;
+  background: radial-gradient(50% 50% at 50% 50%, rgb(192 133 82 / 0.16), rgb(192 133 82 / 0));
+  pointer-events: none;
+}
+
+.finaleMark {
+  position: relative;
+  margin-top: auto;
+}
+
+.finaleLogo {
+  display: block;
+  width: min(66vw, 320px);
+  height: auto;
+  color: #eeeae2;
+}
+
+.finaleLine {
+  position: relative;
+  max-width: 24ch;
+  margin: 18px auto 0;
+  font-family: var(--font-redhat);
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.6;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(238 234 226 / 0.75);
+}
+
+.finaleCtas {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  width: min(100%, 340px);
+  margin-top: auto;
+  padding-top: 40px;
+}
+
+.ctaPrimary,
+.ctaGhost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 50px;
+  border-radius: 999px;
+  font-family: var(--font-manrope);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.ctaPrimary {
+  background: #eeeae2;
+  color: var(--card);
+}
+
+.ctaPrimary:active {
+  background: #fff;
+}
+
+.ctaGhost {
+  border: 1px solid rgb(238 234 226 / 0.35);
+  color: #eeeae2;
+}
+
+.ctaGhost:active {
+  border-color: rgb(238 234 226 / 0.8);
+}
+
+.socials {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.social {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgb(238 234 226 / 0.4);
+  border-radius: 50%;
+  color: rgb(238 234 226 / 0.85);
+}
+
+.social svg {
+  width: 16px;
+  height: 16px;
+}
+
+.legal {
+  position: relative;
+  margin: 22px 0 0;
+  font-family: var(--font-manrope);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgb(238 234 226 / 0.45);
+}
+
+/* ------------------------------------------------------------- header -- */
+
+.header {
+  --chrome: 238 234 226;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 10px;
+  color: rgb(var(--chrome));
+  pointer-events: none;
+  transition: color 0.5s ease;
+}
+
+.header[data-tone="light"]:not([data-menu="true"]) {
+  --chrome: 46 29 16;
+}
+
+.header > * {
+  pointer-events: auto;
+}
+
+.progress {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: rgb(var(--chrome) / 0.55);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  pointer-events: none;
+  /* Moves every frame: its own tiny layer, so the header never repaints. */
+  will-change: transform;
+}
+
+.logo {
+  display: block;
+  line-height: 0;
+}
+
+.logo svg {
+  width: auto;
+  height: 42px;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgb(var(--chrome) / 0.45);
+  border-radius: 999px;
+  /* No backdrop blur: over a film that changes every frame it would be
+     re-blurred every frame, for a 36px pill. */
+  background: rgb(var(--chrome) / 0.14);
+  font-family: var(--font-manrope);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: border-color 0.5s, background-color 0.5s;
+}
+
+.shop svg {
+  width: 13px;
+  height: 13px;
+}
+
+.menuButton {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgb(var(--chrome) / 0.45);
+  border-radius: 50%;
+  background: rgb(var(--chrome) / 0.1);
+  color: inherit;
+  transition: border-color 0.5s, background-color 0.5s;
+}
+
+.burger,
+.burger::before {
+  display: block;
+  width: 16px;
+  height: 1px;
+  background: currentColor;
+  transition: transform 0.45s cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+.burger {
+  transform: translateY(-3px);
+}
+
+.burger::before {
+  content: "";
+  transform: translateY(6px);
+}
+
+.header[data-menu="true"] .burger {
+  transform: rotate(45deg);
+}
+
+.header[data-menu="true"] .burger::before {
+  transform: rotate(-90deg);
+}
+
+/* The menu opens as an iris from the menu button. */
+.menu {
+  --mx: calc(100% - 36px);
+  --my: 34px;
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 104px) 28px calc(env(safe-area-inset-bottom) + 28px);
+  background:
+    radial-gradient(120% 60% at 100% 0%, rgb(105 21 17 / 0.45), rgb(105 21 17 / 0)),
+    var(--night);
+  clip-path: circle(0 at var(--mx) var(--my));
+  visibility: hidden;
+  overscroll-behavior: contain;
+  transition:
+    clip-path 0.7s cubic-bezier(0.76, 0, 0.24, 1),
+    visibility 0s linear 0.7s;
+}
+
+.menu[data-open="true"] {
+  clip-path: circle(150% at var(--mx) var(--my));
+  visibility: visible;
+  transition:
+    clip-path 0.8s cubic-bezier(0.76, 0, 0.24, 1),
+    visibility 0s;
+}
+
+.menuList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menuItem {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.menu[data-open="true"] .menuItem {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1) calc(0.22s + var(--i) * 0.07s),
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1) calc(0.22s + var(--i) * 0.07s);
+}
+
+.menuLink {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-hero);
+  font-size: clamp(34px, 10.5vw, 52px);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-align: left;
+  color: var(--cream);
+}
+
+.menuIndex {
+  font-family: var(--font-manrope);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: rgb(246 241 232 / 0.45);
+}
+
+.menuFoot {
+  margin-top: auto;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.menu[data-open="true"] .menuFoot {
+  opacity: 1;
+  transition: opacity 0.8s ease 0.55s;
+}
+
+.menuShop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--cream);
+  font-family: var(--font-manrope);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--night);
+}
+
+.menuSocials {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+/* ---------------------------------------------------- the piece card -- */
+
+.card {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 45;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.82) 0%, rgb(246 241 232 / 0.66) 100%);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 50px rgb(23 19 16 / 0.4);
+  color: #000;
+  transform: translateY(calc(100% + 40px));
+  visibility: hidden;
+  transition:
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.5s;
+}
+
+.card[data-open="true"] {
+  transform: none;
+  visibility: visible;
+  transition:
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s;
+}
+
+.cardThumb {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: 12px;
+  background: #f7f3ec;
+  object-fit: cover;
+}
+
+.cardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardRoom {
+  margin: 0;
+  font-family: var(--font-manrope);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgb(0 0 0 / 0.5);
+}
+
+.cardName {
+  margin: 4px 0 0;
+  overflow: hidden;
+  font-family: "News701 BT", var(--font-playfair), ui-serif, Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--brand);
+}
+
+.cardDesc {
+  margin: 2px 0 0;
+  font-family: var(--font-redhat);
+  font-size: 12.5px;
+  font-weight: 300;
+  line-height: 1.45;
+  letter-spacing: 0.06em;
+}
+
+.cardRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cardMore {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 6px;
+  background: #8a2f1d;
+  font-family: var(--font-redhat);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: #fff;
+}
+
+.cardPrice {
+  margin-left: auto;
+  font-family: var(--font-redhat);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.cardClose,
+.cardStep {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgb(0 0 0 / 0.14);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.5);
+  color: #2e1d10;
+}
+
+.cardClose {
+  position: absolute;
+  top: -14px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+}
+
+.cardClose svg,
+.cardStep svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ------------------------------------------ reduced motion: a still page -- */
+
+.still {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion {
+    display: none;
+  }
+
+  .still {
+    display: block;
+  }
+
+  .progress {
+    display: none;
+  }
+}
+
+.shot {
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  background: var(--night);
+}
+
+.shot > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shot .title,
+.shot .furnish,
+.shot .kicker,
+.shot .line,
+.stillCraft .eyebrow,
+.stillCraft .beauty {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* No director here to carry the centring: CSS does. */
+.shot .title {
+  transform: translateY(-50%);
+}
+
+.stillCraft {
+  position: relative;
+  padding: calc(env(safe-area-inset-top) + 96px) 8% 56px;
+  background: radial-gradient(69.68% 69.68% at 50% 50%, #e7ddd4 0%, #bcab98 100%);
+  color: #1e1e1e;
+}
+
+.stillCraft .eyebrow,
+.stillCraft .beauty {
+  position: static;
+}
+
+.stillChair {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 28px auto;
+}
+
+.stillNotes {
+  display: grid;
+  gap: 28px;
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ------------------------------------------------- short phones -- */
+
+/* iPhone SE / 8, small Androids (≤ 700px tall): the craft chair gives the
+   notes more room, and the room copy starts a little higher. */
+@media (max-height: 700px) {
+  .eyebrow {
+    top: calc(env(safe-area-inset-top) + 84px);
+  }
+
+  .chairBox {
+    inset: 14% 8% 31%;
+  }
+
+  .beauty,
+  .note {
+    bottom: 5.5%;
+  }
+
+  .noteTitle {
+    font-size: clamp(19px, 5.4vw, 26px);
+  }
+
+  .noteBody,
+  .beauty {
+    font-size: clamp(13.5px, 3.7vw, 17px);
+  }
+
+  .sceneCopy {
+    top: calc(env(safe-area-inset-top) + 88px);
+  }
+
+  /* Clear of the settled chair's feet when Safari's toolbar is out. */
+  .kicker {
+    bottom: 8%;
+  }
+}
+
+/* The shortest screens (a 360×640 Android with its URL bar showing leaves
+   ~510px): a tighter menu so the links never meet Shop Now. */
+@media (max-height: 640px) {
+  .menu {
+    padding-top: calc(env(safe-area-inset-top) + 84px);
+  }
+
+  .menuLink {
+    padding: 6px 0;
+    font-size: clamp(30px, 9vw, 44px);
+  }
+
+  .menuSocials {
+    margin-top: 16px;
+  }
+}
+
+/* ------------------------------------------- phones held sideways -- */
+
+.turn {
+  display: none;
+}
+
+/* Touch screens only: a narrow desktop window keeps the page. */
+@media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
+  .turn {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: var(--night);
+    font-family: var(--font-hero);
+    font-size: 22px;
+    letter-spacing: 0.05em;
+    text-align: center;
+    color: var(--cream);
+  }
+}

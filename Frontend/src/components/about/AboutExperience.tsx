@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import MapleLogo from "@/components/ui/MapleLogo";
 import { PAGE_ENTER_EVENT, transitionState } from "@/lib/page-transition";
 import type { FilmDirector } from "./film/filmDirector";
+import type { PhoneFilmDirector } from "./phone/phoneDirector";
 import { gsap, ScrollTrigger, SplitText } from "./motion/gsap-about";
 import styles from "./about.module.css";
 
@@ -19,10 +20,12 @@ import styles from "./about.module.css";
  * A hard load opens with the intro sheet (wordmark drawn in, load counter,
  * then the sheet wipes away); arriving through the route curtain skips it.
  */
-type Mode = "film" | "stacked" | "static";
+type Mode = "film" | "phone" | "stacked" | "static";
 
 /** Must match the film-mode media query in about.module.css. */
 const FILM_QUERY = "(min-width: 1024px) and (prefers-reduced-motion: no-preference)";
+/** Phones with motion get the phone film (phone/); must match .phoneOnly. */
+const PHONE_QUERY = "(max-width: 1023.98px) and (prefers-reduced-motion: no-preference)";
 
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
@@ -55,12 +58,14 @@ export default function AboutExperience({
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const filmMode = window.matchMedia(FILM_QUERY).matches;
+    const phoneMode = window.matchMedia(PHONE_QUERY).matches;
     const finePointer = window.matchMedia("(pointer: fine)").matches;
     const viaCurtain = transitionState.phase === "covering" || transitionState.phase === "covered";
     const withIntro = !reduce && !viaCurtain && run === 0;
 
     let disposed = false;
     const film: { current: FilmDirector | null } = { current: null };
+    const phone: { current: PhoneFilmDirector | null } = { current: null };
     const cleanups: Array<() => void> = [];
     const ctx = gsap.context(() => {}, root);
 
@@ -130,6 +135,17 @@ export default function AboutExperience({
         } catch (error) {
           console.warn("About: film unavailable, showing the stacked page.", error);
         }
+      } else if (phoneMode) {
+        try {
+          const { createPhoneFilm } = await import("./phone/phoneDirector");
+          if (disposed) return;
+          ctx.add(() => {
+            phone.current = createPhoneFilm(root);
+          });
+          if (phone.current) mode = "phone";
+        } catch (error) {
+          console.warn("About: phone film unavailable, showing the stacked page.", error);
+        }
       }
       if (disposed) return;
       root.dataset.mode = mode;
@@ -138,6 +154,10 @@ export default function AboutExperience({
       ctx.add(() => {
         if (mode === "film" && film.current) {
           enter = film.current.entrance();
+        } else if (mode === "phone" && phone.current) {
+          enter = phone.current.entrance();
+          // The letter, folder, questions and footer reveal as they arrive.
+          buildScrollReveals(root, "[data-stacked-only]");
         } else {
           buildScrollReveals(root);
           enter = buildEntrance(root);
@@ -146,7 +166,7 @@ export default function AboutExperience({
       if (mode === "stacked") cleanups.push(playVideosInView(root));
       if (finePointer) cleanups.push(...magnetic(root));
       if (process.env.NODE_ENV !== "production") {
-        (window as unknown as { __mapleAbout?: unknown }).__mapleAbout = { mode, film: film.current };
+        (window as unknown as { __mapleAbout?: unknown }).__mapleAbout = { mode, film: film.current, phone: phone.current };
       }
       ScrollTrigger.refresh();
 
@@ -166,7 +186,11 @@ export default function AboutExperience({
       // Hold the sheet until the opening frame can actually be shown.
       const heroPoster = root.querySelector<HTMLImageElement>("[data-media-hero] img");
       await Promise.all([
-        film.current ? film.current.whenReady(2600) : imageReady(heroPoster, 2600),
+        film.current
+          ? film.current.whenReady(2600)
+          : phone.current
+            ? phone.current.whenReady(2600)
+            : imageReady(heroPoster, 2600),
         introLead.tl ? introLead.tl.then(() => undefined) : Promise.resolve(),
       ]);
       if (disposed) return;
@@ -199,6 +223,8 @@ export default function AboutExperience({
       cleanups.forEach((fn) => fn());
       film.current?.destroy();
       film.current = null;
+      phone.current?.destroy();
+      phone.current = null;
       ctx.revert();
       if (transitionState.ready === ready) transitionState.ready = null;
       delete root.dataset.mode;
@@ -275,10 +301,12 @@ function buildEntrance(root: HTMLElement) {
   return tl;
 }
 
-function buildScrollReveals(root: HTMLElement) {
+function buildScrollReveals(root: HTMLElement, skip?: string) {
+  const pick = <T extends Element = HTMLElement>(sel: string) =>
+    Array.from(root.querySelectorAll<T>(sel)).filter((el) => !skip || !el.closest(skip));
   const once = (trigger: Element, start: string): ScrollTrigger.Vars => ({ trigger, start, once: true });
 
-  root.querySelectorAll<HTMLElement>('[data-reveal="lines"]').forEach((el) => {
+  pick<HTMLElement>('[data-reveal="lines"]').forEach((el) => {
     SplitText.create(el, {
       type: "lines",
       mask: "lines",
@@ -295,7 +323,7 @@ function buildScrollReveals(root: HTMLElement) {
     });
   });
 
-  root.querySelectorAll<HTMLElement>('[data-reveal="text"]').forEach((el) => {
+  pick<HTMLElement>('[data-reveal="text"]').forEach((el) => {
     SplitText.create(el, {
       type: "lines",
       linesClass: "about-text-line",
@@ -313,7 +341,7 @@ function buildScrollReveals(root: HTMLElement) {
     });
   });
 
-  root.querySelectorAll<HTMLElement>('[data-reveal="write"]').forEach((el) => {
+  pick<HTMLElement>('[data-reveal="write"]').forEach((el) => {
     SplitText.create(el, {
       type: "lines",
       linesClass: "about-ink-line",
@@ -333,11 +361,11 @@ function buildScrollReveals(root: HTMLElement) {
     });
   });
 
-  root.querySelectorAll<HTMLElement>('[data-reveal="fade"]').forEach((el) => {
+  pick<HTMLElement>('[data-reveal="fade"]').forEach((el) => {
     gsap.from(el, { opacity: 0, y: 26, duration: 1.15, ease: "mapleOut", scrollTrigger: once(el, "top 92%") });
   });
 
-  root.querySelectorAll<HTMLElement>('[data-reveal="tab"]').forEach((el) => {
+  pick<HTMLElement>('[data-reveal="tab"]').forEach((el) => {
     gsap.fromTo(
       el,
       { clipPath: "inset(100% 0% 0% 0%)" },
@@ -345,11 +373,11 @@ function buildScrollReveals(root: HTMLElement) {
     );
   });
 
-  root.querySelectorAll<HTMLElement>('[data-reveal="letter"]').forEach((el) => {
+  pick<HTMLElement>('[data-reveal="letter"]').forEach((el) => {
     gsap.from(el, { y: 150, rotate: -2.4, opacity: 0, duration: 1.7, ease: "mapleOut", scrollTrigger: once(el, "top 92%") });
   });
 
-  root.querySelectorAll<HTMLElement>('[data-reveal-group="cards"]').forEach((group) => {
+  pick<HTMLElement>('[data-reveal-group="cards"]').forEach((group) => {
     gsap.from(group.querySelectorAll('[data-reveal="card"]'), {
       y: 110,
       rotate: 1.4,
@@ -361,7 +389,7 @@ function buildScrollReveals(root: HTMLElement) {
     });
   });
 
-  const faqList = root.querySelector<HTMLElement>("[data-reveal-group='faq']");
+  const faqList = pick<HTMLElement>("[data-reveal-group='faq']")[0];
   if (faqList) {
     gsap.from(faqList.querySelectorAll('[data-reveal="rule"]'), {
       scaleX: 0,
@@ -382,7 +410,7 @@ function buildScrollReveals(root: HTMLElement) {
     });
   }
 
-  root.querySelectorAll<HTMLElement>("[data-media]").forEach((slot) => {
+  pick<HTMLElement>("[data-media]").forEach((slot) => {
     if (slot.hasAttribute("data-media-hero")) return; // part of the entrance
     revealMedia(slot, { scrollTrigger: once(slot, "top 82%") });
     const inner = slot.querySelector<HTMLElement>("[data-media-inner]");
@@ -399,8 +427,8 @@ function buildScrollReveals(root: HTMLElement) {
     }
   });
 
-  const hero = root.querySelector<HTMLElement>("[data-hero]");
-  const heroTitle = root.querySelector<HTMLElement>("[data-hero-title-box]");
+  const hero = pick<HTMLElement>("[data-hero]")[0];
+  const heroTitle = pick<HTMLElement>("[data-hero-title-box]")[0];
   if (hero && heroTitle) {
     gsap.to(heroTitle, {
       yPercent: -22,
