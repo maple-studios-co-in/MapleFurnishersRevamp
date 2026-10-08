@@ -54,6 +54,8 @@ export class FrameBank {
   private plannedAt = Number.NaN;
   /** Which way the playhead is heading: 1, -1, or 0 for either. */
   private lead = 0;
+  /** Every `step`-th frame only, while the film plays fast (see setStep). */
+  private step = 1;
   /** Frames fetched into the HTTP cache ahead of time, and the queue. */
   private readonly warmed: boolean[];
   private warmQueue: number[] = [];
@@ -96,6 +98,18 @@ export class FrameBank {
   focus(index: number) {
     this.focusAt = Math.max(0, Math.min(this.count - 1, Math.round(index)));
     if (this.active && Math.abs(this.focusAt - this.plannedAt) >= 3) this.plan(false);
+  }
+
+  /**
+   * Thin the window to every `step`-th frame while the film plays fast: as
+   * many frames decoded, over `step` times the footage, and a half or a
+   * third of the decoding and uploading per second.
+   */
+  setStep(step: number) {
+    const s = Math.max(1, Math.round(step));
+    if (s === this.step) return;
+    this.step = s;
+    if (this.active) this.plan(false);
   }
 
   /** Lean the window the way the film is about to play. */
@@ -149,10 +163,11 @@ export class FrameBank {
     return i % this.stride === 0 || i === this.count - 1;
   }
 
-  /** The window: `keep` either side, or three quarters of it ahead when leaning. */
+  /** The window: `keep` frames either side, or three quarters of it ahead when leaning. */
   private wanted(i: number) {
     if (this.isKey(i)) return true;
-    const d = (i - this.focusAt) * (this.lead || 1);
+    if (i % this.step) return false;
+    const d = ((i - this.focusAt) * (this.lead || 1)) / this.step;
     if (!this.lead) return Math.abs(d) <= this.keep;
     return d >= -Math.round(this.keep / 2) && d <= Math.round(this.keep * 1.5);
   }

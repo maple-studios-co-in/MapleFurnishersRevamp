@@ -26,6 +26,8 @@ export interface StepState {
   at: number;
   /** The beat it is playing toward: `at` itself when at rest. */
   target: number;
+  /** Scrolled part-way from `at` toward the next beat, and resting there. */
+  between: boolean;
   playing: boolean;
   /** The intro is over and the Previous / Next bar is up. */
   ready: boolean;
@@ -124,6 +126,11 @@ class Film {
   private exact = false;
   private dirty = true;
   private active = false;
+  /** Draw every `stride`-th frame (cross-faded) while the playhead runs fast. */
+  private stride = 1;
+  /** The playhead's speed, footage frames per second, smoothed. */
+  private speed = 0;
+  private lastFrame = 0;
 
   constructor(
     readonly spec: FilmSpec,
@@ -190,13 +197,51 @@ class Film {
 
   /** A cut: the playhead lands on `frame` without passing the ones between. */
   snap(frame: number) {
-    this.frame = frame;
+    this.frame = this.lastFrame = frame;
+    this.speed = 0;
     this.dirty = true;
+  }
+
+  /**
+   * Keep up with the playhead's speed: past ~46 footage frames a second
+   * (the weave, a fast swipe) the film is drawn from every second frame,
+   * past ~92 every third, cross-faded between — a phone can decode and
+   * upload that steadily, and on a 60 Hz screen it reads as smooth.
+   */
+  pace(dt: number) {
+    if (dt <= 0) return;
+    const v = Math.abs(this.frame - this.lastFrame) / dt;
+    this.lastFrame = this.frame;
+    this.speed += (v - this.speed) * (1 - Math.exp(-dt * 6));
+    let st = this.stride;
+    if (st === 1 && this.speed > 46) st = 2;
+    if (st === 2 && this.speed > 92) st = 3;
+    if (st === 3 && this.speed < 70) st = 2;
+    if (st === 2 && this.speed < 30) st = 1;
+    if (st === this.stride) return;
+    this.stride = st;
+    this.bank.setStep(st);
+    this.dirty = true;
+  }
+
+  /** The frames a paint at `frame` uses: the stride's pair and the share between. */
+  private pair(frame: number) {
+    const last = this.spec.frames - 1;
+    const st = this.stride;
+    const i0 = Math.min(last, Math.floor(frame / st) * st);
+    const i1 = Math.min(last, i0 + st);
+    return { i0, i1, t: i1 > i0 ? (frame - i0) / (i1 - i0) : 0 };
   }
 
   /** Whether the footage at `frame` is decoded (either side of a blend). */
   near(frame: number) {
-    return this.bank.isReady(Math.floor(frame)) || this.bank.isReady(Math.ceil(frame));
+    const { i0, i1 } = this.pair(frame);
+    return this.bank.isReady(i0) || this.bank.isReady(i1);
+  }
+
+  /** Whether the frame on screen now is the real one, not a stand-in. */
+  shows() {
+    return this.bank.isReady(this.pair(this.frame).i0);
   }
 
   /** Paint the playhead; a no-op when nothing has changed. */
@@ -208,8 +253,7 @@ class Film {
     const q = Math.round(Math.max(0, Math.min(last, this.frame)) * 32) / 32;
     if (!this.dirty && q === this.painted) return;
     this.bank.focus(q);
-    const i0 = Math.floor(q);
-    const t = q - i0;
+    const { i0, i1, t } = this.pair(q);
     const a = this.bank.get(i0);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (!a) {
@@ -217,11 +261,11 @@ class Film {
       this.exact = false;
       return;
     }
-    // Blend only while the film glides: past half a frame per refresh the
+    // Blend only while the film glides: past half a step per refresh the
     // cross-fade can't be seen, and the second frame would be one more
     // fresh image to hand the GPU in the same refresh.
-    const gliding = this.painted < 0 || Math.abs(q - this.painted) <= 0.5;
-    let b = gliding && t > 0.03 && i0 < last && this.bank.isReady(i0 + 1) ? this.bank.get(i0 + 1) : null;
+    const gliding = this.painted < 0 || Math.abs(q - this.painted) <= 0.5 * this.stride;
+    let b = gliding && t > 0.03 && i1 > i0 && this.bank.isReady(i1) ? this.bank.get(i1) : null;
     if (b === a) b = null;
     if (this.alpha) {
       // Cut-outs add up instead of stacking, or the outgoing frame would
@@ -245,7 +289,7 @@ class Film {
     }
     ctx.globalAlpha = 1;
     this.painted = q;
-    this.exact = this.bank.isReady(i0) && (t <= 0.03 || i0 >= last || this.bank.isReady(i0 + 1));
+    this.exact = this.bank.isReady(i0) && (t <= 0.03 || i1 <= i0 || this.bank.isReady(i1));
     this.dirty = false;
   }
 
@@ -343,6 +387,26 @@ interface Path {
   /** Which films change on the way: furnish, chair, rooms. */
   moves: [boolean, boolean, boolean];
 }
+
+/**
+ * Scrolling plays the same story the buttons do, measured in swipes: each
+ * beat takes as many swipes as it has seconds of playing time, held to
+ * 1.6–3, so a beat is done in two or three. A swipe is half the screen of
+ * finger travel (plus a little coast on a flick), or 420px of wheel.
+ */
+interface Seg {
+  path: Path;
+  /** Where the beat starts, and how many swipes it takes. */
+  g0: number;
+  G: number;
+}
+const SWIPES = [1.6, 3] as const;
+const SWIPE_SCREEN = 0.5;
+const WHEEL_SWIPE = 420;
+/** A flick coasts on by at most this much of a swipe. */
+const COAST = 0.7;
+/** Scrolling that stops this close to a beat settles onto it. */
+const SETTLE = 0.12;
 
 /* ------------------------------------------------------------ director -- */
 
@@ -498,6 +562,9 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     /** Where each beat rests, px down the page. */
     steps: STEPS.map(() => 0),
   };
+  /** The beats' stretches as scrolling measures them, and their sum in swipes. */
+  let segs: Seg[] = [];
+  let gTotal = 0;
   const pageTop = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
 
   /**
@@ -597,6 +664,14 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     L.finaleTop = pageTop(finale);
     L.end = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     L.steps = STEPS.map((s) => Math.round(Math.min(L.end, stepY(s))));
+    segs = [];
+    gTotal = 0;
+    for (let i = 0; i < last; i++) {
+      const path = buildPath(L.steps[i], L.steps[i + 1]);
+      const G = Math.min(SWIPES[1], Math.max(SWIPES[0], path.total));
+      segs.push({ path, g0: gTotal, G });
+      gTotal += G;
+    }
     furnish.resize();
     chair.resize();
     roomsFilm.resize();
@@ -623,10 +698,12 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
 
   /* ---------------------------------------------------------- the story */
 
-  /** The story's place on the page: the director's alone, never a gesture's. */
+  /** The story's place on the page. Only the director moves it: playing a
+      beat, or steering it after a swipe or the wheel. */
   const pos = { y: 0 };
   let at = 0;
   let target = 0;
+  let between = false;
   const setY = (y: number) => {
     pos.y = y;
     window.scrollTo(0, y);
@@ -682,6 +759,43 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     return lerp(p.ys[lo], p.ys[hi], span > 0 ? clamp01((cost - p.cum[lo]) / span) : 1);
   };
 
+  /** How far into a path (seconds of playing time) the page at `y` is. */
+  const costAt = (p: Path, y: number) => {
+    if (y <= p.ys[0]) return 0;
+    if (y >= p.ys[p.n]) return p.total;
+    let lo = 0;
+    let hi = p.n;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (p.ys[mid] <= y) lo = mid;
+      else hi = mid;
+    }
+    const span = p.ys[hi] - p.ys[lo];
+    return lerp(p.cum[lo], p.cum[hi], span > 0 ? (y - p.ys[lo]) / span : 0);
+  };
+
+  /** The beat stretch `g` (in swipes) falls in. */
+  const segAt = (g: number) => {
+    for (let i = 0; i < segs.length - 1; i++) if (g < segs[i + 1].g0) return segs[i];
+    return segs[segs.length - 1];
+  };
+  /** Swipes → page, through the beat's path: a swipe plays even film time. */
+  const gToY = (g: number) => {
+    const sg = segAt(g);
+    if (!sg) return L.steps[0];
+    return yAtCost(sg.path, clamp01((g - sg.g0) / sg.G) * sg.path.total);
+  };
+  /** Page → swipes. */
+  const yToG = (y: number) => {
+    for (let i = 0; i < segs.length; i++) {
+      if (y <= L.steps[i + 1]) {
+        const sg = segs[i];
+        return sg.g0 + (sg.path.total > 0 ? costAt(sg.path, y) / sg.path.total : 1) * sg.G;
+      }
+    }
+    return gTotal;
+  };
+
   /** The story's place in beats: 3.5 is half-way from the fourth to the fifth. */
   const beatAt = (y: number) => {
     const ys = L.steps;
@@ -690,6 +804,15 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
       if (y <= ys[i]) return i - 1 + (ys[i] > ys[i - 1] ? (y - ys[i - 1]) / (ys[i] - ys[i - 1]) : 1);
     }
     return last;
+  };
+
+  /** Whether every moving film on screen shows its real frame, not a stand-in. */
+  const showing = (p: Path) => {
+    sample(pos.y, S);
+    if (p.moves[0] && S[3] < 1 && pos.y - L.heroTop > 2 && !furnish.shows()) return false;
+    if (p.moves[1] && S[3] > 0.2 && S[4] < 1 && !chair.shows()) return false;
+    if (p.moves[2] && S[4] > 0 && S[5] < 1 && !roomsFilm.shows()) return false;
+    return true;
   };
 
   /** Whether every film on screen at `y` has its frame decoded (only the moving ones, given `moves`). */
@@ -714,8 +837,8 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
 
   let lastEmit = "";
   const emit = () => {
-    const state: StepState = { at, target, playing: play.path !== null, ready: intro.done };
-    const key = `${at}|${target}|${state.playing}|${state.ready}`;
+    const state: StepState = { at, target, between, playing: play.path !== null, ready: intro.done };
+    const key = `${at}|${target}|${between}|${state.playing}|${state.ready}`;
     if (key === lastEmit) return;
     lastEmit = key;
     opts.onStep(state);
@@ -737,6 +860,7 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     play.v = 0;
     play.dir = 0;
     at = target;
+    between = false;
     // Resting: the next beat is the likelier ask.
     for (const film of films) film.bank.setLead(1);
     emit();
@@ -749,7 +873,10 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     if (!p) return;
     const ahead = Math.abs(target - beatAt(pos.y));
     play.rate += (Math.min(2.6, Math.max(1, 1 + 0.8 * (ahead - 1))) - play.rate) * (1 - Math.exp(-dt * 5));
-    play.buffer += ((decoded(pos.y, p.moves) ? 1 : 0.22) - play.buffer) * (1 - Math.exp(-dt * 14));
+    // A stand-in on screen eases the beat back until the footage catches
+    // up; it eases off and recovers gently, so the speed never pulses.
+    const ok = showing(p);
+    play.buffer += ((ok ? 1 : 0.35) - play.buffer) * (1 - Math.exp(-dt * (ok ? 3 : 6)));
     const vmax = play.rate * Math.min(1, p.total / T_MIN);
     const acc = Math.max(vmax, 0.2) / T_ACC;
     const left = p.total - play.c;
@@ -764,16 +891,28 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     setY(yAtCost(p, play.c));
   };
 
-  /** Play one beat on or back; asked again mid-beat, carry on (or turn) from where it is. */
+  /**
+   * Play one beat on or back: from a beat, from part-way where scrolling
+   * left the story, or — asked again mid-beat — carrying on (or turning)
+   * from where it is.
+   */
   const step = (dir: 1 | -1) => {
     if (!intro.done || cutting) return;
-    if (dir > 0 && target === last && !play.path) {
+    stopSteering();
+    let base = target;
+    if (!play.path) {
+      const b = beatAt(pos.y);
+      const near = Math.round(b);
+      base = Math.abs(b - near) < 0.002 ? near : dir > 0 ? Math.floor(b) : Math.ceil(b);
+    }
+    if (dir > 0 && base === last && !play.path) {
       go(0);
       return;
     }
-    const next = Math.max(0, Math.min(last, target + dir));
-    if (next === target) return;
+    const next = Math.max(0, Math.min(last, base + dir));
+    if (play.path ? next === target : next === base) return;
     target = next;
+    between = false;
     const y1 = L.steps[target];
     const way = Math.sign(y1 - pos.y);
     // Same way: keep the speed, so a second tap never stutters the film.
@@ -783,6 +922,95 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     play.c = 0;
     for (const film of films) film.bank.setLead(way);
     emit();
+  };
+
+  /* ------------------------------------------------------- the steering */
+
+  /**
+   * Scrolling steers the very story the buttons play, in swipes (see Seg).
+   * The page follows the finger closely and coasts a little after a flick.
+   * Where it stops, it rests — part-way, like a scrolled page — unless a
+   * beat is within a breath, which it settles onto. It never waits on
+   * footage: a fast swipe draws every second or third frame instead.
+   */
+  const steer = { on: false, touching: false, g: 0, to: 0, lead: 0, idle: 0 };
+
+  const stopSteering = () => {
+    steer.on = false;
+    steer.touching = false;
+    steer.idle = 0;
+  };
+
+  /** Hand the story to the scroll, taking it over from a playing beat. */
+  const beginSteering = () => {
+    if (cutting || !intro.done || !segs.length) return false;
+    if (play.path) {
+      play.path = null;
+      play.v = 0;
+      play.dir = 0;
+    }
+    if (!steer.on) {
+      steer.on = true;
+      steer.g = steer.to = yToG(pos.y);
+    }
+    steer.idle = 0;
+    return true;
+  };
+
+  /** The bar's view of a steered story: on a beat, or between two. */
+  const syncBeat = () => {
+    const b = beatAt(pos.y);
+    const near = Math.round(b);
+    if (Math.abs(b - near) < 0.002) {
+      at = target = near;
+      between = false;
+    } else {
+      at = target = Math.floor(b);
+      between = true;
+    }
+    emit();
+  };
+
+  const glide = (dt: number, now: number) => {
+    steer.to = Math.max(0, Math.min(gTotal, steer.to));
+    const way = Math.sign(steer.to - steer.g);
+    if (way && way !== steer.lead) {
+      steer.lead = way;
+      for (const film of films) film.bank.setLead(way);
+    }
+    // Under the finger the story moves with it (the films' own easing is
+    // the only smoothing); a coast or the wheel glides there.
+    if (steer.touching) steer.g = steer.to;
+    else steer.g += (steer.to - steer.g) * (1 - Math.exp(-dt * 8));
+    if (Math.abs(steer.to - steer.g) < 5e-4) steer.g = steer.to;
+    setY(gToY(steer.g));
+    syncBeat();
+    if (steer.touching || steer.g !== steer.to) {
+      steer.idle = 0;
+      return;
+    }
+    if (!steer.idle) {
+      steer.idle = now;
+      return;
+    }
+    if (now - steer.idle < 240) return;
+    // At rest: onto a beat within a breath of it, else right where it stopped.
+    const sg = segAt(steer.g);
+    const f = sg ? (steer.g - sg.g0) / sg.G : 0;
+    if (sg && f > 1e-3 && f < SETTLE) {
+      steer.to = sg.g0;
+      steer.idle = 0;
+      return;
+    }
+    if (sg && f > 1 - SETTLE && f < 1 - 1e-3) {
+      steer.to = sg.g0 + sg.G;
+      steer.idle = 0;
+      return;
+    }
+    stopSteering();
+    steer.lead = 0;
+    for (const film of films) film.bank.setLead(1);
+    if (!between) warmNext();
   };
 
   /* ------------------------------------------------------------ the cut */
@@ -806,10 +1034,12 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     if (!intro.done) finishIntro();
     if (cutting || (i === at && i === target && !play.path)) return;
     cutting = true;
+    stopSteering();
     play.path = null;
     play.v = 0;
     play.dir = 0;
     target = i;
+    between = false;
     emit();
     gsap.killTweensOf(curtain);
     gsap.to(curtain, {
@@ -851,16 +1081,75 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   // The pill eases in after a beat; an intro that ends first must stop it.
   const skipIn = gsap.to(skip, { opacity: 1, duration: 0.8, delay: 1.2, paused: true });
 
-  // No gesture moves this page — only the director, through setY. Two
-  // fingers still pinch-zoom.
+  // The page never scrolls itself: a one-finger move or the wheel steers
+  // the story instead (two fingers are a pinch-zoom, the browser's).
   const html = document.documentElement;
   const saved = { overflow: html.style.overflow, behavior: html.style.scrollBehavior, overscroll: html.style.overscrollBehavior };
-  let held = false;
-  const block = (e: Event) => {
-    if ((e as TouchEvent).touches && (e as TouchEvent).touches.length > 1) return;
+  const menuOpen = () => !!document.querySelector("#m-menu[data-open='true']");
+  let touch: { y: number; startY: number; moved: boolean; trail: [number, number][] } | null = null;
+  const onTouchStart = (e: TouchEvent) => {
+    if (e.touches.length !== 1 || menuOpen()) {
+      touch = null;
+      steer.touching = false;
+      return;
+    }
+    const y = e.touches[0].clientY;
+    touch = { y, startY: y, moved: false, trail: [[performance.now(), y]] };
+  };
+  const onTouchMove = (e: TouchEvent) => {
+    if (e.touches.length > 1) {
+      touch = null;
+      steer.touching = false;
+      return;
+    }
     if (e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
+    if (!touch) return;
+    const y = e.touches[0].clientY;
+    if (!intro.done) {
+      // A firm swipe on through the intro skips it, as the pill does.
+      if (touch.startY - y > 48) finishIntro();
+      return;
+    }
+    if (!touch.moved) {
+      // A few px of give, so a tap on a dot or a button stays a tap.
+      if (Math.abs(y - touch.startY) < 6 || !beginSteering()) return;
+      touch.moved = true;
+      steer.touching = true;
+    }
+    steer.to += (touch.y - y) / (SWIPE_SCREEN * L.V);
+    touch.y = y;
+    touch.trail.push([performance.now(), y]);
+    if (touch.trail.length > 6) touch.trail.shift();
   };
+  const onTouchEnd = () => {
+    const t = touch;
+    touch = null;
+    if (!t?.moved || !steer.on) return;
+    steer.touching = false;
+    // A flick coasts on a little: its speed over the last moves, if the
+    // finger was still moving when it lifted.
+    const now = performance.now();
+    const recent = t.trail.filter(([ts]) => now - ts < 180);
+    if (recent.length > 1 && now - recent[recent.length - 1][0] < 90) {
+      const [t0, y0] = recent[0];
+      const [t1, y1] = recent[recent.length - 1];
+      const v = ((y0 - y1) / Math.max(16, t1 - t0)) * 1000;
+      steer.to += Math.max(-COAST, Math.min(COAST, (v / (SWIPE_SCREEN * L.V)) * 0.18));
+    }
+  };
+  const onWheel = (e: WheelEvent) => {
+    if (e.cancelable) e.preventDefault();
+    e.stopImmediatePropagation();
+    if (menuOpen()) return;
+    const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * L.V : e.deltaY;
+    if (!intro.done) {
+      if (px > 40) finishIntro();
+      return;
+    }
+    if (beginSteering()) steer.to += px / WHEEL_SWIPE;
+  };
+  let held = false;
   const hold = (on: boolean) => {
     if (on === held) return;
     held = on;
@@ -868,13 +1157,12 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     // Every move is the director's: never a smooth-scroll of the browser's own.
     html.style.scrollBehavior = on ? "auto" : saved.behavior;
     html.style.overscrollBehavior = on ? "none" : saved.overscroll;
-    if (on) {
-      window.addEventListener("touchmove", block, { passive: false, capture: true });
-      window.addEventListener("wheel", block, { passive: false, capture: true });
-    } else {
-      window.removeEventListener("touchmove", block, { capture: true });
-      window.removeEventListener("wheel", block, { capture: true });
-    }
+    const listen = on ? window.addEventListener.bind(window) : window.removeEventListener.bind(window);
+    listen("touchstart", onTouchStart as EventListener, { passive: true, capture: true });
+    listen("touchmove", onTouchMove as EventListener, { passive: false, capture: true });
+    listen("touchend", onTouchEnd, { passive: true, capture: true });
+    listen("touchcancel", onTouchEnd, { passive: true, capture: true });
+    listen("wheel", onWheel as EventListener, { passive: false, capture: true });
     opts.lock(on);
   };
 
@@ -962,16 +1250,19 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     const dt = Math.min(0.1, (now - lastT) / 1000);
     lastT = now;
     if (play.path) advance(dt);
+    else if (steer.on) glide(dt, now);
     // Nothing else may move the page (a focus jump, find-in-page): put it back.
     else if (Math.abs(window.scrollY - pos.y) > 1.5) window.scrollTo(0, pos.y);
     const y = pos.y;
     const V = L.V;
     const vh = V;
-    const k = 1 - Math.exp(-dt * 11);
+    // The playheads trail the story by a breath; closer under a finger.
+    const k = 1 - Math.exp(-dt * (steer.touching ? 20 : 11));
 
     /* 01–02 · the intro film rests; the weave plays */
     const heroOff = y - L.heroTop;
     furnish.ease(intro.done ? furnishScript.frameAt(Math.max(0, heroOff) / V) : 0, k);
+    furnish.pace(dt);
     const scrubbing = intro.done && heroOff > 4;
     G.title.set(intro.title && !scrubbing);
     opacity(furnishCanvas, intro.done ? ramp(2, 0.22 * V, heroOff) : 0);
@@ -996,6 +1287,7 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     /* 03 · the chair parts; the wordmark glides away; the notes in turn */
     const craftOff = y - L.craftTop - L.bridge;
     chair.ease(craftScript.frameAt(Math.max(0, craftOff) / V), k);
+    chair.pace(dt);
     const exploded = chair.frame >= EXPLODE_FRAME;
     reconcileAssembled(bp, exploded);
     const wy = Math.round(-320 * (chair.frame / (FILMS.chair.frames - 1)) * 10) / 10;
@@ -1022,6 +1314,7 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     /* 04–06 · one film through the rooms */
     const roomsOff = y - L.roomsTop;
     roomsFilm.ease(roomsScript.frameAt(Math.max(0, roomsOff) / V), k);
+    roomsFilm.pace(dt);
     const rf = Math.round(roomsFilm.frame);
     const landed = roomsOff > -0.12 * V;
     let anyCopy = false;
@@ -1136,6 +1429,9 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
       if (sideways.matches) return;
+      // Part-way between two beats, keep the same share of the way.
+      const g = between && !play.path ? yToG(pos.y) : -1;
+      stopSteering();
       if (window.innerWidth === L.width && window.innerHeight === L.V) {
         measure();
       } else {
@@ -1145,12 +1441,13 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
           play.v = 0;
           play.dir = 0;
           at = target;
+          between = false;
           emit();
         }
         layout();
       }
       if (!play.path && !cutting) {
-        setY(L.steps[at]);
+        setY(g >= 0 ? gToY(g) : L.steps[at]);
         snapFilms();
       }
     }, 150);
@@ -1172,7 +1469,7 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
   void document.fonts?.ready.then(() => {
     if (destroyed) return;
     measure();
-    if (!play.path && !cutting && Math.abs(L.steps[at] - pos.y) > 1) setY(L.steps[at]);
+    if (!play.path && !cutting && !steer.on && !between && Math.abs(L.steps[at] - pos.y) > 1) setY(L.steps[at]);
   });
   gsap.fromTo(
     all("[data-m-chrome]", header),
@@ -1188,6 +1485,7 @@ export function createDirector(root: HTMLElement, opts: DirectorOptions): Direct
       L,
       intro,
       play,
+      steer,
       pos,
       state: () => ({ at, target, cutting }),
       step,
