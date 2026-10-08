@@ -2,31 +2,29 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ShoppingBag } from "lucide-react";
-import { useSmoothScroll } from "@/components/layout/SmoothScroll";
 import TransitionLink from "@/components/layout/TransitionLink";
 import MapleLogo from "@/components/ui/MapleLogo";
 import { SHOP_URL } from "@/lib/links";
 import { NAV_LINKS } from "@/lib/sections";
-import { SKIP_INTRO_EVENT } from "./script";
+import { GO_STEP_EVENT } from "./script";
 import Socials from "./Socials";
 import styles from "./mobile.module.css";
 
-/** Where the home page's chapter links land on a phone. */
-const CHAPTER_TARGET: Record<string, string> = {
-  "#intro": "#m-intro",
-  "#spaces": "#m-spaces",
+/** The beat each of the home page's chapter links plays to on a phone. */
+const CHAPTER_STEP: Record<string, string> = {
+  "#intro": "story",
+  "#spaces": "day-room",
 };
 
 /**
  * The phone header, the desktop header's counterpart: the wordmark, the
  * Shop Now pill and a menu button that opens the nav full screen with an
  * iris from the button. The director flips its tone (data-tone) between
- * cream over the films and timber over the craft plate, and draws the
- * page progress along its top edge.
+ * cream over the films and timber over the craft plate. Chapter links
+ * (and the wordmark) cut the story to their beat behind a curtain.
  */
 export default function MobileHeader() {
   const [open, setOpen] = useState(false);
-  const { scrollTo } = useSmoothScroll();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstLinkRef = useRef<HTMLButtonElement>(null);
@@ -55,17 +53,15 @@ export default function MobileHeader() {
     };
   }, [open]);
 
-  const goTo = (target: string) => {
+  const goTo = (step: string) => {
     setOpen(false);
-    window.dispatchEvent(new Event(SKIP_INTRO_EVENT));
-    // Let the iris start closing (and the intro release the page) first.
-    window.setTimeout(() => scrollTo(target), 160);
+    // The curtain falls under the closing iris, so the cut never shows.
+    window.dispatchEvent(new CustomEvent(GO_STEP_EVENT, { detail: step }));
   };
 
   return (
     <>
       <header className={styles.header} data-m-header data-tone="dark" data-menu={open}>
-        <span className={styles.progress} data-m-progress aria-hidden />
         <a
           href="#m-intro"
           className={styles.logo}
@@ -73,7 +69,7 @@ export default function MobileHeader() {
           aria-label="Maple Furnishers, back to the top"
           onClick={(e) => {
             e.preventDefault();
-            goTo("#m-intro");
+            goTo("story");
           }}
         >
           <MapleLogo idPrefix="maple-m-header" />
@@ -112,7 +108,7 @@ export default function MobileHeader() {
             {NAV_LINKS.map((l, i) => {
               const style = { "--i": i } as CSSProperties;
               const index = <span className={styles.menuIndex}>{String(i + 1).padStart(2, "0")}</span>;
-              const chapter = CHAPTER_TARGET[l.href];
+              const chapter = CHAPTER_STEP[l.href];
               return (
                 <li key={l.label} className={styles.menuItem} style={style}>
                   {chapter ? (

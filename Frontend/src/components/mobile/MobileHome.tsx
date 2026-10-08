@@ -6,6 +6,8 @@ import TransitionLink from "@/components/layout/TransitionLink";
 import MapleLogo from "@/components/ui/MapleLogo";
 import type { SceneProducts } from "@/lib/api";
 import { SHOP_URL } from "@/lib/links";
+import type { Director, StepState } from "./director";
+import Dock from "./Dock";
 import MobileHeader from "./MobileHeader";
 import { resolveScenes, type ResolvedScene } from "./scenes";
 import { CRAFT_NOTES, FILMS, INTRO, PHONE_QUERY, frameUrl } from "./script";
@@ -17,10 +19,10 @@ import styles from "./mobile.module.css";
  * The home page below 1024px — the desktop story, re-shot for a phone held
  * upright (the user's portrait renders of every film) and told the same way:
  *
- *  01  the intro film plays with the page held; "Every home has a story."
- *      rises over the sunlit room and the film rests there
- *  02  the chair weaves itself together under the thumb; "Let's furnish
- *      yours." lands on the settled frame
+ *  01  the intro film plays; "Every home has a story." rises over the
+ *      sunlit room and the film rests there
+ *  02  the chair weaves itself together; "Let's furnish yours." lands on
+ *      the settled frame
  *  03  the room dissolves into the cream craft plate; the chair parts with
  *      its three notes, the Maple wordmark gliding away behind it
  *  04–06  one film through the living room (day into evening), dining
@@ -29,13 +31,18 @@ import styles from "./mobile.module.css";
  *      the brand card, with the ways on
  *
  * Every chapter after the first arrives over the last like a sheet laid on
- * a stack. director.ts runs it all from one scroll reading per frame; with
- * reduced motion the same story is a still page.
+ * a stack. Nothing scrolls by hand: the Previous / Next bar (Dock) plays
+ * the story beat by beat, and director.ts runs every film, sheet and line
+ * of copy from the one position it moves. With reduced motion the same
+ * story is a still page that scrolls.
  */
 export default function MobileHome({ sceneProducts }: { sceneProducts?: SceneProducts | null }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const scenes = useMemo(() => resolveScenes(sceneProducts), [sceneProducts]);
   const [spot, setSpot] = useState<OpenSpot | null>(null);
+  const [nav, setNav] = useState<StepState>({ at: 0, target: 0, playing: false, ready: false });
+  const directorRef = useRef<Director | null>(null);
+  const targetRef = useRef(0);
   const smooth = useSmoothScroll();
   const smoothRef = useRef(smooth);
   const heldRef = useRef(false);
@@ -51,22 +58,35 @@ export default function MobileHome({ sceneProducts }: { sceneProducts?: ScenePro
     if (!root || !window.matchMedia(PHONE_QUERY).matches) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let disposed = false;
-    let director: { destroy(): void } | null = null;
     // The films (and their director) load only on phones.
     void import("./director").then(({ createDirector }) => {
       if (disposed) return;
-      director = createDirector(root, {
+      directorRef.current = createDirector(root, {
         lock: (on) => {
           heldRef.current = on;
           if (on) smoothRef.current.stop();
           else smoothRef.current.start();
         },
+        onStep: (state) => {
+          // A piece's card belongs to its room: the story moving on puts it away.
+          if (state.target !== targetRef.current) {
+            targetRef.current = state.target;
+            setSpot(null);
+          }
+          setNav(state);
+        },
       });
     });
     return () => {
       disposed = true;
-      director?.destroy();
+      directorRef.current?.destroy();
+      directorRef.current = null;
     };
+  }, []);
+
+  const onStep = useCallback((dir: 1 | -1) => {
+    directorRef.current?.step(dir);
+    navigator.vibrate?.(6);
   }, []);
 
   const openSpot = useCallback((scene: number, index: number) => {
@@ -75,7 +95,7 @@ export default function MobileHome({ sceneProducts }: { sceneProducts?: ScenePro
   }, []);
 
   return (
-    <div ref={rootRef} className={styles.home} data-m-home>
+    <div ref={rootRef} className={styles.home} data-m-home data-spot-open={spot ? "" : undefined}>
       <MobileHeader />
 
       <div className={styles.motion}>
@@ -108,9 +128,6 @@ export default function MobileHome({ sceneProducts }: { sceneProducts?: ScenePro
                 <br />
                 remember.
               </p>
-              <div className={styles.cue} data-m-cue aria-hidden>
-                <ScrollCueArt />
-              </div>
               <button type="button" className={styles.skip} data-m-skip>
                 Skip intro
               </button>
@@ -235,6 +252,11 @@ export default function MobileHome({ sceneProducts }: { sceneProducts?: ScenePro
 
       <SpotCard scenes={scenes} open={spot} onChange={setSpot} />
 
+      <Dock state={nav} onStep={onStep} />
+
+      {/* The cut: falls over the page while it jumps to a far beat. */}
+      <div className={styles.curtain} data-m-curtain aria-hidden />
+
       <div className={styles.turn} aria-hidden>
         Turn your phone upright
       </div>
@@ -275,29 +297,6 @@ function SceneText({ scene }: { scene: ResolvedScene }) {
         </div>
       )}
     </>
-  );
-}
-
-/** The desktop scroll cue, drawn smaller: arched label, plumb line, drifting ring. */
-function ScrollCueArt() {
-  return (
-    <svg viewBox="0 0 300 195">
-      <defs>
-        <path id="m-scroll-arc" d="M 32,108 Q 150,-20 268,108" fill="none" />
-      </defs>
-      <text
-        fill="#F4F2EC"
-        fontSize="21.863"
-        fontWeight="500"
-        style={{ fontFamily: "var(--font-pearl), var(--font-redhat)", letterSpacing: "5px" }}
-      >
-        <textPath href="#m-scroll-arc" startOffset="50%" textAnchor="middle">
-          SCROLL DOWN
-        </textPath>
-      </text>
-      <line x1="150" y1="103" x2="150" y2="188" stroke="#F4F2EC" strokeOpacity="0.7" strokeWidth="1.2" />
-      <circle className={styles.cueRing} cx="150" cy="134" r="17" fill="none" stroke="#F4F2EC" strokeOpacity="0.95" strokeWidth="1.6" />
-    </svg>
   );
 }
 
