@@ -1,0 +1,166 @@
+/* The About film on a phone. Tokens (--paper, --ink, --burgundy, --muted,
+   --line, fonts) come from .page in about.module.css. phoneDirector sizes
+   the canvas and draws the film inside the window it computes. */
+
+.root {
+  position: relative;
+}
+
+/* The film lives on one fixed sheet of graph paper behind the page. */
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: var(--paper) url("/media/about/graph-paper-960.svg") center top / 1440px auto repeat;
+  pointer-events: none;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Hero: the headline, its handwritten asides, and the film's card ---- */
+
+.hero {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  padding: 92px 12px 12px;
+}
+
+.heroNote {
+  margin: 0 0 6px 6px;
+  font-family: var(--hand);
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--burgundy);
+  transform: rotate(-2deg);
+  transform-origin: 0 50%;
+}
+
+.heroTitle {
+  margin: 0;
+  font-family: var(--pearl);
+  font-size: clamp(42px, 12.6vw, 64px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: var(--ink);
+  -webkit-text-stroke: 1px var(--ink);
+  paint-order: stroke fill;
+}
+
+.heroAside {
+  display: flex;
+  align-items: flex-start;
+  align-self: flex-end;
+  gap: 4px;
+  margin: 6px 12px 0 0;
+  font-family: var(--hand);
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--burgundy);
+  transform: rotate(-3deg);
+}
+
+.heroArrow {
+  width: 34px;
+  height: 20px;
+  flex: none;
+  margin-top: -6px;
+}
+
+/* Where the film first appears: phoneDirector reads this box and opens
+   the film out of it to the full screen as the page scrolls. */
+.card {
+  flex: 1;
+  min-height: 44svh;
+  margin-top: 18px;
+}
+
+.gap {
+  position: relative;
+  z-index: 1;
+  height: 110svh;
+}
+
+/* --- Chapters: a panel rises, holds while the film plays, lifts away ----- */
+
+.chapter {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 240svh;
+  /* The film's own beat between panels: a screen of nothing but film. */
+  padding-bottom: 70svh;
+}
+
+.panel {
+  position: sticky;
+  bottom: 0;
+  padding: 22px 22px max(26px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--paper) url("/media/about/graph-paper-650.svg") center top / 1440px auto repeat;
+  box-shadow: 0 -26px 40px -30px rgb(23 19 16 / 0.45);
+  text-align: center;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--hand);
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--burgundy);
+}
+
+.no {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.title {
+  margin: 12px auto 0;
+  max-width: 13ch;
+  font-family: var(--pearl);
+  font-size: clamp(32px, 9.4vw, 46px);
+  font-weight: 400;
+  line-height: 1.12;
+  color: var(--ink);
+}
+
+.body {
+  margin: 12px auto 0;
+  max-width: 34ch;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--muted);
+}
