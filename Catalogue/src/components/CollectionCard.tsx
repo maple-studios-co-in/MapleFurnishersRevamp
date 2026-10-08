@@ -35,7 +35,17 @@ export type Furniture =
   | "solidwood"
   | "kids"
   | "allChairs"
-  | "allBeds";
+  | "allBeds"
+  | "tables"
+  | "storage"
+  | "outdoor"
+  | "allTables"
+  | "tableDining"
+  | "tableConsole"
+  | "tableBar"
+  | "tableSide"
+  | "tableTv"
+  | "tableCoffee";
 
 interface CardProps {
   title: string;
@@ -61,7 +71,8 @@ export default function CollectionCard({ title, sub, img, furniture, x, y, to, h
         <img className="card-img" src={img} alt="" />
       </span>
       <span className="card-title">{title}</span>
-      <span className="card-sub">{sub}</span>
+      {/* A sub with "\n" carries the design's own line breaks. */}
+      <span className={sub.includes("\n") ? "card-sub card-sub--set" : "card-sub"}>{sub}</span>
       <span className="card-cta">View Catalogue</span>
     </>
   );

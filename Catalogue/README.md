@@ -8,8 +8,13 @@ Router SPA.
 | Route | What it shows |
 | --- | --- |
 | `/` | Landing page listing the collections |
-| `/catalogue-1` | Chair Collection (Seating) PDF viewer |
-| `/catalogue-2` | Nimbus Collection (Living) PDF viewer |
+| `/chairs-collections`, `/sofa-collections`, `/beds-collections`, `/table-collections` | A family's collection page |
+| `/<family>/<slug>` (e.g. `/table-collections/side-tables`) | One collection's PDF viewer |
+| `/cafe-collections`, `/restaurants`, `/nimbus-collection`, `/storage`, `/outdoor` | A catalogue PDF opened directly |
+| `/tables`, `/tables/<slug>` | Short forms, redirected to `/table-collections…` |
+| `/catalogue-1…3/…`, `/cafe`, `/nimbus` | Old links, redirected to the named routes |
+
+The slugs live in `src/catalogues.ts`; the object keys are the URL segments.
 
 On desktop the PDFs render in an in-page iframe. On touch devices the app
 links straight to the PDF instead, because iOS WebKit renders only the first

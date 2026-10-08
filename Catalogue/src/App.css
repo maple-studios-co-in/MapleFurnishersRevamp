@@ -37,6 +37,16 @@
   height: 100%;
 }
 
+/* The 1461px three-row frames: the landing with its Table / Storage /
+   Outdoor row (Scene 27) and Table Collections (Scene 32). */
+.scene--three {
+  min-height: 1461px;
+}
+
+.scene--three .backdrop {
+  height: 100%;
+}
+
 .backdrop {
   position: absolute;
   top: 0;
@@ -242,6 +252,19 @@
 .card--kids .card-img    { left: -17.47px; top: 75px;     width: 247px;     height: 205px; }
 .card--allChairs .card-img { left: 5.54px; top: 66px;     width: 190px;     height: 285px; }
 .card--allBeds .card-img { left: -44.5px;  top: 100px;    width: 290px;     height: 193.33px; }
+/* Landing row 3 (2689:158 / 2689:150 / 2691:378). */
+.card--tables .card-img  { left: -68.67px; top: 34px;     width: 361.333px; height: 271px; }
+.card--storage .card-img { left: -43.19px; top: 116px;    width: 275.546px; height: 177px; object-fit: contain; }
+.card--outdoor .card-img { left: -49.2px;  top: 100px;    width: 300px;     height: 200px; }
+/* Table Collections (Scene 32). The two-view sheets ship cropped to the
+   view the design clips them to, so each box is the clip itself. */
+.card--allTables .card-img    { left: -66px;    top: 31px;  width: 361.333px; height: 271px; }
+.card--tableDining .card-img  { left: -49.42px; top: 85px;  width: 299.458px; height: 226.958px; }
+.card--tableConsole .card-img { left: -38.47px; top: 96px;  width: 278.318px; height: 211px; }
+.card--tableBar .card-img     { left: -16px;    top: 97px;  width: 169.19px;  height: 169px; }
+.card--tableSide .card-img    { left: 14.6px;   top: 121px; width: 170px;     height: 175px; }
+.card--tableTv .card-img      { left: -58.47px; top: 154px; width: 347.846px; height: 76px; }
+.card--tableCoffee .card-img  { left: 0;        top: 97px;  width: 202px;     height: 179.674px; }
 
 .card-title {
   position: absolute;
@@ -266,6 +289,14 @@
   letter-spacing: 1.136px;
   line-height: normal;
   color: #fff;
+}
+
+/* A sub whose line breaks the design sets ("\n" in the copy): each line
+   stays whole. Figma's text engine fits ~4% more into the 207px box than
+   a browser does, so letting the box decide would break these lines a
+   word early; on phones (below) they may still wrap. */
+.card-sub--set {
+  white-space: pre;
 }
 
 .card-cta {
@@ -468,6 +499,16 @@
   .card--kids .card-img    { left: -8.69%;  top: 32.65%; width: 122.83%; }
   .card--allChairs .card-img { left: 2.76%; top: 28.73%; width: 94.49%; }
   .card--allBeds .card-img { left: -22.13%; top: 43.54%; width: 144.22%; }
+  .card--tables .card-img  { left: -34.15%; top: 14.8%;  width: 179.69%; }
+  .card--storage .card-img { left: -21.48%; top: 50.5%;  width: 137.03%; }
+  .card--outdoor .card-img { left: -24.47%; top: 43.53%; width: 149.19%; }
+  .card--allTables .card-img    { left: -32.82%; top: 13.5%;  width: 179.69%; }
+  .card--tableDining .card-img  { left: -24.58%; top: 37%;    width: 148.92%; }
+  .card--tableConsole .card-img { left: -19.13%; top: 41.79%; width: 138.41%; }
+  .card--tableBar .card-img     { left: -7.96%;  top: 42.23%; width: 84.14%; }
+  .card--tableSide .card-img    { left: 7.26%;   top: 52.67%; width: 84.54%; }
+  .card--tableTv .card-img      { left: -29.08%; top: 67.04%; width: 172.99%; }
+  .card--tableCoffee .card-img  { left: 0;       top: 42.23%; width: 100.46%; }
 
   /* Room for the furniture's overhang below the plate (factor × plate
      width, straight from the node geometry). */
@@ -492,6 +533,20 @@
   .card--kids .card-plate    { margin-bottom: calc(min(60vw, 252px) * 0.251); }
   .card--allChairs .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.603); }
   .card--allBeds .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.317); }
+  /* The widest renders (the dining set, the TV unit) run ~1.8x their
+     plate: a smaller plate keeps the whole piece on screen. */
+  .card--tables .card-plate,
+  .card--allTables .card-plate,
+  .card--tableTv .card-plate { width: min(48vw, 252px); }
+  .card--tables .card-plate  { margin-bottom: calc(min(48vw, 252px) * 0.374); }
+  .card--storage .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.315); }
+  .card--outdoor .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.35); }
+  .card--allTables .card-plate    { margin-bottom: calc(min(48vw, 252px) * 0.359); }
+  .card--tableDining .card-plate  { margin-bottom: calc(min(60vw, 252px) * 0.409); }
+  .card--tableConsole .card-plate { margin-bottom: calc(min(60vw, 252px) * 0.384); }
+  .card--tableBar .card-plate     { margin-bottom: calc(min(60vw, 252px) * 0.18); }
+  .card--tableSide .card-plate    { margin-bottom: calc(min(60vw, 252px) * 0.33); }
+  .card--tableCoffee .card-plate  { margin-bottom: calc(min(60vw, 252px) * 0.234); }
 
   .scene--short .backdrop {
     height: 100%;
@@ -511,6 +566,10 @@
     width: min(300px, 82vw);
     text-align: center;
     font-size: 14px;
+  }
+
+  .card-sub--set {
+    white-space: pre-line;
   }
 
   .card-cta {
