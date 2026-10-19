@@ -1,0 +1,736 @@
+/* ==========================================================================
+   /spaces/nimbus — three rooms above the clouds.
+
+   Film (motion allowed, WebGL available): a fixed stage holds the canvas
+   and every overlay; the spacer below supplies the scroll the director
+   turns into one timeline. Before the director decides, the stage shows
+   the cloud's whiteout (the veil colour), which is also where the film
+   opens.
+
+   Static (reduced motion, no WebGL, no script): the finished rooms as
+   ordinary sections.
+   ========================================================================== */
+
+.page {
+  --ink: #1e1e1e;
+  --ink-soft: rgb(30 30 30 / 0.66);
+  --mist: rgb(245 241 234);
+  --burgundy: #741a14;
+  --pearl: var(--font-pearl), var(--font-catilde), ui-serif, Georgia, serif;
+  --redhat: var(--font-redhat-var), var(--font-redhat), ui-sans-serif, system-ui, sans-serif;
+  /* Design px of a 1440 × 900 screen, scaled to fit the viewport. */
+  --u: min(calc(100vw / 1440), calc(100vh / 900));
+  --edge: clamp(20px, calc(100 * 100vw / 1440), 100px);
+
+  position: relative;
+  background: var(--mist);
+  color: var(--ink);
+}
+
+:global(html):has(.page) {
+  background: rgb(245 241 234);
+  scrollbar-width: none;
+}
+
+:global(html):has(.page)::-webkit-scrollbar {
+  display: none;
+}
+
+/* On phones the Spaces header wears a paper bar (its first child). Here it
+   is frosted mist instead, so the rooms run up beneath it. */
+:global(html):has(.page) :global([data-paper-header][data-variant="spaces"]) > div:first-child {
+  border-bottom-color: rgb(255 255 255 / 0.35);
+  background: rgb(245 241 234 / 0.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(16px) saturate(1.15);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* --- Stage ----------------------------------------------------------------- */
+
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  background: var(--mist);
+}
+
+/* Sized to the large viewport, not the stage: as a phone's toolbar slides
+   in and out the stage resizes, but the canvas (and its GPU buffer) holds
+   still and is simply clipped at the foot for a moment. */
+.canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
+}
+
+.spacer,
+.static {
+  display: none;
+}
+
+.page[data-mode="film"] .spacer {
+  display: block;
+}
+
+.page[data-mode="static"] .stage {
+  display: none;
+}
+
+.page[data-mode="static"] .static {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page:not([data-mode]) .stage {
+    display: none;
+  }
+
+  .page:not([data-mode]) .static {
+    display: block;
+  }
+}
+
+/* Overlays wait for the director; it shows each one in its turn. */
+.title,
+.caption,
+.copy,
+.finale,
+.rail,
+.cue {
+  position: absolute;
+  opacity: 0;
+}
+
+.page[data-mode="film"] .rail {
+  opacity: 1;
+}
+
+/* --- A room's name, formed in the cloud --------------------------------- */
+
+/* Full-screen and centred by flex, not translate: the director tweens y,
+   and GSAP would fold a CSS translate into its own transform cache. */
+.title {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px 12vh;
+  text-align: center;
+  pointer-events: none;
+}
+
+.titleInner {
+  position: relative;
+}
+
+/* A soft breath of mist behind the type, so it reads over the brightest sky. */
+.titleInner::before {
+  content: "";
+  position: absolute;
+  inset: -40% -22%;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgb(250 248 244 / 0.62), rgb(250 248 244 / 0));
+}
+
+.titleKicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  font-family: var(--redhat);
+  font-size: clamp(11px, calc(13 * var(--u)), 15px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.titleRule {
+  display: block;
+  width: 34px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.titleName {
+  margin: clamp(10px, calc(18 * var(--u)), 22px) 0 0;
+  font-family: var(--pearl);
+  font-size: clamp(42px, calc(96 * var(--u)), 124px);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: 0.015em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.titleLine {
+  margin: clamp(12px, calc(20 * var(--u)), 26px) 0 0;
+  font-family: var(--redhat);
+  font-size: clamp(16px, calc(23 * var(--u)), 28px);
+  font-weight: 300;
+  line-height: 1.45;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+/* --- Piece-by-piece captions ------------------------------------------------ */
+
+.caption,
+.copy {
+  left: var(--edge);
+  bottom: clamp(26px, calc(72 * var(--u)), 84px);
+  width: min(620px, calc(100vw - 2 * var(--edge)));
+  pointer-events: none;
+}
+
+.copy {
+  width: min(460px, calc(100vw - 2 * var(--edge)));
+}
+
+.caption::before,
+.copy::before {
+  content: "";
+  position: absolute;
+  inset: -55% -40% -60% -30%;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgb(250 248 244 / 0.5), rgb(250 248 244 / 0));
+}
+
+.captionKicker {
+  margin: 0;
+  font-family: var(--redhat);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.steps {
+  position: relative;
+  height: clamp(36px, calc(48 * var(--u)), 54px);
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+
+.step {
+  position: absolute;
+  inset: 0 auto auto 0;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  white-space: nowrap;
+  opacity: 0;
+}
+
+.stepNo {
+  font-family: var(--redhat);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--burgundy);
+}
+
+.stepLabel {
+  font-family: var(--pearl);
+  font-size: clamp(24px, calc(32 * var(--u)), 38px);
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.captionBar {
+  position: relative;
+  width: min(260px, 70%);
+  height: 1px;
+  margin-top: 10px;
+  background: rgb(30 30 30 / 0.16);
+}
+
+/* Scaled by the director (no CSS transform for GSAP to misread). */
+.captionFill {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  transform-origin: 0 50%;
+}
+
+.copyEyebrow {
+  margin: 0;
+  font-family: var(--redhat);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.copyBody {
+  margin: 12px 0 0;
+  font-family: var(--redhat);
+  font-size: clamp(18px, calc(25 * var(--u)), 28px);
+  font-weight: 300;
+  line-height: 1.36;
+  letter-spacing: 0.04em;
+  text-wrap: pretty;
+}
+
+/* --- Room rail -------------------------------------------------------------- */
+
+.rail {
+  top: 50%;
+  right: clamp(14px, calc(40 * var(--u)), 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  transform: translateY(-50%);
+}
+
+.railItem {
+  display: grid;
+  grid-template-columns: auto auto 2px;
+  align-items: center;
+  justify-content: end;
+  gap: 12px;
+  font-family: var(--redhat);
+  color: rgb(30 30 30 / 0.42);
+  text-decoration: none;
+  transition: color 0.45s ease;
+}
+
+.railItem:hover,
+.railItem:focus-visible,
+.railItem[data-active] {
+  color: var(--ink);
+}
+
+.railItem:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 6px;
+}
+
+.railNo {
+  order: 2;
+  min-width: 2.2em;
+  font-family: var(--pearl);
+  font-size: 15px;
+  text-align: right;
+}
+
+.railLabel {
+  order: 1;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateX(6px);
+  transition:
+    opacity 0.4s ease,
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.railItem:hover .railLabel,
+.railItem:focus-visible .railLabel,
+.railItem[data-active] .railLabel {
+  opacity: 1;
+  transform: none;
+}
+
+.railTrack {
+  order: 3;
+  position: relative;
+  width: 2px;
+  height: 46px;
+  overflow: hidden;
+  background: rgb(30 30 30 / 0.14);
+}
+
+.railFill {
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  transform: scaleY(0);
+  transform-origin: 50% 0;
+}
+
+/* --- Scroll cue ------------------------------------------------------------- */
+
+.cue {
+  bottom: clamp(22px, calc(40 * var(--u)), 48px);
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.cueInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.cueLabel {
+  font-family: var(--redhat);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.cueTouch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .cueFine {
+    display: none;
+  }
+
+  .cueTouch {
+    display: inline;
+  }
+}
+
+.cueLine {
+  position: relative;
+  width: 1px;
+  height: 44px;
+  overflow: hidden;
+  background: rgb(30 30 30 / 0.18);
+}
+
+.cueDot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 14px;
+  background: var(--ink);
+  animation: nimbus-cue 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes nimbus-cue {
+  0% {
+    transform: translateY(-14px);
+  }
+  70%,
+  100% {
+    transform: translateY(44px);
+  }
+}
+
+/* --- Finale ------------------------------------------------------------------ */
+
+.finale {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.finaleTagline {
+  margin: 0;
+  font-family: var(--redhat);
+  font-size: clamp(14px, calc(30 * var(--u)), 34px);
+  font-weight: 300;
+  line-height: 1.6;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.finaleTitle {
+  margin: clamp(6px, calc(16 * var(--u)), 20px) 0 0;
+  font-family: var(--pearl);
+  font-size: clamp(56px, calc(250 * var(--u)), 300px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  filter: drop-shadow(0 18px 40px rgb(110 120 132 / 0.28));
+}
+
+.finaleTitle,
+.finaleTitle :global(.nimbus-char) {
+  background-image: linear-gradient(to top, #fff 8%, #9aa5aa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.finaleTitle[data-split] {
+  background-image: none;
+}
+
+.finaleBody {
+  max-width: 34ch;
+  margin: clamp(6px, calc(12 * var(--u)), 16px) 0 0;
+  font-family: var(--redhat);
+  font-size: clamp(17px, calc(24 * var(--u)), 28px);
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+  text-wrap: balance;
+}
+
+.finaleCtas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 22px;
+  margin-top: clamp(26px, calc(46 * var(--u)), 56px);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  height: 54px;
+  padding: 0 30px;
+  border: 1px solid rgb(30 30 30 / 0.85);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.32);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  font-family: var(--redhat);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    background-color 0.45s ease,
+    color 0.45s ease,
+    border-color 0.45s ease;
+}
+
+.cta:hover,
+.cta:focus-visible {
+  background: var(--ink);
+  color: #fff;
+}
+
+.cta:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 4px;
+}
+
+.ctaQuiet {
+  border-color: transparent;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.ctaQuiet:hover,
+.ctaQuiet:focus-visible {
+  border-color: rgb(30 30 30 / 0.3);
+  background: rgb(255 255 255 / 0.3);
+  color: var(--ink);
+}
+
+.ctaArrow {
+  position: relative;
+  width: 22px;
+  height: 1px;
+  background: currentColor;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ctaArrow::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: 0;
+  width: 7px;
+  height: 7px;
+  border-top: 1px solid currentColor;
+  border-right: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.ctaArrowBack {
+  transform: scaleX(-1);
+}
+
+.cta:hover .ctaArrow {
+  transform: translateX(5px);
+}
+
+.cta:hover .ctaArrowBack {
+  transform: translateX(-5px) scaleX(-1);
+}
+
+/* --- Phones --------------------------------------------------------------------- */
+
+@media (max-width: 767px) {
+  .title {
+    padding-bottom: 18vh;
+  }
+
+  /* Two lines on a phone, large enough to read as a title card. */
+  .titleName {
+    font-size: clamp(44px, 12.6vw, 64px);
+    line-height: 1.04;
+  }
+
+  .titleLine {
+    font-size: 16px;
+  }
+
+  .titleKicker {
+    gap: 12px;
+    letter-spacing: 0.34em;
+  }
+
+  .titleRule {
+    width: 22px;
+  }
+
+  .caption,
+  .copy {
+    bottom: calc(28px + env(safe-area-inset-bottom));
+  }
+
+  /* The camera is close in on a phone: give the copy more mist to sit on. */
+  .copy::before {
+    inset: -40% -20% -50% -20%;
+    background: radial-gradient(closest-side, rgb(250 248 244 / 0.82), rgb(250 248 244 / 0));
+  }
+
+  /* A phone scrolls between rooms with the thumb; the rail would sit on the titles. */
+  .rail {
+    display: none;
+  }
+
+  .cue {
+    bottom: calc(26px + env(safe-area-inset-bottom));
+  }
+
+  .cta {
+    height: 50px;
+    padding: 0 24px;
+  }
+}
+
+/* --- Static page ------------------------------------------------------------------ */
+
+.static {
+  padding: 120px var(--edge) 96px;
+}
+
+.staticHead {
+  max-width: 900px;
+  margin: 0 auto 72px;
+  text-align: center;
+}
+
+.staticKicker {
+  margin: 0;
+  font-family: var(--redhat);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.staticTitle {
+  margin: 18px 0 0;
+  font-family: var(--pearl);
+  font-size: clamp(40px, 6vw, 88px);
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+.staticLine {
+  margin: 14px 0 0;
+  font-family: var(--redhat);
+  font-size: clamp(17px, 1.7vw, 24px);
+  font-weight: 300;
+  letter-spacing: 0.06em;
+}
+
+.staticRoom {
+  max-width: 1240px;
+  margin: 0 auto 88px;
+}
+
+.staticPlate {
+  position: relative;
+  aspect-ratio: 1672 / 941;
+  overflow: hidden;
+}
+
+.staticImg {
+  object-fit: cover;
+}
+
+.staticText {
+  max-width: 640px;
+  margin-top: 28px;
+}
+
+.staticRoomTitle {
+  margin: 12px 0 0;
+  font-family: var(--pearl);
+  font-size: clamp(34px, 4vw, 56px);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.staticBody {
+  margin: 12px 0 0;
+  font-family: var(--redhat);
+  font-size: clamp(17px, 1.5vw, 21px);
+  font-weight: 300;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+}
+
+.staticFoot {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .railItem,
+  .railLabel,
+  .cta,
+  .ctaArrow {
+    transition: none;
+  }
+
+  .cueDot {
+    animation: none;
+  }
+}

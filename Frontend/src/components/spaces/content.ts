@@ -1,4 +1,5 @@
 import { CATALOGUE_PATH } from "@/lib/links";
+import { NIMBUS_PATH } from "./nimbus/content";
 
 /**
  * Copy and artwork for /spaces — Figma file Lurp612Dny6LlrAcdK0qk5, frames
@@ -40,6 +41,8 @@ export interface World {
   photo: { src: string; width: number; height: number; alt: string };
   /** The bottom-right link to the other collection. */
   link: { kind: "next" | "previous"; label: string; collection: string; to: WorldId };
+  /** Where "Click to Enter" leads. */
+  enter: string;
 }
 
 export const WORLDS: Record<WorldId, World> = {
@@ -57,6 +60,8 @@ export const WORLDS: Record<WorldId, World> = {
     },
     // The frame spells it "TERA"; the collection it leads to is Terra.
     link: { kind: "next", label: "Next", collection: "Terra Collection", to: "terra" },
+    // The Nimbus rooms; the click flies through cloud into them (nimbus/burst.ts).
+    enter: NIMBUS_PATH,
   },
   terra: {
     id: "terra",
@@ -71,11 +76,7 @@ export const WORLDS: Record<WorldId, World> = {
       alt: "Terra lounge chair: a sculpted walnut frame cradling a deep brown leather seat",
     },
     link: { kind: "previous", label: "Previous", collection: "Nimbus Collection", to: "nimbus" },
+    // Terra's rooms aren't built yet, so it still opens the catalogue.
+    enter: CATALOGUE_PATH,
   },
 };
-
-/**
- * Where "Click to Enter" leads. Each world's own page (Figma frame "5" is
- * the Nimbus one) isn't built yet, so for now both open the catalogue.
- */
-export const ENTER_HREF = CATALOGUE_PATH;
