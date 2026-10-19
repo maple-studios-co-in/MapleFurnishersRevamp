@@ -1,10 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSmoothScroll } from "@/components/layout/SmoothScroll";
 import { PAGE_ENTER_EVENT, transitionState } from "@/lib/page-transition";
 import { gsap, ScrollTrigger } from "@/lib/motion";
 import type { SpacesFilm } from "./film/director";
+import { NIMBUS_PATH } from "./nimbus/content";
+import { hasVeil, releaseVeil } from "./nimbus/veil";
+
+type Router = ReturnType<typeof useRouter>;
 
 /**
  * Motion director for /spaces.
@@ -14,7 +19,9 @@ import type { SpacesFilm } from "./film/director";
  *  stacked  phones: the scenes as a single column, revealed in view
  *  static   prefers-reduced-motion: every scene in place
  *
- * Arriving through the route curtain, the opening waits for it to lift.
+ * Arriving through the route curtain, the opening waits for it to lift;
+ * arriving back from the Nimbus rooms through their cloud, the veil fades
+ * off the Nimbus scene once it is ready.
  */
 type Mode = "film" | "stacked" | "static";
 
@@ -28,6 +35,11 @@ const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(re
 export default function SpacesExperience({ className, children }: { className: string; children: ReactNode }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const { stop, start } = useSmoothScroll();
+  const router = useRouter();
+  const routerRef = useRef(router);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
   // Bumped when the viewport crosses the film boundary: tears the current
   // mode down and builds the other.
   const [run, setRun] = useState(0);
@@ -67,7 +79,9 @@ export default function SpacesExperience({ className, children }: { className: s
     void (async () => {
       if (reduce) {
         root.dataset.mode = "static";
+        cleanups.push(wireNimbusEnter(root, routerRef, false));
         markReady();
+        releaseVeil(hasVeil() ? 600 : 0);
         return;
       }
 
@@ -92,6 +106,7 @@ export default function SpacesExperience({ className, children }: { className: s
       if (disposed) return;
       root.dataset.mode = mode;
       if (finePointer) cleanups.push(...magnetic(root));
+      cleanups.push(wireNimbusEnter(root, routerRef, true));
       if (process.env.NODE_ENV !== "production") {
         (window as unknown as { __mapleSpaces?: unknown }).__mapleSpaces = { mode, film: film.current };
       }
@@ -110,6 +125,7 @@ export default function SpacesExperience({ className, children }: { className: s
         ScrollTrigger.refresh();
       }
       markReady();
+      if (hasVeil()) releaseVeil(1100);
 
       const play = () => enter.play();
       if (viaCurtain && transitionState.phase !== "revealing") {
@@ -167,6 +183,56 @@ function buildStacked(root: HTMLElement) {
     });
   });
   return enter;
+}
+
+/**
+ * Nimbus's "Click to Enter": cloud bursts out of the ring and the rooms
+ * open behind it (nimbus/burst.ts). Interest (hover, focus, an idle beat)
+ * prefetches the route and the first plates. Modified clicks (a new tab)
+ * keep the browser's default; without motion it is a plain navigation.
+ */
+function wireNimbusEnter(root: HTMLElement, router: { current: Router }, motion: boolean) {
+  const link = root.querySelector<HTMLAnchorElement>("[data-world-enter='nimbus']");
+  if (!link) return () => {};
+  let busy = false;
+  let warmed = false;
+  const warm = () => {
+    if (warmed) return;
+    warmed = true;
+    router.current.prefetch(NIMBUS_PATH);
+    if (motion) {
+      void import("./nimbus/burst").then((m) => m.warmNimbus()).catch(() => {});
+    }
+  };
+  const onClick = (e: MouseEvent) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (busy) return;
+    busy = true;
+    const go = () => router.current.push(NIMBUS_PATH);
+    if (!motion) {
+      go();
+      return;
+    }
+    const ring = link.querySelector<HTMLElement>("[data-enter-ring]") ?? link;
+    const r = ring.getBoundingClientRect();
+    const origin = [(r.left + r.width / 2) / window.innerWidth, (r.top + r.height / 2) / window.innerHeight] as const;
+    void import("./nimbus/burst")
+      .then(({ burstIntoNimbus }) =>
+        burstIntoNimbus({ origin, scene: link.closest<HTMLElement>("[data-world-inner]"), ring: link, navigate: go }),
+      )
+      .catch(go);
+  };
+  link.addEventListener("pointerenter", warm);
+  link.addEventListener("focus", warm);
+  link.addEventListener("click", onClick);
+  const idle = window.setTimeout(warm, 3000);
+  return () => {
+    window.clearTimeout(idle);
+    link.removeEventListener("pointerenter", warm);
+    link.removeEventListener("focus", warm);
+    link.removeEventListener("click", onClick);
+  };
 }
 
 /** Rings and the header pill lean toward the cursor and spring back. */

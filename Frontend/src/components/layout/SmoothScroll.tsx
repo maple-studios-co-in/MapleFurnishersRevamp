@@ -4,13 +4,21 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Lenis from "lenis";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
 
+export interface SmoothScrollToOptions {
+  /** Seconds (default 1.2). */
+  duration?: number;
+  /** Jump without animating. */
+  immediate?: boolean;
+  easing?: (t: number) => number;
+}
+
 interface SmoothScrollApi {
   /** Freeze scrolling (used while the hero film plays). */
   stop: () => void;
   /** Resume scrolling. */
   start: () => void;
-  /** Animate to a section id. */
-  scrollTo: (target: string) => void;
+  /** Animate to a section id, or to a scroll offset in px. */
+  scrollTo: (target: string | number, opts?: SmoothScrollToOptions) => void;
 }
 
 const SmoothScrollContext = createContext<SmoothScrollApi>({
@@ -55,8 +63,10 @@ export default function SmoothScroll({
         start: () => {
           document.documentElement.style.overflow = "";
         },
-        scrollTo: (t) =>
-          document.querySelector(t)?.scrollIntoView({ behavior: "auto" }),
+        scrollTo: (t) => {
+          if (typeof t === "number") window.scrollTo({ top: t, behavior: "auto" });
+          else document.querySelector(t)?.scrollIntoView({ behavior: "auto" });
+        },
       });
       return;
     }
@@ -77,7 +87,13 @@ export default function SmoothScroll({
     setApi({
       stop: () => lenis.stop(),
       start: () => lenis.start(),
-      scrollTo: (t) => lenis.scrollTo(t, { offset: 0, duration: 1.2 }),
+      scrollTo: (t, o) =>
+        lenis.scrollTo(t, {
+          offset: 0,
+          duration: o?.duration ?? 1.2,
+          immediate: o?.immediate,
+          easing: o?.easing,
+        }),
     });
 
     return () => {

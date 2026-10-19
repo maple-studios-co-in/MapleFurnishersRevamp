@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import { CUE_GLYPHS, ENTER_HREF, LANDING, WORLDS, type World } from "./content";
+import { CUE_GLYPHS, LANDING, WORLDS, type World } from "./content";
 import styles from "./spaces.module.css";
 
 /**
@@ -120,7 +120,13 @@ function WorldScene({ world }: { world: World }) {
           <span className={styles.switchCollection}>{world.link.collection}</span>
         </a>
 
-        <a href={ENTER_HREF} className={styles.enter} data-world-enter data-magnetic aria-label={`Enter the ${name} collection`}>
+        <a
+          href={world.enter}
+          className={styles.enter}
+          data-world-enter={world.id}
+          data-magnetic
+          aria-label={`Enter the ${name} collection`}
+        >
           <span className={styles.enterRing} data-enter-ring aria-hidden />
           <span className={styles.enterText} data-enter-text aria-hidden>
             Click to

@@ -75,7 +75,7 @@ export default function PaperHeader({ variant = "paper" }: { variant?: "paper" |
                 key={l.label}
                 href={href}
                 className={styles.link}
-                aria-current={href === pathname ? "page" : undefined}
+                aria-current={href === pathname || (href !== "/" && pathname.startsWith(`${href}/`)) ? "page" : undefined}
                 data-intro-item
                 data-tone-item
               >
