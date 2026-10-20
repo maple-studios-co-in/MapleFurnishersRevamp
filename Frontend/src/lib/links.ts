@@ -13,9 +13,12 @@ export const SHOP_URL = "https://shop.maplefurnishers.com/";
  */
 export const CATALOGUE_PATH = "/catalogue";
 
+/** Where the header's "Bulk Order" button leads: the storefront's bulk enquiry form. */
+export const BULK_ENQUIRY_URL = "https://shop.maplefurnishers.com/pages/bulk-enquiry";
+
 /**
- * Where "Bulk Order", "Start your project" and the other enquiry CTAs lead.
- * The site has no contact page or enquiry inbox yet, so this falls back to
- * the storefront. Point it at the enquiry route once one exists.
+ * Where "Start your project" and the other enquiry CTAs lead. The site has
+ * no contact page or enquiry inbox yet, so this falls back to the
+ * storefront. Point it at the enquiry route once one exists.
  */
 export const ENQUIRY_URL = SHOP_URL;

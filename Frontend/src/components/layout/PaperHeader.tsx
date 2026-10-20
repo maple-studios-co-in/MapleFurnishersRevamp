@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import MapleLogo from "@/components/ui/MapleLogo";
-import { ENQUIRY_URL } from "@/lib/links";
+import { BULK_ENQUIRY_URL } from "@/lib/links";
 import { NAV_LINKS, navHref } from "@/lib/sections";
 import TransitionLink from "./TransitionLink";
 import styles from "./PaperHeader.module.css";
@@ -70,6 +70,14 @@ export default function PaperHeader({ variant = "paper" }: { variant?: "paper" |
         <nav aria-label="Primary" className={styles.nav}>
           {NAV_LINKS.map((l) => {
             const href = navHref(l.href);
+            // The catalogue is its own app: a plain link loads it as a page.
+            if (l.separate) {
+              return (
+                <a key={l.label} href={href} className={styles.link} data-intro-item data-tone-item>
+                  {l.label}
+                </a>
+              );
+            }
             return (
               <TransitionLink
                 key={l.label}
@@ -85,7 +93,7 @@ export default function PaperHeader({ variant = "paper" }: { variant?: "paper" |
           })}
         </nav>
 
-        <a href={ENQUIRY_URL} className={styles.cta} data-intro-item data-tone-item data-magnetic>
+        <a href={BULK_ENQUIRY_URL} className={styles.cta} data-intro-item data-tone-item data-magnetic>
           <span className={styles.ctaLabel}>Bulk Order</span>
           {/* The three staggered strokes from the frame (Lines 13–15). */}
           <span className={styles.ctaGlyph} aria-hidden>

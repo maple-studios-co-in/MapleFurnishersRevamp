@@ -111,7 +111,7 @@
 .siteHeader-link:nth-of-type(3) { left: calc(50% + 112.5px); }
 .siteHeader-link:nth-of-type(4) { left: calc(75% - 19px); }
 
-/* Active-tab rule under Home (85px hairline near the bar's bottom edge). */
+/* Active-tab rule under the current tab (85px hairline near the bar's bottom edge). */
 .siteHeader-underline {
   position: absolute;
   left: 50%;
