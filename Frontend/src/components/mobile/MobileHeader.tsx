@@ -13,7 +13,6 @@ import styles from "./mobile.module.css";
 /** The beat each of the home page's chapter links plays to on a phone. */
 const CHAPTER_STEP: Record<string, string> = {
   "#intro": "story",
-  "#spaces": "day-room",
 };
 
 /**
@@ -121,6 +120,12 @@ export default function MobileHeader() {
                       {index}
                       {l.label}
                     </button>
+                  ) : l.separate ? (
+                    // The catalogue is its own app: a plain link loads it as a page.
+                    <a href={l.href} className={styles.menuLink} onClick={() => setOpen(false)}>
+                      {index}
+                      {l.label}
+                    </a>
                   ) : (
                     <TransitionLink href={l.href} className={styles.menuLink} onClick={() => setOpen(false)}>
                       {index}

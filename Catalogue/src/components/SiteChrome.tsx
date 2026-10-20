@@ -9,14 +9,15 @@ import backdrop from "../assets/figma/backdrop.png";
  * The header mirrors the main site's nav so the catalogue feels like the
  * same site. Under the /catalogue proxy these anchors resolve against
  * maple-furnishers.vercel.app, landing on the homepage chapters the labels
- * name (About US → craftsmanship, Services/Spaces → curated spaces). The
- * pill CTA matches the main site's header: Shop Now → the storefront.
+ * name (About US → craftsmanship, Spaces → curated spaces); Catalogues is
+ * this app's own landing, and the tab marked current. The pill CTA matches
+ * the main site's header: Shop Now → the storefront.
  */
 
 const NAV = [
-  { label: "Home", href: "/", active: true },
+  { label: "Home", href: "/", active: false },
   { label: "About US", href: "/#craft", active: false },
-  { label: "Services", href: "/#spaces", active: false },
+  { label: "Catalogues", href: "/catalogue", active: true },
   { label: "Spaces", href: "/#spaces", active: false },
 ];
 

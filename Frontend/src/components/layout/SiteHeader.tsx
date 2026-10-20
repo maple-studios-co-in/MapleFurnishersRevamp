@@ -51,8 +51,18 @@ export default function SiteHeader() {
             by only HALF its value — 90px buys the 45px shift. */}
         <nav className="hidden lg:flex lg:items-center lg:gap-[min(154px,10.7vw)] lg:ml-[min(90px,6.25vw)]">
           {NAV_LINKS.map((l) =>
-            // Route links (About Us → /about) navigate; chapter links scroll.
-            l.href.startsWith("/") ? (
+            // Route links (About Us → /about) navigate; chapter links scroll;
+            // the catalogue is its own app, so it loads as a page.
+            l.separate ? (
+              <a
+                key={l.label}
+                href={l.href}
+                className="transition-colors duration-300 hover:text-[rgb(var(--chrome-accent))]"
+                style={chromeType(400)}
+              >
+                {l.label}
+              </a>
+            ) : l.href.startsWith("/") ? (
               <TransitionLink
                 key={l.label}
                 href={l.href}

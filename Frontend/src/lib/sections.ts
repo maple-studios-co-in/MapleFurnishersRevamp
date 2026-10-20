@@ -6,6 +6,8 @@
  * chapter here is the only edit needed to make it appear in all three.
  */
 
+import { CATALOGUE_PATH } from "./links";
+
 export type SectionTheme = "dark" | "light";
 
 export interface SectionDef {
@@ -31,13 +33,24 @@ export const SECTIONS: readonly SectionDef[] = [
   { id: "contact", label: "06", title: "Beyond The Door", theme: "dark" },
 ] as const;
 
-// A "#" href is a home-page chapter; a "/" href is its own route.
-export const NAV_LINKS = [
+export interface NavLink {
+  label: string;
+  /** "#chapter" for a home-page chapter, "/path" for a route. */
+  href: string;
+  /**
+   * Served by a separate app (the catalogue, behind the /catalogue
+   * rewrite), so it opens as a full page load rather than a client-side
+   * route change under the curtain.
+   */
+  separate?: boolean;
+}
+
+export const NAV_LINKS: readonly NavLink[] = [
   { label: "Home", href: "#intro" },
   { label: "About Us", href: "/about" },
-  { label: "Services", href: "#spaces" },
+  { label: "Catalogues", href: CATALOGUE_PATH, separate: true },
   { label: "Spaces", href: "/spaces" },
-] as const;
+];
 
 /**
  * Resolves a NAV_LINKS href for use off the home page, where a chapter can
