@@ -163,6 +163,12 @@ export class NimbusRenderer {
     this.program = program;
   }
 
+  /** For plates of another shape (the screen turned: see content.ts). */
+  setPlateAspect(aspect: number) {
+    this.opts.plateAspect = aspect;
+    if (this.gl && this.program) this.gl.uniform1f(this.loc.uPlateAspect, aspect);
+  }
+
   resize(cssWidth: number, cssHeight: number, ratio: number) {
     this.width = Math.max(1, Math.round(cssWidth * ratio));
     this.height = Math.max(1, Math.round(cssHeight * ratio));

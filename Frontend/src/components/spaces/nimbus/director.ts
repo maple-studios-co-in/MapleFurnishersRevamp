@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap, ScrollTrigger, SplitText } from "@/lib/motion";
-import { PLATE, plateSrc, ROOMS } from "./content";
+import { PLATES, plateSrc, ROOMS, TALL_QUERY, type PlateSet } from "./content";
 import { PlateBank } from "./plates";
 import { NimbusRenderer, type NimbusFrame } from "./renderer";
 import { holdVeil } from "./veil";
@@ -165,17 +165,42 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   if (!finale.title || !finale.tagline || !finale.body || !finale.ctas) return null;
   const F = finale as { [K in keyof typeof finale]: HTMLElement };
 
-  const renderer = new NimbusRenderer(canvas, { plateAspect: PLATE.width / PLATE.height });
+  /** Touch screens: phones and tablets. */
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+
+  // A portrait screen gets the rooms composed for portrait (see content.ts);
+  // turning the screen swaps the set (see onTurn).
+  const tallQuery = window.matchMedia(TALL_QUERY);
+  let set: PlateSet = tallQuery.matches ? "tall" : "wide";
+  let plate: (typeof PLATES)[PlateSet] = PLATES[set];
+  const renderer = new NimbusRenderer(canvas, { plateAspect: plate.width / plate.height });
   if (!renderer.ok) {
     renderer.destroy();
     return null;
   }
-  const bank = new PlateBank(
-    renderer,
-    ROOMS.map((room) => room.stages.map((_, s) => plateSrc(room, s))),
-  );
-  // Phones start with the first two rooms on the GPU (see syncChrome).
-  if (window.matchMedia("(pointer: coarse)").matches) bank.keepRooms([0, 1]);
+  // Arriving at #dining or #bedroom, the film starts there (see the end).
+  const hashRoom = Math.max(0, ROOMS.findIndex((room) => `#${room.id}` === window.location.hash));
+  /** Rooms a phone holds on the GPU: the one in view and the next (see syncChrome). */
+  let kept = [hashRoom, hashRoom + 1].filter((r) => r < ROOMS.length);
+  const createBank = (first: number) => {
+    const b = new PlateBank(
+      renderer,
+      ROOMS.map((room) => room.stages.map((_, s) => plateSrc(room, s, set))),
+      first,
+    );
+    if (coarse) b.keepRooms(kept);
+    return b;
+  };
+  let bank = createBank(hashRoom);
+
+  /** The camera's marks in the plates in use: a look-at point per stage, and the window it leaves by. */
+  const marksFor = (s: PlateSet) =>
+    ROOMS.map((room) =>
+      s === "tall"
+        ? { focus: room.tall.focus, window: room.tall.window }
+        : { focus: room.stages.map((st) => st.focus), window: room.window },
+    );
+  let marks = marksFor(set);
 
   // ------------------------------------------------------------------ splits
   const nameChars = P.map(
@@ -192,8 +217,6 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     dirty = true;
   };
   const s = (n: number) => () => n * L.u;
-  /** Touch screens: phones and tablets. */
-  const coarse = window.matchMedia("(pointer: coarse)").matches;
   const STEP = coarse ? PACE.touchStep : PACE.step;
   /** Timeline seconds a piece takes to form. */
   const FORMING = STEP * (coarse ? TOUCH_FORM : FORM);
@@ -204,12 +227,12 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   let built = false;
 
   const sizeCanvas = () => {
-    // No more pixels than the plates can fill (1672 × 941: past ~1.25 device
-    // px per plate px the canvas only upsamples them), under a fill-rate
-    // ceiling, times the governor's scale. A 3× phone draws about a quarter
-    // of its native pixels, which the cloud never misses.
-    const detail = 1.25 * Math.min(PLATE.width / L.cw, PLATE.height / L.ch);
-    let ratio = clamp(detail, 0.75, Math.min(window.devicePixelRatio || 1, 2)) * quality;
+    // No more pixels than the plates can fill (past ~1.25 device px per plate
+    // px the canvas only upsamples them), under a fill-rate ceiling, times
+    // the governor's scale. A 3× phone draws under a third of its native
+    // pixels, which the cloud never misses and the plates barely do.
+    const detail = 1.25 * Math.min(plate.width / L.cw, plate.height / L.ch);
+    let ratio = clamp(detail, 0.75, Math.min(window.devicePixelRatio || 1, coarse ? 1.6 : 2)) * quality;
     const MAX_PIXELS = 3.2e6;
     if (L.cw * L.ch * ratio * ratio > MAX_PIXELS) ratio = Math.sqrt(MAX_PIXELS / (L.cw * L.ch));
     renderer.resize(L.cw, L.ch, ratio);
@@ -304,9 +327,9 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     tl.fromTo(S, { scale: CAM.start }, { scale: CAM.end, duration: ROOM, ease: "sine.inOut" }, R);
     const first = R + PACE.titleHold;
     if (coarse) {
-      // Touch: the camera settles on each piece for the whole of its forming
-      // (a phone sees a third of the room, so it must be in view), then
-      // pans on to the next in the pause between them.
+      // Touch: the camera holds on each piece for the whole of its forming,
+      // then moves on to the next in the pause between them, so a swipe
+      // watches a piece form in a still frame.
       for (let k = 1; k <= 5; k++) {
         const at = first + (k - 1) * STEP;
         tl.fromTo(S, { path: k - 1 }, { path: k, duration: TOUCH_PAN, ease: "sine.inOut" }, at - TOUCH_PAN);
@@ -442,6 +465,9 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   };
 
   // ------------------------------------------------------------------ wiring
+  /** The playhead: where the scroll is (target) and where the film is (time). */
+  const play = { target: 0, time: 0, vel: 0 };
+
   L.spacerVw = -1;
   layout();
   let lastU = L.u;
@@ -455,12 +481,16 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
       tl.time(now + 1e-4, true);
       tl.time(now, true);
     }
-    if (longer) ScrollTrigger.refresh();
+    if (longer) {
+      // The scroll length follows the screen's height: when it changes (a
+      // phone turned), stay on the same moment of the film.
+      const now = play.time;
+      ScrollTrigger.refresh();
+      opts.scrollTo(yAt(now), { immediate: true });
+      snapPlayhead();
+    }
   });
   ro.observe(stage);
-
-  /** The playhead: where the scroll is (target) and where the film is (time). */
-  const play = { target: 0, time: 0, vel: 0 };
   /** Which way the visitor last scrolled (1 on, −1 back). */
   let heading = 1;
   const trigger = ScrollTrigger.create({
@@ -573,8 +603,12 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     return to;
   };
 
-  /** Cloud streams in from `at` (screen uv) and rushes past until the screen is white. */
-  const cover = (at: readonly [number, number] = CENTRE) =>
+  /**
+   * Cloud streams in from `at` (screen uv) and rushes past until the screen
+   * is white. `rate` quickens it: a turned screen shows the old plates out
+   * of shape until the cloud is up.
+   */
+  const cover = (at: readonly [number, number] = CENTRE, rate = 1) =>
     new Promise<void>((resolve) => {
       coverTl?.kill();
       Object.assign(E, { atX: at[0], atY: at[1], clear: 0 });
@@ -584,7 +618,8 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
         .fromTo(E, { cloud: 0.35 }, { cloud: 1, duration: 1.0, ease: "power1.in" }, 0)
         .to(E, { travel: E.travel + 1.3, duration: 1.3, ease: "power1.in" }, 0)
         .to(E, { zoom: 1.22, warp: 0.3, streak: 0.6, duration: 1.2, ease: "power2.in" }, 0)
-        .fromTo(E, { white: 0 }, { white: 1, duration: 0.45, ease: "power1.in" }, 0.85);
+        .fromTo(E, { white: 0 }, { white: 1, duration: 0.45, ease: "power1.in" }, 0.85)
+        .timeScale(rate);
     });
 
   /** From a whiteout, the cloud parts onto whatever the scroll shows now. */
@@ -629,7 +664,6 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   railItems.forEach((a) => a.addEventListener("click", onRail));
 
   let shown = -2;
-  let kept = "0,1";
   const fills: number[] = [];
   const syncChrome = () => {
     const time = tl.time();
@@ -658,17 +692,66 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     const finaleLive = finaleAt > 0 && time >= finaleAt + 0.8;
     if (finaleRoot.inert === finaleLive) finaleRoot.inert = !finaleLive;
     // A phone holds two rooms on the GPU, the one in view and the next in the
-    // direction of travel (12 plates, ~75 MB, never all 18).
+    // direction of travel (12 plates, 55–75 MB, never all 18).
     if (coarse) {
       const at = r < 0 ? ROOMS.length - 1 : r;
       const want = [at, at + (heading < 0 ? -1 : 1)].filter((i) => i >= 0 && i < ROOMS.length);
-      const key = want.join(",");
-      if (key !== kept) {
-        kept = key;
+      if (want.join() !== kept.join()) {
+        kept = want;
         bank.keepRooms(want);
       }
     }
   };
+
+  // ------------------------------------------------------- turning the screen
+  // Portrait and landscape have plates of their own. When the screen turns,
+  // the cloud closes over the room, the other set loads beneath it, and the
+  // cloud parts onto the room composed for the new shape.
+  let dead = false;
+  let turnTimer = 0;
+  const swapPlates = (next: PlateSet) => {
+    set = next;
+    plate = PLATES[next];
+    marks = marksFor(next);
+    renderer.setPlateAspect(plate.width / plate.height);
+    bank.destroy();
+    // The room in view first, then the next one the visitor is heading for.
+    bank = createBank(S.room);
+    const ahead = S.room + (heading < 0 ? -1 : 1);
+    if (ahead >= 0 && ahead < ROOMS.length) {
+      bank.prioritise(ahead);
+      bank.prioritise(S.room);
+    }
+    sizeCanvas();
+  };
+  const onTurn = () => {
+    window.clearTimeout(turnTimer);
+    const next: PlateSet = tallQuery.matches ? "tall" : "wide";
+    if (next === set || dead) return;
+    // Under a cloud already (the arrival, a jump, leaving): swap beneath it,
+    // or once it has gone.
+    if (E.white > 0.5) {
+      swapPlates(next);
+      return;
+    }
+    if (busy) {
+      turnTimer = window.setTimeout(onTurn, 300);
+      return;
+    }
+    busy = true;
+    window.clearTimeout(assistTimer);
+    void (async () => {
+      await cover(CENTRE, 2.4);
+      if (dead) return;
+      swapPlates(next);
+      const k = clamp(Math.floor(S.stage), 0, 4);
+      if (S.base === 1) await Promise.race([bank.whenStages(S.room, [k, k + 1]), wait(2500)]);
+      if (dead) return;
+      await uncover();
+      busy = false;
+    })();
+  };
+  tallQuery.addEventListener("change", onTurn);
 
   // ---------------------------------------------------- leaving through cloud
   const leaveLinks = all<HTMLAnchorElement>("[data-leave]");
@@ -708,20 +791,36 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   };
   if (finePointer) window.addEventListener("pointermove", onPointer, { passive: true });
 
+  /** How much of the plate a scale-1 camera sees, across and down (the shader's cover fit). */
+  const view = () => {
+    const pa = plate.width / plate.height;
+    return L.aspect > pa ? ([1, pa / L.aspect] as const) : ([L.aspect / pa, 1] as const);
+  };
+
   /** Where a plate point lands on screen through the camera (ignoring the edge warp). */
   const screenOf = (pt: readonly [number, number], scale: number, fx: number, fy: number): [number, number] => {
-    const pa = PLATE.width / PLATE.height;
-    const vx = L.aspect > pa ? 1 : L.aspect / pa;
-    const vy = L.aspect > pa ? pa / L.aspect : 1;
+    const [vx, vy] = view();
     const cx = clamp(fx, vx / (2 * scale), 1 - vx / (2 * scale));
     const cy = clamp(fy, vy / (2 * scale), 1 - vy / (2 * scale));
     return [clamp(0.5 + ((pt[0] - cx) * scale) / vx, -0.2, 1.2), clamp(0.5 + ((pt[1] - cy) * scale) / vy, -0.2, 1.2)];
   };
 
-  const focusPoints = ROOMS.map((room) => room.stages.map((st) => st.focus));
+  /**
+   * The shader stops the camera dead at the plate's edge. A portrait screen
+   * sees nearly all of a tall plate, so its look-at points often lie past
+   * that edge: ease into it instead (linear for 60% of the way there, then
+   * a smooth knee), so the camera settles rather than stops.
+   */
+  const soften = (c: number, half: number) => {
+    const span = 0.5 - half;
+    if (span <= 0) return 0.5;
+    const d = Math.abs(c - 0.5) / span;
+    if (d <= 0.6) return c;
+    return 0.5 + Math.sign(c - 0.5) * span * (0.6 + 0.4 * Math.tanh((d - 0.6) / 0.4));
+  };
 
   const compose = (time: number): NimbusFrame => {
-    const room = ROOMS[S.room];
+    const mark = marks[S.room];
     const k = clamp(Math.floor(S.stage), 0, 4);
     const mix = clamp(S.stage - k, 0, 1);
     const a = bank.get(S.room, k) ?? bank.nearest(S.room, k);
@@ -729,22 +828,27 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     const missing = S.base === 1 && !a;
     const scale = Math.max(1, S.scale * E.zoom);
     // The camera glides through the room's look-at points, and turns to the
-    // window to leave. A portrait phone sees a third of the plate, so it
-    // walks to each piece; a wide screen sees nearly all of it and only
-    // drifts toward them.
-    const [gx, gy] = along(focusPoints[S.room], S.path);
-    const lx = gx + (room.window[0] - gx) * S.lock;
-    const ly = gy + (room.window[1] - gy) * S.lock;
-    // How far the camera follows its look-at points: almost all the way on a
-    // portrait phone (a little held back, to soften the widest pans), only a
-    // drift on a wide screen; fully once it turns to the window to leave.
+    // window to leave.
+    const [gx, gy] = along(mark.focus, S.path);
+    const lx = gx + (mark.window[0] - gx) * S.lock;
+    const ly = gy + (mark.window[1] - gy) * S.lock;
+    // How far the camera follows its look-at points. A portrait screen sees
+    // the whole room in the tall plates, so it leans toward each piece
+    // (soften() keeps it inside them); in the wide plates, a narrow screen
+    // walks almost all the way to each piece and a wide one only drifts.
+    // Fully, once it turns to the window to leave.
     const wide = clamp((L.aspect - 0.9) / 0.6, 0, 1);
-    const reach = 0.88 - 0.48 * wide;
+    const reach = set === "tall" ? 0.7 : 0.88 - 0.48 * wide;
     const follow = reach + (1 - reach) * S.lock;
-    const fx = 0.5 + (lx - 0.5) * follow + (pointer.sx * 0.012) / scale;
-    const fy = 0.5 + (ly - 0.5) * follow + (pointer.sy * 0.008) / scale;
+    let fx = 0.5 + (lx - 0.5) * follow + (pointer.sx * 0.012) / scale;
+    let fy = 0.5 + (ly - 0.5) * follow + (pointer.sy * 0.008) / scale;
+    if (set === "tall") {
+      const [vx, vy] = view();
+      fx = soften(fx, vx / (2 * scale));
+      fy = soften(fy, vy / (2 * scale));
+    }
     const own = E.cloud > S.cloud;
-    const at = own ? ([E.atX, E.atY] as const) : S.atWindow > 0.5 ? screenOf(room.window, scale, fx, fy) : CENTRE;
+    const at = own ? ([E.atX, E.atY] as const) : S.atWindow > 0.5 ? screenOf(mark.window, scale, fx, fy) : CENTRE;
     return {
       time,
       base: S.base,
@@ -827,9 +931,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   });
 
   // Arriving at #dining or #bedroom: start there.
-  const hashRoom = ROOMS.findIndex((room) => `#${room.id}` === window.location.hash);
   if (hashRoom > 0) {
-    bank.prioritise(hashRoom);
     opts.scrollTo(yAt(roomStarts[hashRoom] + 0.02), { immediate: true });
     snapPlayhead();
   }
@@ -847,7 +949,12 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
       total,
       roomStarts,
       crosses,
-      bank,
+      get bank() {
+        return bank;
+      },
+      get set() {
+        return set;
+      },
       dev,
     };
   }
@@ -858,9 +965,15 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
       draw(gsap.ticker.time);
     },
 
-    whenReady(timeoutMs) {
-      const r = Math.max(0, roomAt(tl.time()));
-      return Promise.race([bank.whenStages(r, [0, 1]), wait(timeoutMs)]);
+    async whenReady(timeoutMs) {
+      const until = performance.now() + timeoutMs;
+      // The screen may turn while it waits: then wait for the other plates.
+      for (;;) {
+        const b = bank;
+        const r = Math.max(0, roomAt(tl.time()));
+        await Promise.race([b.whenStages(r, [0, 1]), wait(until - performance.now())]);
+        if (b === bank || performance.now() >= until) return;
+      }
     },
 
     entrance() {
@@ -885,8 +998,11 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     },
 
     destroy() {
+      dead = true;
       gsap.ticker.remove(tick);
       window.clearTimeout(assistTimer);
+      window.clearTimeout(turnTimer);
+      tallQuery.removeEventListener("change", onTurn);
       coverTl?.kill();
       ro.disconnect();
       trigger.kill();

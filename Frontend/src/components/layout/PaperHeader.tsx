@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import MapleLogo from "@/components/ui/MapleLogo";
-import { BULK_ENQUIRY_URL } from "@/lib/links";
+import { BULK_ENQUIRY_URL, SHOP_URL } from "@/lib/links";
 import { NAV_LINKS, navHref } from "@/lib/sections";
+import PhoneMenu from "./PhoneMenu";
 import TransitionLink from "./TransitionLink";
 import styles from "./PaperHeader.module.css";
 
@@ -93,15 +94,22 @@ export default function PaperHeader({ variant = "paper" }: { variant?: "paper" |
           })}
         </nav>
 
-        <a href={BULK_ENQUIRY_URL} className={styles.cta} data-intro-item data-tone-item data-magnetic>
-          <span className={styles.ctaLabel}>Bulk Order</span>
-          {/* The three staggered strokes from the frame (Lines 13–15). */}
-          <span className={styles.ctaGlyph} aria-hidden>
-            <span className={`${styles.ctaLine} ${styles.ctaLine1}`} />
-            <span className={`${styles.ctaLine} ${styles.ctaLine2}`} />
-            <span className={`${styles.ctaLine} ${styles.ctaLine3}`} />
-          </span>
-        </a>
+        <div className={styles.end}>
+          <a href={BULK_ENQUIRY_URL} className={styles.cta} data-intro-item data-tone-item data-magnetic>
+            <span className={styles.ctaLabel}>Bulk Order</span>
+            {/* The three staggered strokes from the frame (Lines 13–15). */}
+            <span className={styles.ctaGlyph} aria-hidden>
+              <span className={`${styles.ctaLine} ${styles.ctaLine1}`} />
+              <span className={`${styles.ctaLine} ${styles.ctaLine2}`} />
+              <span className={`${styles.ctaLine} ${styles.ctaLine3}`} />
+            </span>
+          </a>
+          {/* Phones: the nav above is hidden there, so it opens from here. */}
+          <PhoneMenu
+            primary={{ label: "Bulk Order", href: BULK_ENQUIRY_URL }}
+            secondary={{ label: "Shop Now", href: SHOP_URL }}
+          />
+        </div>
       </div>
     </header>
   );

@@ -1,7 +1,20 @@
-import Image from "next/image";
+import { getImageProps } from "next/image";
 import { Fragment } from "react";
-import { FINALE, plateSrc, ROOMS } from "./content";
+import { FINALE, plateSrc, ROOMS, TALL_QUERY, type Room } from "./content";
 import styles from "./nimbus.module.css";
+
+/** A finished room for the static page: the tall plate on a portrait screen, like the film. */
+function StaticPlate({ room }: { room: Room }) {
+  const common = { alt: room.alt, fill: true, sizes: "(min-width: 1024px) 86vw, 100vw" };
+  const tall = getImageProps({ ...common, src: plateSrc(room, 5, "tall") }).props.srcSet;
+  const img = getImageProps({ ...common, src: plateSrc(room, 5) }).props;
+  return (
+    <picture>
+      <source media={TALL_QUERY} srcSet={tall} sizes={img.sizes} />
+      <img {...img} alt={room.alt} className={styles.staticImg} />
+    </picture>
+  );
+}
 
 /**
  * Markup for /spaces/nimbus.
@@ -118,13 +131,7 @@ export default function NimbusStage() {
         {ROOMS.map((room) => (
           <section key={room.id} id={room.id} className={styles.staticRoom} aria-labelledby={`nimbus-${room.id}`}>
             <div className={styles.staticPlate}>
-              <Image
-                src={plateSrc(room, 5)}
-                alt={room.alt}
-                fill
-                sizes="(min-width: 1024px) 86vw, 100vw"
-                className={styles.staticImg}
-              />
+              <StaticPlate room={room} />
             </div>
             <div className={styles.staticText}>
               <p className={styles.staticKicker}>

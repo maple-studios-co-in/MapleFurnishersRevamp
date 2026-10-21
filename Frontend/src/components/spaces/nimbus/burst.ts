@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "@/lib/motion";
-import { PLATE, plateSrc, ROOMS } from "./content";
+import { PLATES, plateSrc, ROOMS, TALL_QUERY } from "./content";
 import { cloudNoise } from "./noise";
 import { NimbusRenderer } from "./renderer";
 import { holdVeil } from "./veil";
@@ -41,7 +41,8 @@ export function burstIntoNimbus(opts: {
   window.addEventListener("touchmove", block, { capture: true, passive: false });
   window.addEventListener("keydown", block, { capture: true });
 
-  const renderer = new NimbusRenderer(canvas, { transparent: true, plateAspect: PLATE.width / PLATE.height });
+  // Cloud only (base 0): the plate shape never shows.
+  const renderer = new NimbusRenderer(canvas, { transparent: true, plateAspect: PLATES.wide.width / PLATES.wide.height });
   const B = { cloud: 0.3, spread: 0, travel: 0, white: 0 };
 
   const tick = (time: number) =>
@@ -110,7 +111,8 @@ export function burstIntoNimbus(opts: {
  */
 export function warmNimbus() {
   cloudNoise();
+  const set = window.matchMedia(TALL_QUERY).matches ? "tall" : "wide";
   for (const stage of [0, 1]) {
-    void fetch(plateSrc(ROOMS[0], stage), { cache: "force-cache" }).catch(() => {});
+    void fetch(plateSrc(ROOMS[0], stage, set), { cache: "force-cache" }).catch(() => {});
   }
 }

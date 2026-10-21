@@ -19,6 +19,7 @@
     "frames:outro": "node scripts/build-frame-scene.mjs .assets-src/end-frames Frontend/public/media/sequences/outro --from=260 --to=742 --step=2 --width=1280 --quality=52",
     "frames:all": "npm run frames:hero && npm run frames:chair && npm run frames:outro",
     "plates:nimbus": "node scripts/build-nimbus-plates.mjs .assets-src/nimbus Frontend/public/media/spaces/nimbus-v1",
+    "plates:nimbus-tall": "node scripts/build-nimbus-plates.mjs .assets-src/nimbus-tall Frontend/public/media/spaces/nimbus-tall-v1 --quality=84",
     "dev:api": "npm run dev --workspace Backend",
     "build:api": "npm run build --workspace Backend",
     "start:api": "npm run start --workspace Backend",
