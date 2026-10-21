@@ -690,6 +690,14 @@
   overflow: hidden;
 }
 
+/* Portrait screens get the tall plates (TALL_QUERY in content.ts). */
+@media (max-aspect-ratio: 4/5) {
+  .staticPlate {
+    aspect-ratio: 810 / 1440;
+    max-height: 82svh;
+  }
+}
+
 .staticImg {
   object-fit: cover;
 }

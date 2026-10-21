@@ -8,6 +8,10 @@ import { CATALOGUE_PATH } from "@/lib/links";
  * the empty room, then each piece added in turn, ending fully styled. The
  * renderer dissolves between neighbouring plates on the GPU, so the scroll
  * position can sit anywhere between two of them.
+ *
+ * There are two sets of plates: wide (16:9) for landscape screens, and
+ * tall (9:16), the same rooms recomposed for phones, so a portrait screen
+ * sees the whole room instead of a third of a wide one.
  */
 
 export const NIMBUS_PATH = "/spaces/nimbus";
@@ -16,25 +20,31 @@ export const SPACES_NIMBUS = "/spaces#nimbus";
 /** The Nimbus PDF in the catalogue app (proxied under /catalogue). */
 export const NIMBUS_CATALOGUE = `${CATALOGUE_PATH}/nimbus-collection`;
 
-/** All eighteen plates share the sequences' native size. */
-export const PLATE = { width: 1672, height: 941 } as const;
+/** Each set's plates share their sequence's native size. */
+export const PLATES = {
+  wide: { width: 1672, height: 941, root: "/media/spaces/nimbus-v1" },
+  tall: { width: 810, height: 1440, root: "/media/spaces/nimbus-tall-v1" },
+} as const;
 
-const PLATE_ROOT = "/media/spaces/nimbus-v1";
+export type PlateSet = keyof typeof PLATES;
+
+/** Screens this tall or taller (phones, portrait tablets) get the tall plates. */
+export const TALL_QUERY = "(max-aspect-ratio: 4/5)";
 
 export type RoomId = "living" | "dining" | "bedroom";
 
+type Point = readonly [number, number];
+
 export interface RoomStage {
-  /** Plate file name, without extension. */
+  /** Plate file name in the wide set, without extension (tall plates are 00–05). */
   file: string;
   /** What arrives at this stage (stage 0 is the empty room). */
   label: string;
   /**
-   * Where the camera looks once this stage has arrived, in plate UV
-   * (0–1, y down). On wide screens the frame barely moves; on a portrait
-   * phone, which sees about a third of the plate's width, the camera walks
-   * across the room from piece to piece.
+   * Where the camera looks once this stage has arrived, in wide-plate UV
+   * (0–1, y down). On wide screens the frame barely moves toward it.
    */
-  focus: readonly [number, number];
+  focus: Point;
 }
 
 export interface Room {
@@ -44,9 +54,11 @@ export interface Room {
   line: string;
   eyebrow: string;
   body: string;
-  /** The window onto the cloud sea, in plate UV: the camera leaves the room through it. */
-  window: readonly [number, number];
+  /** The window onto the cloud sea, in wide-plate UV: the camera leaves the room through it. */
+  window: Point;
   stages: readonly RoomStage[];
+  /** The same for the tall plates: the window, and a look-at point per stage. */
+  tall: { window: Point; focus: readonly Point[] };
   /** Alt text for the finished room (static page). */
   alt: string;
 }
@@ -68,6 +80,20 @@ export const ROOMS: readonly Room[] = [
       { file: "04-tables", label: "Coffee & side tables", focus: [0.52, 0.66] },
       { file: "05-styled", label: "Finishing touches", focus: [0.84, 0.52] },
     ],
+    tall: {
+      window: [0.55, 0.47],
+      // The lounge chairs stand at the plate's edges, past a phone's frame:
+      // the camera turns to the left one as they form, then sweeps right
+      // across the tables to the other.
+      focus: [
+        [0.5, 0.5],
+        [0.5, 0.72],
+        [0.5, 0.61],
+        [0.3, 0.66],
+        [0.62, 0.65],
+        [0.5, 0.58],
+      ],
+    },
     alt: "Nimbus living room above the clouds: a pale sofa, two rounded lounge chairs and stone coffee tables on a textured rug",
   },
   {
@@ -86,6 +112,17 @@ export const ROOMS: readonly Room[] = [
       { file: "04-console-pendant", label: "Console & pendant", focus: [0.82, 0.46] },
       { file: "05-styled", label: "Finishing touches", focus: [0.58, 0.45] },
     ],
+    tall: {
+      window: [0.22, 0.47],
+      focus: [
+        [0.45, 0.5],
+        [0.55, 0.72],
+        [0.55, 0.6],
+        [0.55, 0.65],
+        [0.65, 0.45],
+        [0.58, 0.55],
+      ],
+    },
     alt: "Nimbus dining room above the clouds: a long timber table ringed by soft white chairs under a cloud-like pendant",
   },
   {
@@ -104,11 +141,25 @@ export const ROOMS: readonly Room[] = [
       { file: "04-vanity", label: "The vanity", focus: [0.24, 0.52] },
       { file: "05-styled", label: "Finishing touches", focus: [0.62, 0.5] },
     ],
+    tall: {
+      window: [0.3, 0.47],
+      focus: [
+        [0.45, 0.5],
+        [0.55, 0.7],
+        [0.62, 0.62],
+        [0.62, 0.6],
+        [0.22, 0.52],
+        [0.55, 0.57],
+      ],
+    },
     alt: "Nimbus bedroom above the clouds: an upholstered bed with layered linens, glowing bedside tables and a sculpted vanity",
   },
 ];
 
-export const plateSrc = (room: Room, stage: number) => `${PLATE_ROOT}/${room.id}/${room.stages[stage].file}.webp`;
+export const plateSrc = (room: Room, stage: number, set: PlateSet = "wide") =>
+  set === "tall"
+    ? `${PLATES.tall.root}/${room.id}/${String(stage).padStart(2, "0")}.webp`
+    : `${PLATES.wide.root}/${room.id}/${room.stages[stage].file}.webp`;
 
 export const FINALE = {
   title: "NIMBUS",

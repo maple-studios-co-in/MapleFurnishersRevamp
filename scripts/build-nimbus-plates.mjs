@@ -13,8 +13,13 @@
  * keyframes/ and (as a fallback for a missing or broken keyframe) the
  * frames at each stage's `fully_visible_from_frame`.
  *
+ * A manifest that doesn't list its stages (the portrait set's) takes them
+ * from keyframes/ in name order, fully visible at --stage-frames (default
+ * 0,48,72,96,120,144, as both supplied sets were measured), and the plates
+ * are named after the keyframes.
+ *
  * Usage:
- *   node scripts/build-nimbus-plates.mjs <srcRoot> <outDir> [--quality=86]
+ *   node scripts/build-nimbus-plates.mjs <srcRoot> <outDir> [--quality=86] [--stage-frames=0,48,...]
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
@@ -34,6 +39,8 @@ const flag = (n, d) => {
 const srcRoot = path.resolve(srcArg);
 const outDir = path.resolve(outArg);
 const QUALITY = flag("quality", 86);
+const stageFramesFlag = flags.find((f) => f.startsWith("--stage-frames="));
+const STAGE_FRAMES = stageFramesFlag ? stageFramesFlag.split("=")[1].split(",").map(Number) : [0, 48, 72, 96, 120, 144];
 
 const rooms = readdirSync(srcRoot).filter((d) => existsSync(path.join(srcRoot, d, "manifest.json")));
 if (!rooms.length) {
@@ -60,7 +67,17 @@ let total = 0;
 for (const room of rooms) {
   const dir = path.join(srcRoot, room);
   const manifest = JSON.parse(readFileSync(path.join(dir, "manifest.json"), "utf8"));
-  const { width, height, pattern, stages } = manifest;
+  const { width, height, pattern } = manifest;
+  const stages =
+    manifest.stages ??
+    readdirSync(path.join(dir, "keyframes"))
+      .filter((f) => f.endsWith(".webp"))
+      .sort()
+      .map((file, i) => ({
+        name: path.basename(file, ".webp"),
+        keyframe: `keyframes/${file}`,
+        fully_visible_from_frame: STAGE_FRAMES[i],
+      }));
   const roomOut = path.join(outDir, room);
   rmSync(roomOut, { recursive: true, force: true });
   mkdirSync(roomOut, { recursive: true });

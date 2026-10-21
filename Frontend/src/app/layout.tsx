@@ -10,6 +10,7 @@ import {
 import localFont from "next/font/local";
 import "./globals.css";
 import PageTransitionProvider from "@/components/layout/PageTransition";
+import PhoneSiteHeader from "@/components/layout/PhoneSiteHeader";
 import SectionRail from "@/components/layout/SectionRail";
 import SectionTheme from "@/components/layout/SectionTheme";
 import SiteHeader from "@/components/layout/SiteHeader";
@@ -124,6 +125,9 @@ export default function RootLayout({
               <SectionRail />
               <SocialRail />
             </div>
+            {/* …and pages with neither a phone header nor PaperHeader get
+                one with the menu (the customizer). */}
+            <PhoneSiteHeader />
             {children}
           </PageTransitionProvider>
         </SmoothScroll>

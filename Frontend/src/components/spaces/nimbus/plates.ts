@@ -28,6 +28,7 @@ export class PlateBank {
   /** Rooms allowed on the GPU; null keeps them all. */
   private wanted: Set<number> | null = null;
   private inFlight = 0;
+  private readonly concurrency = 4;
   private destroyed = false;
 
   /** A plate reached the GPU. */
@@ -36,7 +37,8 @@ export class PlateBank {
   constructor(
     private readonly renderer: NimbusRenderer,
     urls: string[][],
-    private readonly concurrency = 4,
+    /** The room fetched first: the one in view. */
+    first = 0,
   ) {
     urls.forEach((stages, room) =>
       stages.forEach((url, stage) => {
@@ -45,6 +47,7 @@ export class PlateBank {
         this.urls.set(key, url);
       }),
     );
+    this.prioritise(first);
     renderer.onRestored = () => this.refill();
     this.fetchMore();
   }
@@ -123,6 +126,8 @@ export class PlateBank {
     this.onChange = null;
     for (const item of this.ready) release(item);
     this.ready.length = 0;
+    // The renderer may outlive the bank (a set of plates swapped for another).
+    for (const tex of this.textures.values()) this.renderer.release(tex);
     this.textures.clear();
     for (const w of this.waiters) w.resolve();
     this.waiters = [];

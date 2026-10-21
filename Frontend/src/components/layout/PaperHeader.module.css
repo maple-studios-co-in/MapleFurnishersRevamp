@@ -173,6 +173,38 @@
   background-image: url("/media/about/bulk-order-line-3.svg");
 }
 
+/* The pill and, on phones, the menu button beside it (PhoneMenu takes
+   this colour). */
+.end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #1e1e1e;
+}
+
+/* Phones: the pill shrinks to its label beside the menu button; its stroke
+   glyph would read there as a second menu icon. */
+@media (max-width: 1023px) {
+  .cta {
+    display: flex;
+    align-items: center;
+    width: auto;
+    height: 36px;
+    padding: 0 16px;
+  }
+
+  .ctaLabel {
+    position: static;
+    transform: none;
+    font-size: 12px;
+    letter-spacing: 2.2px;
+  }
+
+  .ctaGlyph {
+    display: none;
+  }
+}
+
 /* --- Desktop: the frame's geometry. Logo at x 100, nav centred on the
    frame with 160px between links, pill ending at x 1329. */
 @media (min-width: 1024px) {
@@ -206,8 +238,11 @@
     margin-top: calc(3 * var(--u));
   }
 
-  .cta {
+  .end {
     justify-self: end;
+  }
+
+  .cta {
     margin-right: calc(11 * var(--u));
   }
 }

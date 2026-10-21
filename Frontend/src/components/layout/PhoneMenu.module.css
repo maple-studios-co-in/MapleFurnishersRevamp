@@ -1,0 +1,298 @@
+/* The phone menu (PhoneMenu.tsx), in the home menu's dress
+   (mobile/mobile.module.css): night with a burgundy glow, TAN PEARL links,
+   an iris that opens from the button. */
+
+/* --- The button, in the header: takes the header's own colour. ------------- */
+
+.button {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Ring and wash in the current colour, whatever the header's tone. */
+.button::before,
+.button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.button::before {
+  border: 1px solid currentColor;
+  opacity: 0.45;
+}
+
+.button::after {
+  background: currentColor;
+  opacity: 0.08;
+  transition: opacity 0.3s ease;
+}
+
+.button:hover::after,
+.button:focus-visible::after {
+  opacity: 0.16;
+}
+
+.button:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 3px;
+}
+
+.burger,
+.burger::before {
+  display: block;
+  width: 16px;
+  height: 1px;
+  background: currentColor;
+}
+
+.burger {
+  transform: translateY(-3px);
+}
+
+.burger::before {
+  content: "";
+  transform: translateY(6px);
+}
+
+@media (min-width: 1024px) {
+  .button {
+    display: none;
+  }
+}
+
+/* --- The menu --------------------------------------------------------------- */
+
+.menu {
+  --mx: calc(100% - 36px);
+  --my: 32px;
+  --bx: 16px;
+  --by: 12px;
+  --cream: #f4f2ec;
+  --night: #120e0b;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 108px) 28px calc(env(safe-area-inset-bottom) + 28px);
+  background:
+    radial-gradient(120% 60% at 100% 0%, rgb(105 21 17 / 0.45), rgb(105 21 17 / 0)),
+    var(--night);
+  color: var(--cream);
+  clip-path: circle(0 at var(--mx) var(--my));
+  visibility: hidden;
+  overscroll-behavior: contain;
+  transition:
+    clip-path 0.7s cubic-bezier(0.76, 0, 0.24, 1),
+    visibility 0s linear 0.7s;
+}
+
+.menu[data-open="true"] {
+  clip-path: circle(150% at var(--mx) var(--my));
+  visibility: visible;
+  transition:
+    clip-path 0.8s cubic-bezier(0.76, 0, 0.24, 1),
+    visibility 0s;
+}
+
+@media (min-width: 1024px) {
+  .menu {
+    display: none;
+  }
+}
+
+/* The wordmark and the close button sit where the header's were. */
+.top {
+  position: absolute;
+  top: var(--by);
+  left: 16px;
+  display: flex;
+  align-items: center;
+  height: 40px;
+}
+
+.logo {
+  display: block;
+  line-height: 0;
+  color: var(--cream);
+}
+
+.logo svg {
+  width: auto;
+  height: 40px;
+}
+
+.close {
+  position: absolute;
+  top: var(--by);
+  right: var(--bx);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgb(244 242 236 / 0.45);
+  border-radius: 50%;
+  background: rgb(244 242 236 / 0.1);
+  color: var(--cream);
+  cursor: pointer;
+}
+
+.close:focus-visible {
+  outline: 1px solid var(--cream);
+  outline-offset: 3px;
+}
+
+.cross,
+.cross::before {
+  display: block;
+  width: 16px;
+  height: 1px;
+  background: currentColor;
+}
+
+.cross {
+  transform: rotate(45deg);
+}
+
+.cross::before {
+  content: "";
+  transform: rotate(-90deg);
+}
+
+.list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.menu[data-open="true"] .item {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1) calc(0.22s + var(--i) * 0.07s),
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1) calc(0.22s + var(--i) * 0.07s);
+}
+
+.link {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 0;
+  font-family: var(--font-hero);
+  font-size: clamp(34px, 10.5vw, 52px);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  text-decoration: none;
+}
+
+.link:focus-visible {
+  outline: 1px solid var(--cream);
+  outline-offset: 4px;
+}
+
+.index {
+  font-family: var(--font-manrope);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: rgb(246 241 232 / 0.45);
+}
+
+/* The page you're on: its number in the brand's warm accent, and a dot. */
+.link[aria-current="page"] .index {
+  color: #c08552;
+}
+
+.link[aria-current="page"]::after {
+  content: "";
+  flex: none;
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: #c08552;
+}
+
+.foot {
+  display: grid;
+  gap: 12px;
+  margin-top: auto;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.menu[data-open="true"] .foot {
+  opacity: 1;
+  transition: opacity 0.8s ease 0.55s;
+}
+
+.primary,
+.secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  border-radius: 999px;
+  font-family: var(--font-manrope);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.primary {
+  background: var(--cream);
+  color: var(--night);
+}
+
+.secondary {
+  border: 1px solid rgb(244 242 236 / 0.4);
+  color: var(--cream);
+}
+
+.socials {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .menu[data-open="true"],
+  .item,
+  .menu[data-open="true"] .item,
+  .foot,
+  .menu[data-open="true"] .foot {
+    transition: none;
+  }
+}
