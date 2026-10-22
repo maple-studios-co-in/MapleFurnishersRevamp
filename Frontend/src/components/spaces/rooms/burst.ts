@@ -1,18 +1,20 @@
 "use client";
 
 import { gsap } from "@/lib/motion";
-import { PLATES, plateSrc, ROOMS, TALL_QUERY } from "./content";
+import { cssRgb, plateSrc, TALL_QUERY, type RoomsWorld } from "./content";
+import { leafSheet } from "./leaves";
 import { cloudNoise } from "./noise";
-import { NimbusRenderer } from "./renderer";
+import { RoomsRenderer } from "./renderer";
 import { holdVeil } from "./veil";
 
 /**
- * "Click to Enter" on the Nimbus scene of /spaces: cloud billows out of the
- * ring and rushes past the camera while the scene leans in toward it, until
- * the screen is white. Then the veil (veil.ts) is held and the Nimbus rooms
- * load behind it, opening from that same white.
+ * "Click to Enter" on a world's scene of /spaces: its cloud (Nimbus) or its
+ * leaves (Terra) billow out of the ring and rushes past the camera
+ * while the scene leans in toward it, until the screen is the world's
+ * whiteout. Then the veil (veil.ts) is held and the rooms load behind it,
+ * opening from that same colour.
  */
-export function burstIntoNimbus(opts: {
+export function burstInto(world: RoomsWorld, opts: {
   /** Screen uv of the ring's centre. */
   origin: readonly [number, number];
   /** Pushed toward the ring as the cloud comes. */
@@ -42,7 +44,12 @@ export function burstIntoNimbus(opts: {
   window.addEventListener("keydown", block, { capture: true });
 
   // Cloud only (base 0): the plate shape never shows.
-  const renderer = new NimbusRenderer(canvas, { transparent: true, plateAspect: PLATES.wide.width / PLATES.wide.height });
+  const renderer = new RoomsRenderer(canvas, {
+    transparent: true,
+    plateAspect: world.plates.wide.width / world.plates.wide.height,
+    palette: world.palette,
+    transit: world.transit,
+  });
   const B = { cloud: 0.3, spread: 0, travel: 0, white: 0 };
 
   const tick = (time: number) =>
@@ -68,7 +75,7 @@ export function burstIntoNimbus(opts: {
   const finish = () => {
     if (done) return;
     done = true;
-    holdVeil();
+    holdVeil(cssRgb(world.palette.whiteout));
     gsap.ticker.remove(tick);
     window.removeEventListener("wheel", block, { capture: true });
     window.removeEventListener("touchmove", block, { capture: true });
@@ -79,6 +86,8 @@ export function burstIntoNimbus(opts: {
   };
 
   const tl = gsap.timeline({ onComplete: finish });
+  // Terra plays slower than Nimbus, its leaves too.
+  if (world.transit === "foliage") tl.timeScale(0.75);
   if (renderer.ok) {
     renderer.resize(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio || 1, 1.25));
     gsap.ticker.add(tick);
@@ -88,7 +97,7 @@ export function burstIntoNimbus(opts: {
       .to(B, { white: 1, duration: 0.5, ease: "power2.in" }, 1.08);
   } else {
     // No WebGL: the white simply rises.
-    canvas.style.background = "rgb(245 241 234)";
+    canvas.style.background = `rgb(${cssRgb(world.palette.whiteout)})`;
     tl.fromTo(canvas, { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "power2.in" }, 0.25);
   }
   if (opts.ring) tl.to(opts.ring, { scale: 1.3, opacity: 0, duration: 0.75, ease: "power2.out" }, 0);
@@ -106,13 +115,14 @@ export function burstIntoNimbus(opts: {
 
 /**
  * Called when a visitor shows interest (hover, focus, an idle beat): builds
- * the cloud noise and starts the living room's first plates so the click
- * lands on a warm cache.
+ * the cloud noise (and a foliage world's leaves) and starts the first
+ * room's first plates, so the click lands on a warm cache.
  */
-export function warmNimbus() {
+export function warmRooms(world: RoomsWorld) {
   cloudNoise();
+  if (world.transit === "foliage") leafSheet();
   const set = window.matchMedia(TALL_QUERY).matches ? "tall" : "wide";
   for (const stage of [0, 1]) {
-    void fetch(plateSrc(ROOMS[0], stage, set), { cache: "force-cache" }).catch(() => {});
+    void fetch(plateSrc(world, world.rooms[0], stage, set), { cache: "force-cache" }).catch(() => {});
   }
 }

@@ -1,4 +1,4 @@
-import type { NimbusRenderer } from "./renderer";
+import type { RoomsRenderer } from "./renderer";
 
 type Source = ImageBitmap | HTMLImageElement;
 type Decoded = { source: Source; url?: string };
@@ -35,7 +35,7 @@ export class PlateBank {
   onChange: (() => void) | null = null;
 
   constructor(
-    private readonly renderer: NimbusRenderer,
+    private readonly renderer: RoomsRenderer,
     urls: string[][],
     /** The room fetched first: the one in view. */
     first = 0,

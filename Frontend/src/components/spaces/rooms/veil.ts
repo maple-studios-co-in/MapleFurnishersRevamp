@@ -5,13 +5,13 @@
  * A page that leaves through cloud fills the screen with it, holds the veil,
  * then navigates. The veil lives on <body>, outside React, so it survives
  * the route change; the next page draws its own first frame in the same
- * colour beneath it and releases it, at once (Nimbus, which opens from that
- * whiteout) or with a fade (Spaces). Nothing is left hanging if the next
- * page never claims it.
+ * colour beneath it and releases it, at once (a world's rooms, which open
+ * from that whiteout) or with a fade (Spaces). Nothing is left hanging if
+ * the next page never claims it.
+ *
+ * Its colour is the world's whiteout (CloudPalette in content.ts, also
+ * WHITEOUT in the shader): Nimbus's pearl, Terra's warm sand.
  */
-
-/** #F5F1EA — must match WHITEOUT in shader.ts. */
-export const VEIL_RGB = "245 241 234";
 
 const VEIL_ID = "maple-cloud-veil";
 const SAFETY_MS = 9000;
@@ -22,7 +22,8 @@ export function hasVeil() {
   return typeof document !== "undefined" && Boolean(document.getElementById(VEIL_ID));
 }
 
-export function holdVeil() {
+/** Fills the screen with the veil, in CSS "r g b" (cssRgb of the world's whiteout). */
+export function holdVeil(rgb: string) {
   let el = document.getElementById(VEIL_ID);
   if (!el) {
     el = document.createElement("div");
@@ -32,11 +33,11 @@ export function holdVeil() {
       position: "fixed",
       inset: "0",
       zIndex: "10000",
-      background: `rgb(${VEIL_RGB})`,
       pointerEvents: "auto",
     });
     document.body.appendChild(el);
   }
+  el.style.background = `rgb(${rgb})`;
   el.style.transition = "none";
   el.style.opacity = "1";
   window.clearTimeout(safety);

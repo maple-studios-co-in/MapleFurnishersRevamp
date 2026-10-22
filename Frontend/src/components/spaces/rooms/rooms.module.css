@@ -1,5 +1,6 @@
 /* ==========================================================================
-   /spaces/nimbus — three rooms above the clouds.
+   A world's rooms: /spaces/nimbus (three rooms above the clouds) and
+   /spaces/terra (three rooms grounded in earth), themed by [data-world].
 
    Film (motion allowed, WebGL available): a fixed stage holds the canvas
    and every overlay; the spacer below supplies the scroll the director
@@ -12,10 +13,19 @@
    ========================================================================== */
 
 .page {
-  --ink: #1e1e1e;
-  --ink-soft: rgb(30 30 30 / 0.66);
+  --ink-rgb: 30 30 30;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft: rgb(var(--ink-rgb) / 0.66);
+  /* The world's whiteout (CloudPalette), behind everything. */
   --mist: rgb(245 241 234);
-  --burgundy: #741a14;
+  /* The soft breath of light behind type over the rooms. */
+  --scrim: 250 248 244;
+  --title-scrim: 0.62;
+  --text-scrim: 0.5;
+  --accent: #741a14;
+  --title-hi: #fff;
+  --title-lo: #9aa5aa;
+  --title-shadow: rgb(110 120 132 / 0.28);
   --pearl: var(--font-pearl), var(--font-catilde), ui-serif, Georgia, serif;
   --redhat: var(--font-redhat-var), var(--font-redhat), ui-sans-serif, system-ui, sans-serif;
   /* Design px of a 1440 × 900 screen, scaled to fit the viewport. */
@@ -27,9 +37,43 @@
   color: var(--ink);
 }
 
+/* Terra: umber ink, a terracotta accent, sand-warm light (terra.ts). */
+.page[data-world="terra"] {
+  --ink-rgb: 43 32 24;
+  --mist: rgb(232 228 202);
+  /* Terra's rooms are busier and darker than Nimbus's sky: more light behind the type. */
+  --scrim: 251 245 236;
+  --title-scrim: 0.94;
+  --text-scrim: 0.86;
+  --accent: #8c4a2a;
+  --title-hi: #f7ead8;
+  --title-lo: #8a6a4e;
+  --title-shadow: rgb(112 84 56 / 0.34);
+}
+
+/* Terra's walls are dark timber and bronze, its floors bright travertine:
+   the names form low, over the floor, rather than over the walls. */
+.page[data-world="terra"] .title {
+  padding: 30vh 24px 0;
+}
+
+.page[data-world="terra"] .titleInner::before {
+  inset: -70% -34%;
+}
+
+.page[data-world="terra"] :is(.titleKicker, .titleName, .titleLine, .captionKicker, .stepLabel, .copyEyebrow, .copyBody) {
+  text-shadow:
+    0 0 26px rgb(var(--scrim) / 0.9),
+    0 0 3px rgb(var(--scrim) / 0.55);
+}
+
 :global(html):has(.page) {
   background: rgb(245 241 234);
   scrollbar-width: none;
+}
+
+:global(html):has(.page[data-world="terra"]) {
+  background: rgb(232 228 202);
 }
 
 :global(html):has(.page)::-webkit-scrollbar {
@@ -43,6 +87,10 @@
   background: rgb(245 241 234 / 0.5);
   -webkit-backdrop-filter: blur(16px) saturate(1.15);
   backdrop-filter: blur(16px) saturate(1.15);
+}
+
+:global(html):has(.page[data-world="terra"]) :global([data-paper-header][data-variant="spaces"]) > div:first-child {
+  background: rgb(232 228 202 / 0.5);
 }
 
 .srOnly {
@@ -145,7 +193,7 @@
   position: absolute;
   inset: -40% -22%;
   z-index: -1;
-  background: radial-gradient(closest-side, rgb(250 248 244 / 0.62), rgb(250 248 244 / 0));
+  background: radial-gradient(closest-side, rgb(var(--scrim) / var(--title-scrim)), rgb(var(--scrim) / 0));
 }
 
 .titleKicker {
@@ -211,7 +259,7 @@
   position: absolute;
   inset: -55% -40% -60% -30%;
   z-index: -1;
-  background: radial-gradient(closest-side, rgb(250 248 244 / 0.5), rgb(250 248 244 / 0));
+  background: radial-gradient(closest-side, rgb(var(--scrim) / var(--text-scrim)), rgb(var(--scrim) / 0));
 }
 
 .captionKicker {
@@ -249,7 +297,7 @@
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.18em;
-  color: var(--burgundy);
+  color: var(--accent);
 }
 
 .stepLabel {
@@ -264,7 +312,7 @@
   width: min(260px, 70%);
   height: 1px;
   margin-top: 10px;
-  background: rgb(30 30 30 / 0.16);
+  background: rgb(var(--ink-rgb) / 0.16);
 }
 
 /* Scaled by the director (no CSS transform for GSAP to misread). */
@@ -313,7 +361,7 @@
   justify-content: end;
   gap: 12px;
   font-family: var(--redhat);
-  color: rgb(30 30 30 / 0.42);
+  color: rgb(var(--ink-rgb) / 0.42);
   text-decoration: none;
   transition: color 0.45s ease;
 }
@@ -363,7 +411,7 @@
   width: 2px;
   height: 46px;
   overflow: hidden;
-  background: rgb(30 30 30 / 0.14);
+  background: rgb(var(--ink-rgb) / 0.14);
 }
 
 .railFill {
@@ -419,7 +467,7 @@
   width: 1px;
   height: 44px;
   overflow: hidden;
-  background: rgb(30 30 30 / 0.18);
+  background: rgb(var(--ink-rgb) / 0.18);
 }
 
 .cueDot {
@@ -429,10 +477,10 @@
   width: 1px;
   height: 14px;
   background: var(--ink);
-  animation: nimbus-cue 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  animation: rooms-cue 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
-@keyframes nimbus-cue {
+@keyframes rooms-cue {
   0% {
     transform: translateY(-14px);
   }
@@ -473,12 +521,12 @@
   line-height: 1.12;
   letter-spacing: 0.05em;
   white-space: nowrap;
-  filter: drop-shadow(0 18px 40px rgb(110 120 132 / 0.28));
+  filter: drop-shadow(0 18px 40px var(--title-shadow));
 }
 
 .finaleTitle,
-.finaleTitle :global(.nimbus-char) {
-  background-image: linear-gradient(to top, #fff 8%, #9aa5aa 100%);
+.finaleTitle :global(.rooms-char) {
+  background-image: linear-gradient(to top, var(--title-hi) 8%, var(--title-lo) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -514,7 +562,7 @@
   gap: 14px;
   height: 54px;
   padding: 0 30px;
-  border: 1px solid rgb(30 30 30 / 0.85);
+  border: 1px solid rgb(var(--ink-rgb) / 0.85);
   border-radius: 999px;
   background: rgb(255 255 255 / 0.32);
   -webkit-backdrop-filter: blur(8px);
@@ -552,7 +600,7 @@
 
 .ctaQuiet:hover,
 .ctaQuiet:focus-visible {
-  border-color: rgb(30 30 30 / 0.3);
+  border-color: rgb(var(--ink-rgb) / 0.3);
   background: rgb(255 255 255 / 0.3);
   color: var(--ink);
 }
@@ -623,7 +671,7 @@
   /* The camera is close in on a phone: give the copy more mist to sit on. */
   .copy::before {
     inset: -40% -20% -50% -20%;
-    background: radial-gradient(closest-side, rgb(250 248 244 / 0.82), rgb(250 248 244 / 0));
+    background: radial-gradient(closest-side, rgb(var(--scrim) / max(0.82, var(--text-scrim))), rgb(var(--scrim) / 0));
   }
 
   /* A phone scrolls between rooms with the thumb; the rail would sit on the titles. */
