@@ -1,13 +1,13 @@
 import { getImageProps } from "next/image";
 import { Fragment } from "react";
-import { FINALE, plateSrc, ROOMS, TALL_QUERY, type Room } from "./content";
-import styles from "./nimbus.module.css";
+import { plateSrc, ROOM_WORLDS, TALL_QUERY, type Room, type RoomsWorld, type RoomsWorldId } from "./content";
+import styles from "./rooms.module.css";
 
 /** A finished room for the static page: the tall plate on a portrait screen, like the film. */
-function StaticPlate({ room }: { room: Room }) {
+function StaticPlate({ world, room }: { world: RoomsWorld; room: Room }) {
   const common = { alt: room.alt, fill: true, sizes: "(min-width: 1024px) 86vw, 100vw" };
-  const tall = getImageProps({ ...common, src: plateSrc(room, 5, "tall") }).props.srcSet;
-  const img = getImageProps({ ...common, src: plateSrc(room, 5) }).props;
+  const tall = getImageProps({ ...common, src: plateSrc(world, room, 5, "tall") }).props.srcSet;
+  const img = getImageProps({ ...common, src: plateSrc(world, room, 5) }).props;
   return (
     <picture>
       <source media={TALL_QUERY} srcSet={tall} sizes={img.sizes} />
@@ -17,7 +17,7 @@ function StaticPlate({ room }: { room: Room }) {
 }
 
 /**
- * Markup for /spaces/nimbus.
+ * Markup for a world's rooms (/spaces/nimbus, /spaces/terra).
  *
  * The film: one fixed stage (the WebGL canvas, the room names that form in
  * the cloud, the piece-by-piece captions, each room's copy, the room rail
@@ -26,19 +26,21 @@ function StaticPlate({ room }: { room: Room }) {
  * The static page: the three finished rooms as ordinary sections, for
  * reduced motion, no WebGL and no script.
  */
-export default function NimbusStage() {
+export default function RoomsStage({ world: id }: { world: RoomsWorldId }) {
+  const world = ROOM_WORLDS[id];
+  const { rooms, finale } = world;
   return (
     <>
-      <div className={styles.stage} data-nimbus-stage>
-        <canvas className={styles.canvas} data-nimbus-canvas aria-hidden />
-        <h1 className={styles.srOnly}>Nimbus: a living room, a dining room and a bedroom above the clouds</h1>
+      <div className={styles.stage} data-rooms-stage>
+        <canvas className={styles.canvas} data-rooms-canvas aria-hidden />
+        <h1 className={styles.srOnly}>{world.heading}</h1>
 
-        {ROOMS.map((room, r) => (
+        {rooms.map((room, r) => (
           <Fragment key={room.id}>
             <div className={styles.title} data-room-title={r}>
               <div className={styles.titleInner} data-title-inner>
                 <p className={styles.titleKicker} data-title-kicker>
-                  <span>Nimbus</span>
+                  <span>{world.name}</span>
                   <span className={styles.titleRule} aria-hidden />
                   <span>{room.numeral}</span>
                 </p>
@@ -75,28 +77,28 @@ export default function NimbusStage() {
 
         <div className={styles.finale} data-finale>
           <p className={styles.finaleTagline} data-finale-tagline>
-            {FINALE.tagline}
+            {finale.tagline}
           </p>
           <h2 className={styles.finaleTitle} data-finale-title>
-            {FINALE.title}
+            {finale.title}
           </h2>
           <p className={styles.finaleBody} data-finale-body>
-            {FINALE.body}
+            {finale.body}
           </p>
           <div className={styles.finaleCtas} data-finale-ctas>
-            <a href={FINALE.primary.href} className={styles.cta} data-leave="external">
-              <span>{FINALE.primary.label}</span>
+            <a href={finale.primary.href} className={styles.cta} data-leave="external">
+              <span>{finale.primary.label}</span>
               <span className={styles.ctaArrow} aria-hidden />
             </a>
-            <a href={FINALE.secondary.href} className={`${styles.cta} ${styles.ctaQuiet}`} data-leave="internal">
+            <a href={finale.secondary.href} className={`${styles.cta} ${styles.ctaQuiet}`} data-leave="internal">
               <span className={`${styles.ctaArrow} ${styles.ctaArrowBack}`} aria-hidden />
-              <span>{FINALE.secondary.label}</span>
+              <span>{finale.secondary.label}</span>
             </a>
           </div>
         </div>
 
-        <nav className={styles.rail} aria-label="Nimbus rooms" data-rail>
-          {ROOMS.map((room, r) => (
+        <nav className={styles.rail} aria-label={`${world.name} rooms`} data-rail>
+          {rooms.map((room, r) => (
             <a key={room.id} href={`#${room.id}`} className={styles.railItem} data-rail-item={r}>
               <span className={styles.railNo}>{room.numeral}</span>
               <span className={styles.railLabel}>{room.title.replace(/^The /, "")}</span>
@@ -120,24 +122,24 @@ export default function NimbusStage() {
         </div>
       </div>
 
-      <div className={styles.spacer} data-nimbus-spacer aria-hidden />
+      <div className={styles.spacer} data-rooms-spacer aria-hidden />
 
-      <div className={styles.static} data-nimbus-static>
+      <div className={styles.static} data-rooms-static>
         <header className={styles.staticHead}>
-          <p className={styles.staticKicker}>Nimbus</p>
-          <h1 className={styles.staticTitle}>Three rooms above the clouds</h1>
-          <p className={styles.staticLine}>{FINALE.tagline}</p>
+          <p className={styles.staticKicker}>{world.name}</p>
+          <h1 className={styles.staticTitle}>{world.staticTitle}</h1>
+          <p className={styles.staticLine}>{finale.tagline}</p>
         </header>
-        {ROOMS.map((room) => (
-          <section key={room.id} id={room.id} className={styles.staticRoom} aria-labelledby={`nimbus-${room.id}`}>
+        {rooms.map((room) => (
+          <section key={room.id} id={room.id} className={styles.staticRoom} aria-labelledby={`${id}-${room.id}`}>
             <div className={styles.staticPlate}>
-              <StaticPlate room={room} />
+              <StaticPlate world={world} room={room} />
             </div>
             <div className={styles.staticText}>
               <p className={styles.staticKicker}>
-                Nimbus · {room.numeral}
+                {world.name} · {room.numeral}
               </p>
-              <h2 id={`nimbus-${room.id}`} className={styles.staticRoomTitle}>
+              <h2 id={`${id}-${room.id}`} className={styles.staticRoomTitle}>
                 {room.title}
               </h2>
               <p className={styles.staticLine}>{room.line}</p>
@@ -146,15 +148,15 @@ export default function NimbusStage() {
           </section>
         ))}
         <footer className={styles.staticFoot}>
-          <p className={styles.staticBody}>{FINALE.body}</p>
+          <p className={styles.staticBody}>{finale.body}</p>
           <div className={styles.finaleCtas}>
-            <a href={FINALE.primary.href} className={styles.cta}>
-              <span>{FINALE.primary.label}</span>
+            <a href={finale.primary.href} className={styles.cta}>
+              <span>{finale.primary.label}</span>
               <span className={styles.ctaArrow} aria-hidden />
             </a>
-            <a href={FINALE.secondary.href} className={`${styles.cta} ${styles.ctaQuiet}`}>
+            <a href={finale.secondary.href} className={`${styles.cta} ${styles.ctaQuiet}`}>
               <span className={`${styles.ctaArrow} ${styles.ctaArrowBack}`} aria-hidden />
-              <span>{FINALE.secondary.label}</span>
+              <span>{finale.secondary.label}</span>
             </a>
           </div>
         </footer>

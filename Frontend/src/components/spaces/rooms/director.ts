@@ -1,12 +1,12 @@
 "use client";
 
 import { gsap, ScrollTrigger, SplitText } from "@/lib/motion";
-import { PLATES, plateSrc, ROOMS, TALL_QUERY, type PlateSet } from "./content";
+import { cssRgb, plateSrc, TALL_QUERY, type PlateSet, type RoomsWorld, type Tempo } from "./content";
 import { PlateBank } from "./plates";
-import { NimbusRenderer, type NimbusFrame } from "./renderer";
+import { RoomsRenderer, type RoomsFrame } from "./renderer";
 import { holdVeil } from "./veil";
 
-export interface NimbusFilm {
+export interface RoomsFilm {
   /** Lays the film out and draws its first frame (the whiteout) at once. */
   drawNow(): void;
   /** Resolves once the room in view has its first plates on the GPU (or on timeout). */
@@ -16,7 +16,7 @@ export interface NimbusFilm {
   destroy(): void;
 }
 
-export interface NimbusFilmOptions {
+export interface RoomsFilmOptions {
   /** Scrolls the page (through Lenis) to a px offset. */
   scrollTo: (y: number, opts?: { duration?: number; immediate?: boolean; easing?: (t: number) => number }) => void;
   /** Client-side navigation, used when leaving through the cloud veil. */
@@ -24,8 +24,9 @@ export interface NimbusFilmOptions {
 }
 
 /**
- * Pacing in timeline seconds; the page scrolls VH_PER_SECOND viewport
- * heights per second, so each beat also reads as scroll distance.
+ * Pacing in timeline seconds; the page scrolls the world's vhPerSecond
+ * viewport heights per second (TEMPO), so each beat also reads as scroll
+ * distance.
  */
 const PACE = {
   /** The room's name holds over the empty room… */
@@ -42,16 +43,11 @@ const PACE = {
   touchStep: 1.6,
   /** The finished room, with its copy. */
   styledHold: 1.25,
-  /** Out through the window, through the cloud, into the next room. */
-  cross: 2.9,
   finaleHold: 1.5,
 } as const;
 const FORM = 0.74;
 const TOUCH_FORM = 0.58;
 const TOUCH_PAN = 0.6;
-const VH_PER_SECOND = 0.72;
-/** Inside a cross: the moment the cloud is a whiteout and the rooms change beneath it. */
-const SWAP = 1.5;
 /** Cloud reach that covers any screen from any origin. */
 const SPREAD = 2.7;
 /** Camera scale: arriving, room-wide, pushed in once furnished, through the window. */
@@ -59,25 +55,30 @@ const CAM = { arrive: 1.0, start: 1.05, end: 1.15, exit: 1.9 } as const;
 const CENTRE = [0.5, 0.46] as const;
 
 /**
+ * Nimbus's tempo, the default; a world may slow it (Tempo, content.ts).
+ *
  * The playhead eases after the scroll instead of being bolted to it: it
- * takes SMOOTH seconds to settle, and over short distances it never runs
- * faster than MAX_RATE timeline-seconds per second, so a piece always takes
+ * takes `smooth` seconds to settle, and over short distances it never runs
+ * faster than `maxRate` timeline-seconds per second, so a piece always takes
  * the best part of a second to form however hard the wheel is flicked.
  * Far jumps (End, a long drag of the scrollbar) catch up faster.
+ *
+ * A crossing (out through the window, through the cloud, into the next
+ * room) lasts `cross`; at `swap` inside it the cloud is a whiteout and the
+ * rooms change beneath it.
  */
-const SMOOTH = 0.55;
-const MAX_RATE = 1.1;
+const TEMPO: Tempo = { vhPerSecond: 0.72, maxRate: 1.1, smooth: 0.55, cross: 2.9, swap: 1.5 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /** Critically damped follow with a speed limit (after Unity's SmoothDamp). */
-function smoothDamp(current: number, target: number, velocity: number, maxSpeed: number, dt: number) {
-  const omega = 2 / SMOOTH;
+function smoothDamp(current: number, target: number, velocity: number, maxSpeed: number, dt: number, smooth: number) {
+  const omega = 2 / smooth;
   const x = omega * dt;
   const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
-  const maxChange = maxSpeed * SMOOTH;
+  const maxChange = maxSpeed * smooth;
   const change = clamp(current - target, -maxChange, maxChange);
   const to = current - change;
   const temp = (velocity + omega * change) * dt;
@@ -108,7 +109,7 @@ function along(points: ReadonlyArray<readonly [number, number]>, u: number): [nu
 }
 
 /**
- * Builds the Nimbus film on NimbusStage's markup.
+ * Builds a world's rooms film (Nimbus, Terra) on RoomsStage's markup.
  *
  *  room      the name forms, then each piece gathers out of mist and
  *            resolves as the camera glides through the room; on a portrait
@@ -125,21 +126,25 @@ function along(points: ReadonlyArray<readonly [number, number]>, u: number): [nu
  * Call inside a gsap.context so every tween, split and trigger is
  * reverted with it.
  */
-export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): NimbusFilm | null {
+export function createRoomsFilm(root: HTMLElement, world: RoomsWorld, opts: RoomsFilmOptions): RoomsFilm | null {
+  const rooms = world.rooms;
+  const tempo: Tempo = { ...TEMPO, ...world.tempo };
+  /** Foliage instead of cloud between rooms (Terra). */
+  const leafy = world.transit === "foliage";
   const one = <T extends Element = HTMLElement>(sel: string, scope: ParentNode = root) => scope.querySelector<T>(sel);
   const all = <T extends Element = HTMLElement>(sel: string, scope: ParentNode = root) =>
     Array.from(scope.querySelectorAll<T>(sel));
 
-  const stage = one("[data-nimbus-stage]");
-  const canvas = one<HTMLCanvasElement>("canvas[data-nimbus-canvas]");
-  const spacer = one("[data-nimbus-spacer]");
+  const stage = one("[data-rooms-stage]");
+  const canvas = one<HTMLCanvasElement>("canvas[data-rooms-canvas]");
+  const spacer = one("[data-rooms-spacer]");
   const finaleRoot = one("[data-finale]");
   const rail = one("[data-rail]");
   const cue = one("[data-cue]");
   const cueInner = one("[data-cue-inner]");
   if (!stage || !canvas || !spacer || !finaleRoot || !rail || !cue || !cueInner) return null;
 
-  const parts = ROOMS.map((_, r) => {
+  const parts = rooms.map((_, r) => {
     const title = one(`[data-room-title='${r}']`);
     const caption = one(`[data-caption='${r}']`);
     const copy = one(`[data-copy='${r}']`);
@@ -172,20 +177,24 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   // turning the screen swaps the set (see onTurn).
   const tallQuery = window.matchMedia(TALL_QUERY);
   let set: PlateSet = tallQuery.matches ? "tall" : "wide";
-  let plate: (typeof PLATES)[PlateSet] = PLATES[set];
-  const renderer = new NimbusRenderer(canvas, { plateAspect: plate.width / plate.height });
+  let plate: RoomsWorld["plates"][PlateSet] = world.plates[set];
+  const renderer = new RoomsRenderer(canvas, {
+    plateAspect: plate.width / plate.height,
+    palette: world.palette,
+    transit: world.transit,
+  });
   if (!renderer.ok) {
     renderer.destroy();
     return null;
   }
   // Arriving at #dining or #bedroom, the film starts there (see the end).
-  const hashRoom = Math.max(0, ROOMS.findIndex((room) => `#${room.id}` === window.location.hash));
+  const hashRoom = Math.max(0, rooms.findIndex((room) => `#${room.id}` === window.location.hash));
   /** Rooms a phone holds on the GPU: the one in view and the next (see syncChrome). */
-  let kept = [hashRoom, hashRoom + 1].filter((r) => r < ROOMS.length);
+  let kept = [hashRoom, hashRoom + 1].filter((r) => r < rooms.length);
   const createBank = (first: number) => {
     const b = new PlateBank(
       renderer,
-      ROOMS.map((room) => room.stages.map((_, s) => plateSrc(room, s, set))),
+      rooms.map((room) => room.stages.map((_, s) => plateSrc(world, room, s, set))),
       first,
     );
     if (coarse) b.keepRooms(kept);
@@ -195,7 +204,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
 
   /** The camera's marks in the plates in use: a look-at point per stage, and the window it leaves by. */
   const marksFor = (s: PlateSet) =>
-    ROOMS.map((room) =>
+    rooms.map((room) =>
       s === "tall"
         ? { focus: room.tall.focus, window: room.tall.window }
         : { focus: room.stages.map((st) => st.focus), window: room.window },
@@ -204,9 +213,9 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
 
   // ------------------------------------------------------------------ splits
   const nameChars = P.map(
-    (p) => SplitText.create(p.name, { type: "words,chars", charsClass: "nimbus-char" }).chars as HTMLElement[],
+    (p) => SplitText.create(p.name, { type: "words,chars", charsClass: "rooms-char" }).chars as HTMLElement[],
   );
-  const finaleChars = SplitText.create(F.title, { type: "chars", charsClass: "nimbus-char" }).chars as HTMLElement[];
+  const finaleChars = SplitText.create(F.title, { type: "chars", charsClass: "rooms-char" }).chars as HTMLElement[];
   F.title.dataset.split = "";
 
   // ------------------------------------------------------------------ layout
@@ -258,7 +267,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     if (!total || (L.spacerVw === L.vw && Math.abs(vh - L.spacerVh) <= 120)) return false;
     L.spacerVw = L.vw;
     L.spacerVh = vh;
-    L.pxPerSecond = VH_PER_SECOND * vh;
+    L.pxPerSecond = tempo.vhPerSecond * vh;
     spacer.style.height = `${Math.round(total * L.pxPerSecond + vh)}px`;
     return true;
   };
@@ -309,11 +318,11 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
 
   tl.fromTo(cue, { opacity: 1 }, { opacity: 0, duration: 0.35 }, 0.04);
 
-  ROOMS.forEach((room, r) => {
+  rooms.forEach((room, r) => {
     const R = t;
     roomStarts.push(R);
     const p = P[r];
-    const last = r === ROOMS.length - 1;
+    const last = r === rooms.length - 1;
 
     // The block, not its full-screen wrapper, takes the blur: a phone would
     // otherwise filter a whole screen of transparent layer every frame.
@@ -381,21 +390,35 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     const X = R + ROOM;
     crosses.push(X);
     tl.fromTo(p.copy, { opacity: 1, y: 0 }, { opacity: 0, y: s(-12), duration: 0.5, ease: "power2.in" }, X - 0.45);
-    tl.set(S, { atWindow: 1 }, X);
-    tl.fromTo(S, { scale: CAM.end }, { scale: CAM.exit, duration: SWAP - 0.05, ease: "power2.in" }, X);
-    tl.fromTo(S, { lock: 0 }, { lock: 1, duration: SWAP - 0.2, ease: "power1.inOut" }, X);
-    tl.fromTo(S, { warp: 0 }, { warp: 0.38, duration: SWAP - 0.05, ease: "power2.in" }, X);
-    tl.fromTo(S, { streak: 0 }, { streak: 0.85, duration: SWAP - 0.45, ease: "power2.in" }, X + 0.45);
-    tl.fromTo(S, { spread: 0 }, { spread: SPREAD, duration: SWAP - 0.2, ease: "power2.in" }, X + 0.05);
-    tl.fromTo(S, { cloud: 0 }, { cloud: 1, duration: SWAP - 0.4, ease: "power2.in" }, X + 0.2);
-    tl.fromTo(S, { travel }, { travel: travel + 2.0, duration: PACE.cross }, X);
+    // Whatever comes between rooms streams from the way out.
+    tl.set(S, { atWindow: 1 }, leafy ? X - 0.2 : X);
+    tl.fromTo(S, { scale: CAM.end }, { scale: CAM.exit, duration: tempo.swap - 0.05, ease: "power2.in" }, X);
+    tl.fromTo(S, { lock: 0 }, { lock: 1, duration: tempo.swap - 0.2, ease: "power1.inOut" }, X);
+    tl.fromTo(S, { warp: 0 }, { warp: 0.38, duration: tempo.swap - 0.05, ease: "power2.in" }, X);
+    tl.fromTo(S, { streak: 0 }, { streak: 0.85, duration: tempo.swap - 0.45, ease: "power2.in" }, X + 0.45);
+    if (leafy) {
+      // Leaves drift in at the edges as the camera turns for the garden, and
+      // thicken steadily; the light comes up through them, never a snap.
+      tl.fromTo(S, { spread: 0 }, { spread: SPREAD, duration: tempo.swap, ease: "sine.inOut" }, X - 0.2);
+      tl.fromTo(S, { cloud: 0 }, { cloud: 1, duration: tempo.swap - 0.1, ease: "power1.inOut" }, X - 0.2);
+    } else {
+      tl.fromTo(S, { spread: 0 }, { spread: SPREAD, duration: tempo.swap - 0.2, ease: "power2.in" }, X + 0.05);
+      tl.fromTo(S, { cloud: 0 }, { cloud: 1, duration: tempo.swap - 0.4, ease: "power2.in" }, X + 0.2);
+    }
+    tl.fromTo(S, { travel }, { travel: travel + 2.0, duration: tempo.cross }, X);
     travel += 2.0;
-    tl.fromTo(S, { white: 0 }, { white: 1, duration: 0.43, ease: "power1.in" }, X + SWAP - 0.45);
+    const dip = leafy ? 0.62 : 0.43;
+    tl.fromTo(
+      S,
+      { white: 0 },
+      { white: 1, duration: dip, ease: leafy ? "sine.inOut" : "power1.in" },
+      X + tempo.swap - dip - 0.02,
+    );
 
     // Under the whiteout the next room, or the sky, takes the screen.
-    const W = X + SWAP;
-    const after = PACE.cross - SWAP;
-    const next = last ? null : ROOMS[r + 1];
+    const W = X + tempo.swap;
+    const after = tempo.cross - tempo.swap;
+    const next = last ? null : rooms[r + 1];
     if (next) {
       tl.set(
         S,
@@ -410,7 +433,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
         P[r + 1].inner,
         { opacity: 0, y: s(34), filter: "blur(12px)" },
         { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.9, ease: "power2.out" },
-        X + SWAP - 0.5,
+        X + tempo.swap - 0.5,
       );
     } else {
       tl.set(S, { base: 2, warp: 0, streak: 0, atWindow: 0 }, W);
@@ -433,8 +456,8 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     tl.fromTo(S, { white: 1 }, { white: 0, duration: 0.6, ease: "power1.out" }, W + 0.05);
     tl.fromTo(S, { clear: 0 }, { clear: 1, duration: after - 0.05, ease: "power1.inOut" }, W + 0.05);
     tl.fromTo(S, { cloud: 1 }, { cloud: 0, duration: after - 0.15, ease: "power1.in" }, W + 0.15);
-    tl.set(S, { spread: 0, clear: 0 }, X + PACE.cross);
-    t = X + PACE.cross;
+    tl.set(S, { spread: 0, clear: 0 }, X + tempo.cross);
+    t = X + tempo.cross;
   });
   total = t + PACE.finaleHold;
   tl.set({}, {}, total);
@@ -460,7 +483,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   const roomAt = (time: number) => {
     if (finaleAt && time >= finaleAt) return -1;
     let r = 0;
-    for (let i = 1; i < roomStarts.length; i++) if (time >= roomStarts[i] - (PACE.cross - SWAP)) r = i;
+    for (let i = 1; i < roomStarts.length; i++) if (time >= roomStarts[i] - (tempo.cross - tempo.swap)) r = i;
     return r;
   };
 
@@ -518,8 +541,8 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
       play.vel = 0;
       return false;
     }
-    const rate = MAX_RATE + Math.max(0, Math.abs(gap) - 2.5) * 0.9;
-    [play.time, play.vel] = smoothDamp(play.time, play.target, play.vel, rate, dt);
+    const rate = tempo.maxRate + Math.max(0, Math.abs(gap) - 2.5) * 0.9;
+    [play.time, play.vel] = smoothDamp(play.time, play.target, play.vel, rate, dt, tempo.smooth);
     tl.time(clamp(play.time, 0, total));
     return true;
   };
@@ -544,7 +567,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   let assistTimer = 0;
   let touching = false;
   let carryUntil = 0;
-  /** Dev-only switch (see __nimbusFilm), so a capture can hold a frame mid-cross. */
+  /** Dev-only switch (see __roomsFilm), so a capture can hold a frame mid-cross. */
   const dev = { assist: true };
   const carry = (now: number, dest: number, perSecond: number, base: number, max: number) => {
     const duration = Math.min(max, base + Math.abs(dest - now) * perSecond);
@@ -559,7 +582,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
       const now = trigger.progress * total;
       for (const X of crosses) {
         const a = X;
-        const b = X + PACE.cross;
+        const b = X + tempo.cross;
         if (now <= a + 0.08 || now >= b - 0.08) continue;
         carry(now, dir < 0 ? a - 0.01 : b + 0.01, 0.5, 0.9, 2.6);
         return;
@@ -675,7 +698,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
       });
       // Keep the address on the room in view (once the visitor has moved).
       if (shown !== -2 && r >= 0) {
-        const hash = r === 0 ? "" : `#${ROOMS[r].id}`;
+        const hash = r === 0 ? "" : `#${rooms[r].id}`;
         if (window.location.hash !== hash) {
           window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
         }
@@ -683,7 +706,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
       shown = r;
     }
     for (let i = 0; i < roomStarts.length; i++) {
-      const v = clamp((time - roomStarts[i]) / (ROOM + PACE.cross - SWAP), 0, 1);
+      const v = clamp((time - roomStarts[i]) / (ROOM + tempo.cross - tempo.swap), 0, 1);
       if (Math.abs(v - (fills[i] ?? -1)) < 0.002) continue;
       fills[i] = v;
       const el = railFills[i];
@@ -694,8 +717,8 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     // A phone holds two rooms on the GPU, the one in view and the next in the
     // direction of travel (12 plates, 55–75 MB, never all 18).
     if (coarse) {
-      const at = r < 0 ? ROOMS.length - 1 : r;
-      const want = [at, at + (heading < 0 ? -1 : 1)].filter((i) => i >= 0 && i < ROOMS.length);
+      const at = r < 0 ? rooms.length - 1 : r;
+      const want = [at, at + (heading < 0 ? -1 : 1)].filter((i) => i >= 0 && i < rooms.length);
       if (want.join() !== kept.join()) {
         kept = want;
         bank.keepRooms(want);
@@ -711,14 +734,14 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   let turnTimer = 0;
   const swapPlates = (next: PlateSet) => {
     set = next;
-    plate = PLATES[next];
+    plate = world.plates[next];
     marks = marksFor(next);
     renderer.setPlateAspect(plate.width / plate.height);
     bank.destroy();
     // The room in view first, then the next one the visitor is heading for.
     bank = createBank(S.room);
     const ahead = S.room + (heading < 0 ? -1 : 1);
-    if (ahead >= 0 && ahead < ROOMS.length) {
+    if (ahead >= 0 && ahead < rooms.length) {
       bank.prioritise(ahead);
       bank.prioritise(S.room);
     }
@@ -765,7 +788,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     const at = [(r.left + r.width / 2) / L.vw, (r.top + r.height / 2) / L.vh] as const;
     void cover(at).then(() => {
       if (link.dataset.leave === "internal") {
-        holdVeil();
+        holdVeil(cssRgb(world.palette.whiteout));
         opts.navigate(link.getAttribute("href") ?? "/spaces");
       } else {
         window.location.assign(link.href);
@@ -819,7 +842,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
     return 0.5 + Math.sign(c - 0.5) * span * (0.6 + 0.4 * Math.tanh((d - 0.6) / 0.4));
   };
 
-  const compose = (time: number): NimbusFrame => {
+  const compose = (time: number): RoomsFrame => {
     const mark = marks[S.room];
     const k = clamp(Math.floor(S.stage), 0, 4);
     const mix = clamp(S.stage - k, 0, 1);
@@ -919,7 +942,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   let preloaded = 0;
   const onScrollLoad = () => {
     const r = roomAt(tl.time());
-    const want = Math.min(ROOMS.length - 1, Math.max(0, r) + 1);
+    const want = Math.min(rooms.length - 1, Math.max(0, r) + 1);
     if (want > preloaded) {
       preloaded = want;
       bank.prioritise(want);
@@ -939,7 +962,7 @@ export function createNimbusFilm(root: HTMLElement, opts: NimbusFilmOptions): Ni
   built = true;
 
   if (process.env.NODE_ENV !== "production") {
-    (window as unknown as { __nimbusFilm?: unknown }).__nimbusFilm = {
+    (window as unknown as { __roomsFilm?: unknown }).__roomsFilm = {
       tl,
       trigger,
       play,

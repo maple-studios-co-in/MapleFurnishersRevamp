@@ -1,5 +1,7 @@
+import type { CloudPalette, Rgb } from "./content";
+
 /**
- * GLSL for the Nimbus rooms: one full-screen pass that draws
+ * GLSL for the Spaces rooms (Nimbus, Terra): one full-screen pass that draws
  *
  *  - the room: two neighbouring stage plates, the newer one condensing out
  *    of mist over the older (a noise-shaped dissolve with a soft glow at its
@@ -8,12 +10,14 @@
  *    toward a point, magnify its edges as it moves forward (near walls and
  *    floor rush past faster than the far window) and smear radially at
  *    speed;
- *  - the cloud: five sheets at depth that the camera flies through, each
+ *  - the cloud (or, in a foliage world, leaves): five sheets at depth that
+ *    the camera flies through, each
  *    sheet growing as it nears and fading as it passes, lit from the upper
- *    left in the plates' own palette (white tops, lavender shade, peach
- *    edges); they stream out from a point (a window, a ring), and part from
- *    the middle of the screen when they clear;
- *  - the finale: a pearl sky over a sea of cloud that drifts toward you;
+ *    left in the world's palette (content.ts: Nimbus's white tops, lavender
+ *    shade and peach edges; Terra's sunlit sand); they stream out from a
+ *    point (a window, a ring), and part from the middle of the screen when
+ *    they clear;
+ *  - the finale: a sky over a sea of cloud that drifts toward you;
  *  - the whiteout: the flat colour of the cloud veil (veil.ts), so a page
  *    change hidden inside the cloud is seamless.
  *
@@ -24,19 +28,27 @@
  * Written as plain strings: keep backticks out of these sources entirely.
  */
 
-export const NIMBUS_VERT = /* glsl */ `
+const vec3 = (c: Rgb) => `vec3(${c.map((v) => (v / 255).toFixed(6)).join(", ")})`;
+
+export const ROOMS_VERT = /* glsl */ `
 attribute vec2 aPos;
 void main() {
   gl_Position = vec4(aPos, 0.0, 1.0);
 }
 `;
 
-export const NIMBUS_FRAG = /* glsl */ `
+/**
+ * The fragment shader, with the world's palette compiled in as constants,
+ * and its transit: cloud (Nimbus) or foliage (Terra, which also samples the
+ * leaf sheet of leaves.ts).
+ */
+export const roomsFrag = (p: CloudPalette, transit: "cloud" | "foliage" = "cloud") => /* glsl */ `
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
 #else
 precision mediump float;
 #endif
+${transit === "foliage" ? "#define FOLIAGE" : ""}
 
 uniform vec2 uRes;
 uniform float uTime;
@@ -57,19 +69,22 @@ uniform float uSpread;
 uniform float uClear;
 uniform float uTravel;
 uniform vec2 uCloudAt;
+#ifdef FOLIAGE
+uniform sampler2D uLeaves;
+#endif
 
 uniform float uWhite;
 uniform float uSkyDrift;
 uniform float uGrade;
 
-const vec3 WHITEOUT = vec3(0.960784, 0.945098, 0.917647);
-const vec3 C_LIT = vec3(1.0, 0.988235, 0.972549);
-const vec3 C_SHADE = vec3(0.768627, 0.788235, 0.847059);
-const vec3 C_WARM = vec3(0.992157, 0.894118, 0.819608);
-const vec3 SKY_TOP = vec3(0.776471, 0.819608, 0.866667);
-const vec3 SKY_LOW = vec3(0.937255, 0.92549, 0.886275);
-const vec3 HAZE = vec3(0.972549, 0.964706, 0.952941);
-const vec3 MIST = vec3(0.986, 0.976, 0.963);
+const vec3 WHITEOUT = ${vec3(p.whiteout)};
+const vec3 C_LIT = ${vec3(p.lit)};
+const vec3 C_SHADE = ${vec3(p.shade)};
+const vec3 C_WARM = ${vec3(p.warm)};
+const vec3 SKY_TOP = ${vec3(p.skyTop)};
+const vec3 SKY_LOW = ${vec3(p.skyLow)};
+const vec3 HAZE = ${vec3(p.haze)};
+const vec3 MIST = ${vec3(p.mist)};
 
 // Screen uv to plate uv through the camera. The look-at point is clamped so
 // the view never leaves the plate; the edge magnification only ever samples
@@ -121,11 +136,16 @@ float puffs(vec2 p) {
        + texture2D(uNoise, p * 2.63 + 0.67).a * 0.15;
 }
 
-// The finale: a pearl sky over a floor of cloud receding to a warm horizon,
+// The finale: a sky over a floor of cloud (or treetops) receding to a warm horizon,
 // drifting slowly toward the viewer. Between the billows the floor falls
-// into lavender shade, never through to sky.
+// into shade, never through to sky.
 vec3 sky(vec2 uv, float aspect) {
+#ifdef FOLIAGE
+  // Low: a line of trees under a wide sky, so the finale's words sit on light.
+  float horizon = 0.8;
+#else
   float horizon = 0.62;
+#endif
   vec3 col = mix(SKY_TOP, SKY_LOW, smoothstep(-0.05, horizon, uv.y));
   col = mix(col, C_WARM, 0.3 * exp(-pow((uv.y - horizon) / 0.09, 2.0)));
   float dy = uv.y - horizon;
@@ -139,6 +159,10 @@ vec3 sky(vec2 uv, float aspect) {
     float sea = smoothstep(0.26, 0.6, body);
     float lit = smoothstep(0.05, 0.95, 0.58 + (body - bodyL) * 2.6);
     vec3 cloud = mix(C_SHADE * 0.94, mix(C_SHADE, C_LIT, lit), sea);
+#ifdef FOLIAGE
+    // Treetops, not cloud: the leaves' own grain over the canopy.
+    cloud *= mix(0.84, 1.06, texture2D(uLeaves, sp * 1.6).a);
+#endif
     cloud = mix(cloud, C_WARM, 0.3 * (1.0 - smoothstep(0.0, 0.1, d)));
     // Distance haze folds the floor into the horizon glow.
     float near = smoothstep(0.0, 0.09, d);
@@ -168,6 +192,58 @@ float bank(vec2 uv, float aspect) {
   return reach * (1.0 - open);
 }
 
+#ifdef FOLIAGE
+// Foliage instead of cloud (Terra): five sheets of leaves at depth (the
+// sheet of leaves.ts: olive, bay, fern), placed like the cloud sheets, so
+// they stream out from the opening the camera leaves by and grow as they
+// near. They gather into branches that thicken as the camera goes deeper.
+// Far sheets are small leaves softened into the light; the nearest are
+// vast and out of focus as they sweep past the lens. The sun comes through
+// in dapples, and the leaves it lands on glow warm.
+vec4 layers(vec2 uv, float aspect) {
+  vec2 c = (uv - uCloudAt) * vec2(aspect, 1.0);
+  float rad = length(c);
+  float t = uTravel * 5.0;
+  float base = floor(t);
+  float ph = t - base;
+  float th = mix(0.74, 0.26, uCloud);
+  vec2 drift = vec2(uTime * 0.004, uTime * 0.002);
+  vec4 acc = vec4(0.0);
+  // Far to near, each sheet laid over the ones behind it.
+  for (int i = 0; i < 5; i++) {
+    float k = 4.0 - float(i);
+    float z = (k + 1.0 - ph) / 5.0;
+    float id = base + k;
+    float depth = mix(0.16, 2.3, z);
+    float ang = id * 2.39996;
+    float ca = cos(ang);
+    float sa = sin(ang);
+    vec2 pp = mat2(ca, sa, -sa, ca) * c * depth * 0.62 + vec2(fract(id * 0.618034), fract(id * 0.381966)) * 7.0;
+    float near = 1.0 - z;
+    // Sampled before any branch (mip selection needs uniform control flow):
+    // out of focus toward the lens, a little soft far off.
+    vec4 leaf = texture2D(uLeaves, pp * 0.55, 0.4 + 4.6 * smoothstep(0.5, 1.0, near));
+    float dap = texture2D(uNoise, pp * 0.7 + drift * 3.0).g;
+    // Branches, not wallpaper: leaves only where this sheet's clumps are.
+    float clump = puffs(pp * 0.36 + 1.7 + drift);
+    float reach = 1.0 - smoothstep(uSpread * 0.6, uSpread, rad + (clump - 0.5) * 0.4);
+    float open = smoothstep(-0.14, 0.14, uClear * 1.7 - rad - (clump - 0.5) * 0.5);
+    float m = smoothstep(th, th + 0.2, clump) * reach * (1.0 - open);
+    float a = leaf.a * m * smoothstep(0.0, 0.12, z) * (1.0 - smoothstep(0.8, 1.0, z));
+    if (a > 0.002) {
+      vec3 col = leaf.rgb / max(leaf.a, 0.004);
+      float sun = smoothstep(0.45, 0.85, dap);
+      col *= mix(0.8, 1.15, dap);
+      col = mix(col, col * 0.55 + C_WARM * 0.5, sun * 0.35);
+      // Far sheets fold into the light; the nearest sit in their own shade.
+      col = mix(col, HAZE, 0.5 * smoothstep(0.4, 1.0, z));
+      col *= mix(1.0, 0.7, smoothstep(0.55, 1.0, near));
+      acc = vec4(col * a, a) + acc * (1.0 - a);
+    }
+  }
+  return acc;
+}
+#else
 // Five sheets of cloud at depth. A sheet's world position is the screen
 // offset times its distance, so a sheet magnifies as it nears: far sheets
 // are fields of small puffs, the nearest a few vast soft billows sweeping
@@ -211,6 +287,8 @@ vec4 layers(vec2 uv, float aspect) {
   }
   return acc;
 }
+
+#endif
 
 void main() {
   vec2 uv = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uRes;

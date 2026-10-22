@@ -5,13 +5,14 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useSmoothScroll } from "@/components/layout/SmoothScroll";
 import { gsap, ScrollTrigger } from "@/lib/motion";
 import { PAGE_ENTER_EVENT, transitionState } from "@/lib/page-transition";
-import type { NimbusFilm } from "./director";
+import { ROOM_WORLDS, type RoomsWorldId } from "./content";
+import type { RoomsFilm } from "./director";
 import { hasVeil, releaseVeil } from "./veil";
 
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 /**
- * Motion director for /spaces/nimbus.
+ * Motion director for a world's rooms (/spaces/nimbus, /spaces/terra).
  *
  *  film    the WebGL rooms (director.ts), scrubbed by the page's scroll,
  *          opening from the cloud's whiteout
@@ -19,10 +20,18 @@ const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(re
  *
  * Arriving from Spaces' "Click to Enter", the page loads behind the cloud
  * veil; its own first frame is that same whiteout, so the veil is simply
- * lifted and the cloud clears onto the living room. Arriving through the
+ * lifted and the cloud clears onto the first room. Arriving through the
  * route curtain, the opening waits for the curtain to lift.
  */
-export default function NimbusExperience({ className, children }: { className: string; children: ReactNode }) {
+export default function RoomsExperience({
+  world,
+  className,
+  children,
+}: {
+  world: RoomsWorldId;
+  className: string;
+  children: ReactNode;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { scrollTo } = useSmoothScroll();
@@ -42,7 +51,7 @@ export default function NimbusExperience({ className, children }: { className: s
     const viaCurtain = transitionState.phase === "covering" || transitionState.phase === "covered";
 
     let disposed = false;
-    const film: { current: NimbusFilm | null } = { current: null };
+    const film: { current: RoomsFilm | null } = { current: null };
     const cleanups: Array<() => void> = [];
     const ctx = gsap.context(() => {}, root);
 
@@ -62,16 +71,16 @@ export default function NimbusExperience({ className, children }: { className: s
         return;
       }
       try {
-        const { createNimbusFilm } = await import("./director");
+        const { createRoomsFilm } = await import("./director");
         if (disposed) return;
         ctx.add(() => {
-          film.current = createNimbusFilm(root, {
+          film.current = createRoomsFilm(root, ROOM_WORLDS[world], {
             scrollTo: (y, o) => scrollRef.current(y, o),
             navigate: (href) => routerRef.current.push(href),
           });
         });
       } catch (error) {
-        console.warn("Nimbus: film unavailable, showing the static page.", error);
+        console.warn("Spaces rooms: film unavailable, showing the static page.", error);
       }
       if (disposed) return;
       if (!film.current) {
@@ -84,7 +93,7 @@ export default function NimbusExperience({ className, children }: { className: s
       film.current.drawNow();
       releaseVeil(0);
       if (process.env.NODE_ENV !== "production") {
-        (window as unknown as { __mapleNimbus?: unknown }).__mapleNimbus = { film: film.current };
+        (window as unknown as { __mapleRooms?: unknown }).__mapleRooms = { film: film.current };
       }
 
       // Type laid out, and the room in view on the GPU, before the cloud parts.
@@ -114,10 +123,10 @@ export default function NimbusExperience({ className, children }: { className: s
       if (transitionState.ready === ready) transitionState.ready = null;
       delete root.dataset.mode;
     };
-  }, []);
+  }, [world]);
 
   return (
-    <div ref={rootRef} className={className} data-nimbus-page>
+    <div ref={rootRef} className={className} data-rooms-page data-world={world}>
       {children}
     </div>
   );

@@ -1,5 +1,5 @@
 /**
- * Build the Nimbus room plates for /spaces/nimbus from the supplied scroll
+ * Build the room plates for /spaces/nimbus and /spaces/terra from the supplied scroll
  * sequences.
  *
  * Each sequence (168 frames per room) is a staged cross-dissolve: every
@@ -68,16 +68,19 @@ for (const room of rooms) {
   const dir = path.join(srcRoot, room);
   const manifest = JSON.parse(readFileSync(path.join(dir, "manifest.json"), "utf8"));
   const { width, height, pattern } = manifest;
-  const stages =
+  // Plates are named after their keyframes (a portrait manifest gives its
+  // stages display names), and a stage without a frame takes --stage-frames.
+  const stages = (
     manifest.stages ??
     readdirSync(path.join(dir, "keyframes"))
       .filter((f) => f.endsWith(".webp"))
       .sort()
-      .map((file, i) => ({
-        name: path.basename(file, ".webp"),
-        keyframe: `keyframes/${file}`,
-        fully_visible_from_frame: STAGE_FRAMES[i],
-      }));
+      .map((file) => ({ keyframe: `keyframes/${file}` }))
+  ).map((stage, i) => ({
+    name: path.basename(stage.keyframe, ".webp"),
+    keyframe: stage.keyframe,
+    fully_visible_from_frame: stage.fully_visible_from_frame ?? STAGE_FRAMES[i],
+  }));
   const roomOut = path.join(outDir, room);
   rmSync(roomOut, { recursive: true, force: true });
   mkdirSync(roomOut, { recursive: true });

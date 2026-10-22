@@ -1,8 +1,10 @@
 import { cloudNoise, NOISE_SIZE } from "./noise";
-import { NIMBUS_FRAG, NIMBUS_VERT } from "./shader";
+import type { CloudPalette, RoomsWorld } from "./content";
+import { leafSheet } from "./leaves";
+import { ROOMS_VERT, roomsFrag } from "./shader";
 
-/** One frame of the Nimbus pass (see shader.ts). Amounts are 0–1 unless noted. */
-export interface NimbusFrame {
+/** One frame of the rooms pass (see shader.ts). Amounts are 0–1 unless noted. */
+export interface RoomsFrame {
   time: number;
   /** 0 transparent (cloud only), 1 the room plates, 2 the finale sky. */
   base: number;
@@ -38,6 +40,7 @@ const UNIFORMS = [
   "uCam",
   "uStreak",
   "uNoise",
+  "uLeaves",
   "uCloud",
   "uSpread",
   "uClear",
@@ -51,15 +54,17 @@ const UNIFORMS = [
 type UniformName = (typeof UNIFORMS)[number];
 
 /**
- * Full-screen WebGL pass for the Nimbus rooms and their cloud (one
- * triangle, one program). Plates are uploaded by PlateBank through
+ * Full-screen WebGL pass for a world's rooms and what the camera flies
+ * through between them, cloud or foliage (one triangle, one program). Plates are uploaded by PlateBank through
  * upload(); after a lost context, onRestored asks it to upload them again.
  */
-export class NimbusRenderer {
+export class RoomsRenderer {
   private gl: WebGLRenderingContext | null = null;
   private program: WebGLProgram | null = null;
   private buffer: WebGLBuffer | null = null;
   private noise: WebGLTexture | null = null;
+  /** The leaf sheet, in a foliage world. */
+  private leaves: WebGLTexture | null = null;
   private blank: WebGLTexture | null = null;
   private loc = {} as Record<UniformName, WebGLUniformLocation | null>;
   private width = 1;
@@ -71,7 +76,12 @@ export class NimbusRenderer {
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
-    private readonly opts: { transparent?: boolean; plateAspect: number },
+    private readonly opts: {
+      transparent?: boolean;
+      plateAspect: number;
+      palette: CloudPalette;
+      transit: RoomsWorld["transit"];
+    },
   ) {
     canvas.addEventListener("webglcontextlost", this.onLost, false);
     canvas.addEventListener("webglcontextrestored", this.onRestore, false);
@@ -108,8 +118,8 @@ export class NimbusRenderer {
     if (!gl) return;
     this.gl = gl;
 
-    const vs = compile(gl, gl.VERTEX_SHADER, NIMBUS_VERT);
-    const fs = compile(gl, gl.FRAGMENT_SHADER, NIMBUS_FRAG);
+    const vs = compile(gl, gl.VERTEX_SHADER, ROOMS_VERT);
+    const fs = compile(gl, gl.FRAGMENT_SHADER, roomsFrag(this.opts.palette, this.opts.transit));
     if (!vs || !fs) return;
     const program = gl.createProgram();
     if (!program) return;
@@ -136,6 +146,7 @@ export class NimbusRenderer {
     gl.uniform1i(this.loc.uPlateA, 0);
     gl.uniform1i(this.loc.uPlateB, 1);
     gl.uniform1i(this.loc.uNoise, 2);
+    gl.uniform1i(this.loc.uLeaves, 3);
     gl.uniform1f(this.loc.uPlateAspect, this.opts.plateAspect);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
@@ -153,11 +164,28 @@ export class NimbusRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.generateMipmap(gl.TEXTURE_2D);
 
+    // A foliage world's leaves: premultiplied, so the mipmaps (soft, out of
+    // focus leaves) average colour by coverage and never fringe dark.
+    if (this.opts.transit === "foliage") {
+      this.leaves = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, this.leaves);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, leafSheet());
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.generateMipmap(gl.TEXTURE_2D);
+    }
+
     // Stands in for a plate that hasn't arrived (drawn under the whiteout).
     this.blank = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.blank);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([245, 241, 234, 255]));
+    const [r, g, b] = this.opts.palette.whiteout.map(Math.round);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([r, g, b, 255]));
     setPlateParams(gl);
 
     this.program = program;
@@ -199,7 +227,7 @@ export class NimbusRenderer {
     if (this.gl && !this.lost) this.gl.deleteTexture(tex);
   }
 
-  render(f: NimbusFrame) {
+  render(f: RoomsFrame) {
     const gl = this.gl;
     if (!gl || !this.program || this.lost) return;
     const u = this.loc;
@@ -225,6 +253,10 @@ export class NimbusRenderer {
     gl.bindTexture(gl.TEXTURE_2D, f.plateB ?? a);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, this.noise);
+    if (this.leaves) {
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, this.leaves);
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 

@@ -6,8 +6,8 @@ import { useSmoothScroll } from "@/components/layout/SmoothScroll";
 import { PAGE_ENTER_EVENT, transitionState } from "@/lib/page-transition";
 import { gsap, ScrollTrigger } from "@/lib/motion";
 import type { SpacesFilm } from "./film/director";
-import { NIMBUS_PATH } from "./nimbus/content";
-import { hasVeil, releaseVeil } from "./nimbus/veil";
+import { ROOM_WORLDS, type RoomsWorldId } from "./rooms/content";
+import { hasVeil, releaseVeil } from "./rooms/veil";
 
 type Router = ReturnType<typeof useRouter>;
 
@@ -20,8 +20,8 @@ type Router = ReturnType<typeof useRouter>;
  *  static   prefers-reduced-motion: every scene in place
  *
  * Arriving through the route curtain, the opening waits for it to lift;
- * arriving back from the Nimbus rooms through their cloud, the veil fades
- * off the Nimbus scene once it is ready.
+ * arriving back from a world's rooms through their cloud, the veil fades
+ * off that world's scene once it is ready.
  */
 type Mode = "film" | "stacked" | "static";
 
@@ -79,7 +79,7 @@ export default function SpacesExperience({ className, children }: { className: s
     void (async () => {
       if (reduce) {
         root.dataset.mode = "static";
-        cleanups.push(wireNimbusEnter(root, routerRef, false));
+        cleanups.push(...ENTERABLE.map((id) => wireEnter(root, id, routerRef, false)));
         markReady();
         releaseVeil(hasVeil() ? 600 : 0);
         return;
@@ -106,7 +106,7 @@ export default function SpacesExperience({ className, children }: { className: s
       if (disposed) return;
       root.dataset.mode = mode;
       if (finePointer) cleanups.push(...magnetic(root));
-      cleanups.push(wireNimbusEnter(root, routerRef, true));
+      cleanups.push(...ENTERABLE.map((id) => wireEnter(root, id, routerRef, true)));
       if (process.env.NODE_ENV !== "production") {
         (window as unknown as { __mapleSpaces?: unknown }).__mapleSpaces = { mode, film: film.current };
       }
@@ -185,23 +185,27 @@ function buildStacked(root: HTMLElement) {
   return enter;
 }
 
+/** The worlds whose "Click to Enter" opens their rooms (rooms/content.ts). */
+const ENTERABLE: readonly RoomsWorldId[] = ["nimbus", "terra"];
+
 /**
- * Nimbus's "Click to Enter": cloud bursts out of the ring and the rooms
- * open behind it (nimbus/burst.ts). Interest (hover, focus, an idle beat)
+ * A world's "Click to Enter": its cloud bursts out of the ring and the rooms
+ * open behind it (rooms/burst.ts). Interest (hover, focus, an idle beat)
  * prefetches the route and the first plates. Modified clicks (a new tab)
  * keep the browser's default; without motion it is a plain navigation.
  */
-function wireNimbusEnter(root: HTMLElement, router: { current: Router }, motion: boolean) {
-  const link = root.querySelector<HTMLAnchorElement>("[data-world-enter='nimbus']");
+function wireEnter(root: HTMLElement, id: RoomsWorldId, router: { current: Router }, motion: boolean) {
+  const world = ROOM_WORLDS[id];
+  const link = root.querySelector<HTMLAnchorElement>(`[data-world-enter='${id}']`);
   if (!link) return () => {};
   let busy = false;
   let warmed = false;
   const warm = () => {
     if (warmed) return;
     warmed = true;
-    router.current.prefetch(NIMBUS_PATH);
+    router.current.prefetch(world.path);
     if (motion) {
-      void import("./nimbus/burst").then((m) => m.warmNimbus()).catch(() => {});
+      void import("./rooms/burst").then((m) => m.warmRooms(world)).catch(() => {});
     }
   };
   const onClick = (e: MouseEvent) => {
@@ -209,7 +213,7 @@ function wireNimbusEnter(root: HTMLElement, router: { current: Router }, motion:
     e.preventDefault();
     if (busy) return;
     busy = true;
-    const go = () => router.current.push(NIMBUS_PATH);
+    const go = () => router.current.push(world.path);
     if (!motion) {
       go();
       return;
@@ -217,11 +221,14 @@ function wireNimbusEnter(root: HTMLElement, router: { current: Router }, motion:
     const ring = link.querySelector<HTMLElement>("[data-enter-ring]") ?? link;
     const r = ring.getBoundingClientRect();
     const origin = [(r.left + r.width / 2) / window.innerWidth, (r.top + r.height / 2) / window.innerHeight] as const;
-    void import("./nimbus/burst")
-      .then(({ burstIntoNimbus }) =>
-        burstIntoNimbus({ origin, scene: link.closest<HTMLElement>("[data-world-inner]"), ring: link, navigate: go }),
+    void import("./rooms/burst")
+      .then(({ burstInto }) =>
+        burstInto(world, { origin, scene: link.closest<HTMLElement>("[data-world-inner]"), ring: link, navigate: go }),
       )
-      .catch(go);
+      .catch((error) => {
+        console.warn("Spaces: the burst is unavailable, entering directly.", error);
+        go();
+      });
   };
   link.addEventListener("pointerenter", warm);
   link.addEventListener("focus", warm);

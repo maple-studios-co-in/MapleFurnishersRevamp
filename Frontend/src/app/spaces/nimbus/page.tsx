@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import PaperHeader from "@/components/layout/PaperHeader";
 import { spacesFontVars } from "@/components/spaces/fonts";
-import NimbusExperience from "@/components/spaces/nimbus/NimbusExperience";
-import NimbusStage from "@/components/spaces/nimbus/NimbusStage";
-import styles from "@/components/spaces/nimbus/nimbus.module.css";
+import RoomsExperience from "@/components/spaces/rooms/RoomsExperience";
+import RoomsStage from "@/components/spaces/rooms/RoomsStage";
+import styles from "@/components/spaces/rooms/rooms.module.css";
 
 const description =
   "Step inside Nimbus: a living room, a dining room and a bedroom above the clouds, furnished piece by piece as you scroll.";
@@ -28,9 +28,9 @@ export default function NimbusPage() {
   return (
     <>
       <PaperHeader variant="spaces" />
-      <NimbusExperience className={`${styles.page} ${spacesFontVars}`}>
-        <NimbusStage />
-      </NimbusExperience>
+      <RoomsExperience world="nimbus" className={`${styles.page} ${spacesFontVars}`}>
+        <RoomsStage world="nimbus" />
+      </RoomsExperience>
     </>
   );
 }
